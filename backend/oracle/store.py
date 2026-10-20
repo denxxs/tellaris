@@ -92,6 +92,13 @@ CREATE TABLE IF NOT EXISTS predictions (
   data TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS predictions_run ON predictions(run_id);
+CREATE TABLE IF NOT EXISTS interviews (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  created_at REAL NOT NULL,
+  data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS interviews_run ON interviews(run_id);
 """
 
 JSON_COLS = {"request", "spec", "world", "research", "results", "report", "usage"}
@@ -330,6 +337,27 @@ class Store:
 
     async def delete_prediction(self, pred_id: str) -> None:
         await self._exec("DELETE FROM predictions WHERE id = ?", (pred_id,))
+
+
+    # ---------- group interviews ----------
+
+    async def save_interview(self, data: dict[str, Any]) -> None:
+        await self._exec(
+            "INSERT OR REPLACE INTO interviews (id, run_id, created_at, data) VALUES (?,?,?,?)",
+            (data["id"], data["run_id"], data["created_at"], json.dumps(data)),
+        )
+
+    async def interviews(self, run_id: str) -> list[dict[str, Any]]:
+        async with self.db.execute("SELECT data FROM interviews WHERE run_id = ? ORDER BY created_at DESC", (run_id,)) as cur:
+            return [json.loads(r["data"]) for r in await cur.fetchall()]
+
+    async def interview(self, iv_id: str) -> dict[str, Any] | None:
+        async with self.db.execute("SELECT data FROM interviews WHERE id = ?", (iv_id,)) as cur:
+            row = await cur.fetchone()
+        return json.loads(row["data"]) if row else None
+
+    async def delete_interview(self, iv_id: str) -> None:
+        await self._exec("DELETE FROM interviews WHERE id = ?", (iv_id,))
 
 
 store = Store()

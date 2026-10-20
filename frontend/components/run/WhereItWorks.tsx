@@ -7,16 +7,25 @@ import { WorldMap } from "@/components/world/WorldMap";
 import { cx, int, pctSmart, signedPts } from "@/lib/format";
 import type { LiveState } from "@/lib/useRunStream";
 import type { Results, SplitCell } from "@/lib/types";
+import type { GroupPreset } from "./AskGroup";
 
 const ORDER = ["country", "region", "age", "gender", "income", "work", "segment", "company"];
 
-function Spot({ c, tone }: { c: SplitCell; tone: "hot" | "cold" }) {
+function Spot({ c, tone, onAsk }: { c: SplitCell; tone: "hot" | "cold"; onAsk?: (g: GroupPreset) => void }) {
   return (
     <li className="flex items-baseline justify-between gap-4 border-b border-rule py-2.5 first:pt-0 last:border-0 last:pb-0">
       <div className="min-w-0">
         <div className="text-[14px] text-text">{c.label}</div>
         <div className="text-[12px] text-faint">
           {int(c.n)} people simulated, likely {pctSmart(c.ci[0])} to {pctSmart(c.ci[1])}
+          {onAsk && c.keys && (
+            <>
+              {". "}
+              <button type="button" onClick={() => onAsk({ keys: c.keys!, label: c.label })} className="text-muted underline underline-offset-2 hover:text-text">
+                Ask them why
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="shrink-0 text-right">
@@ -28,7 +37,7 @@ function Spot({ c, tone }: { c: SplitCell; tone: "hot" | "cold" }) {
 }
 
 /** Where the answer is clearly higher or lower than overall, and every breakdown. */
-export function WhereItWorks({ r, live, measure }: { r: Results; live: LiveState; measure: string }) {
+export function WhereItWorks({ r, live, measure, onAsk }: { r: Results; live: LiveState; measure: string; onAsk?: (g: GroupPreset) => void }) {
   const sp = r.splits!;
   const dims = useMemo(() => ORDER.filter((d) => sp.dimensions[d]), [sp]);
   const [dim, setDim] = useState(dims[0] ?? "country");
@@ -47,7 +56,7 @@ export function WhereItWorks({ r, live, measure }: { r: Results; live: LiveState
       <Card className="lg:col-span-3">
         <CardHead title="Where it works best">Groups clearly above the overall {pctSmart(r.headline.value)}: their likely range sits entirely above it.</CardHead>
         {sp.hot.length ? (
-          <ul>{sp.hot.map((c, i) => <Spot key={i} c={c} tone="hot" />)}</ul>
+          <ul>{sp.hot.map((c, i) => <Spot key={i} c={c} tone="hot" onAsk={onAsk} />)}</ul>
         ) : (
           <p className="text-[13px] leading-[18px] text-muted">No group is clearly above the overall answer. More people would make smaller differences visible.</p>
         )}
@@ -55,7 +64,7 @@ export function WhereItWorks({ r, live, measure }: { r: Results; live: LiveState
       <Card className="lg:col-span-3">
         <CardHead title="Where it struggles">Groups clearly below the overall answer.</CardHead>
         {sp.cold.length ? (
-          <ul>{sp.cold.map((c, i) => <Spot key={i} c={c} tone="cold" />)}</ul>
+          <ul>{sp.cold.map((c, i) => <Spot key={i} c={c} tone="cold" onAsk={onAsk} />)}</ul>
         ) : (
           <p className="text-[13px] leading-[18px] text-muted">No group is clearly below the overall answer. More people would make smaller differences visible.</p>
         )}

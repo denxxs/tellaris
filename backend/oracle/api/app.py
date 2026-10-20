@@ -21,6 +21,7 @@ from ..scenario.lenses import LENSES
 from ..world.countries import global_sample
 from ..backtest.runner import BacktestRequest, builtin_cases, job_view, start_backtest
 from ..backtest.track import ResolveRequest as ResolveRequestModel
+from ..simulate.interview import InterviewRequest
 from ..backtest.track import TrackRequest as TrackRequestModel
 from ..config import PROVIDER_KEY_ENV, env, settings_store
 from ..events import hub
@@ -436,6 +437,52 @@ async def chat(run_id: str, pid: str, req: ChatRequest) -> dict[str, Any]:
     history = [*history, {"role": "user", "content": req.message}, {"role": "assistant", "content": reply}]
     await store.save_chat(run_id, pid, history)
     return {"reply": reply, "chat": history}
+
+
+# ------------------------------------------------------------------ asking a group
+
+_interview_tasks: set[asyncio.Task] = set()
+
+
+@app.post("/api/runs/{run_id}/interviews")
+async def start_interview(run_id: str, req: InterviewRequest) -> dict[str, Any]:
+    from ..simulate import interview as iv
+
+    run = await store.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "Run not found")
+    if run.get("status") != "done":
+        raise HTTPException(400, "Wait for the simulation to finish before asking a group.")
+    people = [Persona.model_validate(p) for p in await store.personas(run_id)]
+    if not iv.members(people, req.group):
+        raise HTTPException(400, "Nobody in this simulation matches that group.")
+    rec = iv.new_record(run_id, req)
+    await store.save_interview(rec)
+    roles = settings_store.get().roles
+    crowd = roles.crowd or [roles.planner]
+    task = asyncio.create_task(iv.run_interview(rec["id"], run, req, crowd, roles.analyst or roles.planner))
+    _interview_tasks.add(task)
+    task.add_done_callback(_interview_tasks.discard)
+    return rec
+
+
+@app.get("/api/runs/{run_id}/interviews")
+async def list_interviews(run_id: str) -> list[dict[str, Any]]:
+    return await store.interviews(run_id)
+
+
+@app.get("/api/interviews/{iv_id}")
+async def get_interview(iv_id: str) -> dict[str, Any]:
+    rec = await store.interview(iv_id)
+    if not rec:
+        raise HTTPException(404, "Interview not found")
+    return rec
+
+
+@app.delete("/api/interviews/{iv_id}")
+async def delete_interview(iv_id: str) -> dict[str, bool]:
+    await store.delete_interview(iv_id)
+    return {"ok": True}
 
 
 @app.get("/api/runs/{run_id}/committees")

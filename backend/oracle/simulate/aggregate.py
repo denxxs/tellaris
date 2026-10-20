@@ -283,7 +283,8 @@ class Aggregator:
     def _age_band(age: int) -> str:
         return "18-29" if age < 30 else "30-44" if age < 45 else "45-59" if age < 60 else "60+"
 
-    def _dims(self) -> dict[str, tuple[str, Any, Any]]:
+    @classmethod
+    def _dims(cls) -> dict[str, tuple[str, Any, Any]]:
         """Dimension id -> (label, key function, display function)."""
         cs = countries()
         age_label = {"18-29": "Under 30s", "30-44": "30 to 44 year olds", "45-59": "45 to 59 year olds", "60+": "Over 60s"}
@@ -304,7 +305,7 @@ class Aggregator:
         return {
             "country": ("Country", lambda p: p.country, lambda k: cs[k].name if k in cs else k),
             "region": ("Region", region, lambda k: k),
-            "age": ("Age", lambda p: self._age_band(p.age), lambda k: age_label.get(k, k)),
+            "age": ("Age", lambda p: cls._age_band(p.age), lambda k: age_label.get(k, k)),
             "gender": ("Gender", lambda p: p.gender, lambda k: gender_label.get(k, k)),
             "income": ("Income", lambda p: p.income_band, lambda k: income_label.get(k, k)),
             "work": ("Type of work", lambda p: "Not working" if p.isco == 0 else isco[p.isco], lambda k: k),
@@ -360,7 +361,7 @@ class Aggregator:
             if dim_id in dimensions:
                 groups = cells(keyfn)
                 for r in dimensions[dim_id]["rows"]:
-                    add({"label": r["label"], "dims": [dim_id], **{k: r[k] for k in ("n", "value", "ci", "people")}}, groups[r["key"]])
+                    add({"label": r["label"], "dims": [dim_id], "keys": {dim_id: r["key"]}, **{k: r[k] for k in ("n", "value", "ci", "people")}}, groups[r["key"]])
         for a, b in pairs:
             if a not in dimensions or b not in dimensions:
                 continue
@@ -372,7 +373,7 @@ class Aggregator:
                     continue
                 s = self._summary(members, boots_n=300)
                 joiner = " in " if b in ("country", "region") else ", "
-                add({"label": f"{sa(va)}{joiner}{sb(vb)}", "dims": [a, b], **{k: s[k] for k in ("n", "value", "ci")}, "people": s.get("people")}, members)
+                add({"label": f"{sa(va)}{joiner}{sb(vb)}", "dims": [a, b], "keys": {a: va, b: vb}, **{k: s[k] for k in ("n", "value", "ci")}, "people": s.get("people")}, members)
 
         def score(c: dict[str, Any]) -> float:
             return abs(c["value"] - overall) * math.sqrt(c["n"])
@@ -497,3 +498,8 @@ class Aggregator:
             "quotes": self.quotes(),
             "splits": self.splits(head),
         }
+
+
+def breakdowns() -> dict[str, tuple[str, Any, Any]]:
+    """The breakdown dimensions used by Where it works: id -> (label, key function, display function)."""
+    return Aggregator._dims()

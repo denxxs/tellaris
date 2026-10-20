@@ -635,6 +635,54 @@ def society_turn(ctx: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def interview_answer(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Answers that follow the person: keener people pick earlier options, pay more and score higher."""
+    p, lean, kind = ctx["persona"], ctx.get("p") or 0.5, ctx.get("kind", "open")
+    r = _rng("interview", p["id"], ctx.get("question", ""))
+    t = p["traits"]
+    out: dict[str, Any] = {"answer": "", "choice": None, "number": None, "scale": None}
+    if kind == "choice":
+        opts = ctx.get("options") or ["Yes", "No"]
+        i = min(len(opts) - 1, max(0, int((1 - lean) * len(opts) + r.gauss(0, 0.8))))
+        out["choice"] = opts[i]
+        out["answer"] = f"{opts[i]}, honestly. " + ("That's what fits how I live." if lean >= 0.5 else "The others don't really speak to me.")
+    elif kind == "number":
+        base = max(0.0, (1 - t["price_sensitivity"]) * 20 * (0.4 + lean) + r.gauss(0, 2))
+        out["number"] = round(base, 1)
+        out["answer"] = f"Around {out['number']}{' ' + ctx['unit'] if ctx.get('unit') else ''}. " + ("More than that and I'd think twice." if t["price_sensitivity"] > 0.5 else "I'd pay a bit more if it really worked.")
+    elif kind == "scale":
+        out["scale"] = int(max(0, min(10, round(lean * 10 + r.gauss(0, 1.5)))))
+        out["answer"] = f"I'd say {out['scale']}. " + ("It matters to me." if out["scale"] >= 6 else "Not something I think about much.")
+    else:
+        out["answer"] = r.choice([
+            "If a friend I trust used it first, I'd try it.",
+            "Price is the thing. Make it cheaper and I'm in.",
+            "I'd need to see it work for someone like me.",
+            "Honestly, I'm happy with what I have now.",
+            "Show me it's safe with my data and I'll consider it.",
+        ])
+    return out
+
+
+def interview_digest(ctx: dict[str, Any]) -> dict[str, Any]:
+    answers = ctx.get("answers") or []
+    groups: dict[str, list[int]] = {}
+    for a in answers:
+        text = a["answer"].lower()
+        label = (
+            "Price decides it" if "price" in text or "cheaper" in text or "pay" in text
+            else "Wants proof from people like them" if "friend" in text or "someone like me" in text or "trust" in text
+            else "Happy with what they have" if "happy with" in text or "not something" in text
+            else "Data safety" if "data" in text
+            else "Fits their life" if "fits" in text or "matters" in text
+            else "Other"
+        )
+        groups.setdefault(label, []).append(a["n"])
+    themes = sorted(({"label": k, "answers": v} for k, v in groups.items()), key=lambda t: -len(t["answers"]))[:6]
+    top = themes[0]["label"].lower() if themes else "mixed views"
+    return {"summary": f"{len(answers)} people answered. The most common thread: {top}.", "themes": themes}
+
+
 def reflect(ctx: dict[str, Any]) -> dict[str, Any]:
     """Weigh what you remember: memories that disagree and matter most pull you a little."""
     p, cur, start, mems = ctx["persona"], ctx["p"], ctx["start"], ctx.get("memories") or []
@@ -694,4 +742,6 @@ HANDLERS["public_brief"] = public_brief
 HANDLERS["clarify"] = clarify
 HANDLERS["society_turn"] = society_turn
 HANDLERS["reflect"] = reflect
+HANDLERS["interview_answer"] = interview_answer
+HANDLERS["interview_digest"] = interview_digest
 HANDLERS["file_facts"] = file_facts

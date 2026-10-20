@@ -96,6 +96,11 @@ export const api = {
   backtest: (id: string) => req<BacktestJob>(`/api/backtest/${id}`),
   backtests: () => req<BacktestJob[]>("/api/backtests"),
   calibration: () => req<Record<string, Calibration>>("/api/calibration"),
+  interviews: (runId: string) => req<Interview[]>(`/api/runs/${runId}/interviews`),
+  interview: (iid: string) => req<Interview>(`/api/interviews/${iid}`),
+  askGroup: (runId: string, body: { question: string; kind: InterviewKind; options?: string[]; unit?: string | null; group: Record<string, string>; limit: number }) =>
+    req<Interview>(`/api/runs/${runId}/interviews`, { method: "POST", body: JSON.stringify(body) }),
+  deleteInterview: (iid: string) => req<{ ok: boolean }>(`/api/interviews/${iid}`, { method: "DELETE" }),
   trackRecord: () => req<{ predictions: Prediction[]; summary: TrackSummary }>("/api/track"),
   runPredictions: (id: string) => req<Prediction[]>(`/api/runs/${id}/track`),
   track: (id: string, body: { resolves_on: string; note?: string }) => req<Prediction>(`/api/runs/${id}/track`, { method: "POST", body: JSON.stringify(body) }),
@@ -149,6 +154,52 @@ export type Prediction = {
   blind?: boolean;
   error?: number;
   within_range?: boolean;
+};
+
+export type InterviewKind = "open" | "choice" | "number" | "scale";
+export type InterviewAnswer = {
+  n: number;
+  persona_id: string;
+  name: string;
+  country: string;
+  occupation: string;
+  age: number;
+  segment: string;
+  weight: number;
+  leaning: number;
+  answer: string;
+  choice: string | null;
+  number: number | null;
+  scale: number | null;
+};
+export type InterviewStats = {
+  n: number;
+  options?: { option: string; share: number; n: number }[];
+  mean?: number;
+  median?: number;
+  p10?: number;
+  p90?: number;
+  counts?: number[];
+};
+export type Interview = {
+  id: string;
+  run_id: string;
+  created_at: number;
+  status: "running" | "done" | "failed";
+  question: string;
+  kind: InterviewKind;
+  options: string[];
+  unit: string | null;
+  group: Record<string, string>;
+  group_label: string;
+  limit: number;
+  pool: number;
+  asked: number;
+  done: number;
+  answers: InterviewAnswer[];
+  results: { all: InterviewStats | null; leaning_yes: InterviewStats | null; leaning_no: InterviewStats | null } | null;
+  digest: { summary: string; themes: { label: string; answers: number[]; share: number }[]; error?: string } | null;
+  error?: string;
 };
 
 export type TrackSummary = {
