@@ -85,6 +85,13 @@ CREATE TABLE IF NOT EXISTS backtests (
   created_at REAL NOT NULL,
   data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS predictions (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  created_at REAL NOT NULL,
+  data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS predictions_run ON predictions(run_id);
 """
 
 JSON_COLS = {"request", "spec", "world", "research", "results", "report", "usage"}
@@ -299,6 +306,30 @@ class Store:
     async def backtests(self, limit: int = 20) -> list[dict[str, Any]]:
         async with self.db.execute("SELECT id, created_at, data FROM backtests ORDER BY created_at DESC LIMIT ?", (limit,)) as cur:
             return [{"id": r["id"], "created_at": r["created_at"], **json.loads(r["data"])} for r in await cur.fetchall()]
+
+
+    # ---------- track record ----------
+
+    async def save_prediction(self, data: dict[str, Any]) -> None:
+        await self._exec(
+            "INSERT OR REPLACE INTO predictions (id, run_id, created_at, data) VALUES (?,?,?,?)",
+            (data["id"], data["run_id"], data["created_at"], json.dumps(data)),
+        )
+
+    async def predictions(self, run_id: str | None = None) -> list[dict[str, Any]]:
+        sql, args = "SELECT data FROM predictions", ()
+        if run_id:
+            sql, args = sql + " WHERE run_id = ?", (run_id,)
+        async with self.db.execute(sql + " ORDER BY created_at DESC", args) as cur:
+            return [json.loads(r["data"]) for r in await cur.fetchall()]
+
+    async def prediction(self, pred_id: str) -> dict[str, Any] | None:
+        async with self.db.execute("SELECT data FROM predictions WHERE id = ?", (pred_id,)) as cur:
+            row = await cur.fetchone()
+        return json.loads(row["data"]) if row else None
+
+    async def delete_prediction(self, pred_id: str) -> None:
+        await self._exec("DELETE FROM predictions WHERE id = ?", (pred_id,))
 
 
 store = Store()

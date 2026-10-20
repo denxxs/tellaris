@@ -5,6 +5,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { CommitteesTab, CountriesTab, GroupsTab, InfluenceTab, MethodTab, PricingTab, ReasonsTab } from "@/components/run/Details";
 import { SocietyTab } from "@/components/run/Society";
+import { TrackButton } from "@/components/run/TrackButton";
 import { WhereItWorks } from "@/components/run/WhereItWorks";
 import { Overview } from "@/components/run/Overview";
 import { PeopleTab } from "@/components/run/People";
@@ -128,7 +129,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!running && live.status === "done" && lensId && meta && (
             <Select
               label="Run again with a different lens"
@@ -150,9 +151,12 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
             </Button>
           ) : (
             live.status === "done" && (
+              <>
+              {live.spec?.outcome_type !== "numeric" && <TrackButton runId={id} horizonMonths={live.spec?.horizon_months} demo={!!usedMock} />}
               <a href={api.exportUrl(id)} className="inline-flex h-8 items-center rounded-md border border-control bg-surface px-3 text-[13px] font-medium hover:bg-raised">
                 Download data
               </a>
+              </>
             )
           )}
         </div>

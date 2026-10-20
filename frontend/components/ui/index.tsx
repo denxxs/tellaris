@@ -221,8 +221,12 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: 
 
 /* ---------------------------------------------------------------- surfaces */
 
-export function Card({ children, className, pad = true, as: As = "section" }: { children: ReactNode; className?: string; pad?: boolean; as?: "section" | "div" }) {
-  return <As className={cx("rounded-lg border border-border bg-surface", pad && "p-5", className)}>{children}</As>;
+export function Card({ children, className, pad = true, as: As = "section", id }: { children: ReactNode; className?: string; pad?: boolean; as?: "section" | "div"; id?: string }) {
+  return (
+    <As id={id} className={cx("rounded-lg border border-border bg-surface", pad && "p-5", className)}>
+      {children}
+    </As>
+  );
 }
 
 export function CardHead({ title, children, aside }: { title: string; children?: ReactNode; aside?: ReactNode }) {

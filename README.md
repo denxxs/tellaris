@@ -67,7 +67,9 @@ Keys are saved in `backend/var/settings.json` on your machine and never committe
 
 ## Accuracy
 
-The **Accuracy** page runs Oracle on questions with known outcomes, scores the error, and fits the say/do correction from the results. Built-in cases are famous votes and adoption numbers that models may already know, so their scores are optimistic. Add cases from after your models' training cutoff for an honest test.
+**Track record** is the honest test. On a finished simulation about something that hasn't happened yet, choose **Track this prediction** and set the date the real answer will be known. Oracle freezes the answer. When the result is out, enter it on the **Accuracy** page: Oracle scores the error, shows predicted against real, and once three predictions of a kind are scored it can learn the say/do correction from them instead of the defaults.
+
+**Past events** runs Oracle on famous votes and adoption numbers with known outcomes. Models may already know them, so their scores are optimistic; use them as a quick check.
 
 Simulations are not ground truth. Treat results as a well-structured, explainable estimate, and check them against real-world tests.
 
