@@ -131,6 +131,24 @@ async def preview(req: PreviewRequest) -> dict[str, Any]:
     return {"spec": spec.model_dump(), "world": graph_payload(spec.targets, infl), "usage": usage.to_dict()}
 
 
+class HeadcountRequest(BaseModel):
+    spec: ScenarioSpec
+
+
+@app.post("/api/scenario/headcount")
+async def headcount(req: HeadcountRequest) -> dict[str, Any]:
+    """Estimated real people behind each group, per country."""
+    from ..population.headcount import segment_headcount
+
+    spec = req.spec
+    out = []
+    for seg in spec.segments:
+        where = [c for c in (seg.countries or spec.targets) if c in countries()]
+        per = {c: round(segment_headcount(c, seg.occupations, custom=bool(seg.custom_occupation))) for c in where}
+        out.append({"name": seg.name, "total": sum(per.values()), "by_country": per})
+    return {"segments": out, "total": sum(s["total"] for s in out)}
+
+
 class WorldRequest(BaseModel):
     targets: list[str]
     sectors: list[str] = Field(default_factory=list)
@@ -229,7 +247,7 @@ def _person_summary(p: dict[str, Any], rs: list[dict[str, Any]]) -> dict[str, An
         "id": p["id"], "name": p.get("name"), "country": p["country"], "country_name": p["country_name"],
         "segment": p["segment"], "occupation": p["occupation"], "seniority": p["seniority"], "age": p["age"],
         "company_type": p["company_type"], "voice": p.get("influencer_voice"), "is_buyer": p.get("is_buyer"),
-        "weight": p.get("weight"), "exposures": [e["source"] for e in p.get("exposures", [])],
+        "weight": p.get("weight"), "represents": p.get("represents", 0), "exposures": [e["source"] for e in p.get("exposures", [])],
         "p": round(sum(ps) / len(ps), 4) if ps else None,
         "choice": rs[0]["choice"] if rs else None,
         "quote": rs[0]["quote"] if rs else None,

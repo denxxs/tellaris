@@ -12,4 +12,7 @@ Read `docs/vision.md` first. It has the full vision, architecture and plan from 
 - `frontend/` Next.js 15 + Tailwind v4. Run: `npm run dev`. Check: `npx tsc --noEmit && npx eslint app components lib`.
 - `./dev.ps1` starts both. Runtime data (DB, API keys) lives in `backend/var/` (gitignored).
 - `mock/oracle` is the offline model used for tests and demo mode; keep `oracle/llm/mock.py` handlers in sync when adding LLM tasks.
-- Design tokens are in `frontend/app/globals.css` (fog/panel/ink, iris for actions and influence, yes=teal, no=raspberry). Fonts: Bricolage Grotesque (display), IBM Plex Sans (UI).
+- UI follows the design-taste-frontend skill's app rules, "framed sheet" style (`.taste-skill/direction.json`): tinted L-frame + white sheet, colour on data only. Tokens in `frontend/app/globals.css`: teal `--yes` (main series), amber `--no`, blue `--flow` (outside influence); near-black primary button; no violet/indigo, gradients or resting shadows. Font: IBM Plex Sans (Plex Mono for IDs/model names only). Titles 22px, answer figure 36px max.
+- Signature element: the crowd (`components/run/Crowd.tsx`), one square per simulated person, plus the live world map.
+- Check UI with `node .claude/skills/design-taste-frontend/scripts/lint.mjs --app frontend/app frontend/components` and `inspect.mjs --app <url>`.
+- Country data: `backend/scripts/build_world.py` rebuilds `oracle/data/countries.json` for every country from World Bank + ILOSTAT (hand-tuned overrides in `countries_curated.json`). Influence edges: hand-written `influence.json` + rules in `oracle/world/rules.py`. Headcounts: `oracle/population/headcount.py`.

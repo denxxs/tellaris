@@ -1,68 +1,74 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CountryPicker } from "@/components/composer/CountryPicker";
-import { ScenarioEditor } from "@/components/composer/ScenarioEditor";
-import { Button, ErrorNote, Panel, Textarea } from "@/components/ui";
+import { ScenarioEditor, estimateCalls } from "@/components/composer/ScenarioEditor";
+import { RunTable } from "@/components/run/RunTable";
+import { Button, Card, CardHead, ErrorNote, Field, PageHead, Segmented, Skeleton, Textarea } from "@/components/ui";
 import { WorldMap } from "@/components/world/WorldMap";
 import { api } from "@/lib/api";
-import { cx } from "@/lib/format";
-import { RunTable } from "@/components/run/RunTable";
-import type { Meta, RunConfig, RunListItem, Spec, World } from "@/lib/types";
+import { useMeta } from "@/lib/meta";
+import { int } from "@/lib/format";
+import type { RunConfig, RunListItem, Spec, World } from "@/lib/types";
 
 const EXAMPLES = [
   {
-    label: "B2B SaaS across the US and India",
+    label: "A B2B tool in the US and India",
     text: "We're launching Ledgerly, an AI tool that automates month-end close for finance teams, at $49 per seat per month. Target B2B SaaS founders and CFOs in the USA, plus financial analysts at Infosys, Cognizant and TCS in India. Will they adopt it within 12 months?",
     targets: ["USA", "IND"],
   },
   {
-    label: "A price change",
+    label: "A price rise",
     text: "Our project management app costs $12 per user per month. We're thinking of raising it to $18 with an AI assistant included. How many existing small-business customers in the UK and Germany would stay versus cancel over the next 6 months?",
     targets: ["GBR", "DEU"],
   },
   {
-    label: "A consumer launch",
-    text: "A subscription app that plans healthy weekly meals from what's already in your fridge, $6.99 a month, launching in Brazil and Mexico. Will young working adults sign up and keep using it for 3 months?",
-    targets: ["BRA", "MEX"],
+    label: "A consumer app in Latin America",
+    text: "A subscription app that plans healthy weekly meals from what's already in your fridge, $6.99 a month, launching in Brazil, Mexico and Colombia. Will young working adults sign up and keep using it for 3 months?",
+    targets: ["BRA", "MEX", "COL"],
   },
   {
-    label: "A policy question",
+    label: "A policy vote",
     text: "If the EU banned the sale of new combustion-engine cars from 2035, would voters in Germany, France and Poland support or oppose it today? Outcomes: Support, Oppose.",
     targets: ["DEU", "FRA", "POL"],
+  },
+  {
+    label: "Fintech across Africa",
+    text: "A mobile app that lets small shop owners in Nigeria, Kenya and Ghana get stock on credit from wholesalers, paid back daily through mobile money, with a 2% fee per order. Will shop owners use it at least weekly within 6 months?",
+    targets: ["NGA", "KEN", "GHA"],
   },
 ];
 
 const SIZES = [
-  { id: "quick", label: "Quick", sub: "100 people", agents: 100, runs: 1 },
-  { id: "standard", label: "Standard", sub: "300 people", agents: 300, runs: 2 },
-  { id: "deep", label: "Deep", sub: "1,000 people", agents: 1000, runs: 3 },
+  { value: "quick", label: "Quick", sub: "100 people", agents: 100, runs: 1 },
+  { value: "standard", label: "Standard", sub: "300 people", agents: 300, runs: 2 },
+  { value: "deep", label: "Deep", sub: "1,000 people", agents: 1000, runs: 3 },
 ] as const;
+type Size = (typeof SIZES)[number]["value"];
 
-export default function Home() {
+const QUICK_PICKS = ["USA", "IND", "CHN", "GBR", "DEU", "BRA", "JPN", "NGA", "IDN", "MEX"];
+
+export default function NewSimulation() {
   const router = useRouter();
-  const [meta, setMeta] = useState<Meta | null>(null);
+  const { meta, countryName } = useMeta();
   const [prompt, setPrompt] = useState("");
   const [targets, setTargets] = useState<string[]>([]);
-  const [size, setSize] = useState<(typeof SIZES)[number]["id"]>("standard");
+  const [size, setSize] = useState<Size>("standard");
   const [world, setWorld] = useState<World | null>(null);
   const [spec, setSpec] = useState<Spec | null>(null);
   const [config, setConfig] = useState<RunConfig | null>(null);
   const [busy, setBusy] = useState<"review" | "run" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recent, setRecent] = useState<RunListItem[]>([]);
+  const [recent, setRecent] = useState<RunListItem[] | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.meta().then(setMeta).catch((e) => setError(e.message));
-    api.runs().then((r) => setRecent(r.slice(0, 6))).catch(() => {});
+    api.runs().then((r) => setRecent(r.slice(0, 5))).catch(() => setRecent([]));
   }, []);
 
-  // The map answers the country picker: pick India and see who shapes it.
-  const activeTargets = spec?.targets ?? targets;
+  const activeTargets = useMemo(() => spec?.targets ?? targets, [spec, targets]);
   useEffect(() => {
     if (!activeTargets.length) {
       setWorld(null);
@@ -72,12 +78,8 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [activeTargets, spec]);
 
-  const sizeCfg = SIZES.find((s) => s.id === size)!;
-  const baseConfig = useMemo<RunConfig | null>(
-    () => (meta ? { ...meta.defaults, agents: sizeCfg.agents, runs_per_agent: sizeCfg.runs } : null),
-    [meta, sizeCfg],
-  );
-
+  const sizeCfg = SIZES.find((s) => s.value === size)!;
+  const baseConfig = useMemo<RunConfig | null>(() => (meta ? { ...meta.defaults, agents: sizeCfg.agents, runs_per_agent: sizeCfg.runs } : null), [meta, sizeCfg]);
   const canGo = prompt.trim().length >= 10;
 
   async function review() {
@@ -88,7 +90,7 @@ export default function Home() {
       setSpec(r.spec);
       setWorld(r.world);
       setConfig(baseConfig);
-      setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -108,174 +110,186 @@ export default function Home() {
     }
   }
 
-  const influencerCount = world?.nodes.filter((n) => n.role === "influencer").length ?? 0;
+  const influencers = world?.nodes.filter((n) => n.role === "influencer") ?? [];
 
   return (
-    <div className="mx-auto max-w-[1320px] px-4 py-8 md:px-8 md:py-12">
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)] lg:gap-12">
-        <div className="flex min-w-0 flex-col gap-6">
-          <h1 className="t-hero">How will the world react?</h1>
-          <p className="max-w-[52ch] text-[17px] leading-relaxed text-ink-2">
-            Describe a product, a price, a policy or anything you want to predict. Oracle builds a population across the countries you pick,
-            lets each person decide for themselves, and tells you what&apos;s likely to happen and why.
-          </p>
+    <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
+      <PageHead title="New simulation">
+        Describe a product, a price, a policy or anything you want to predict. Oracle builds the people it depends on in the countries you choose, and each one decides for themselves.
+      </PageHead>
 
-          <Panel pad={false} className="shadow-lift">
-            <div className="p-4 md:p-5">
-              <label htmlFor="prompt" className="sr-only">
-                Describe what you want to predict
-              </label>
-              <Textarea
-                id="prompt"
-                rows={6}
-                value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                  if (spec) setSpec(null);
-                }}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGo) run();
-                }}
-                placeholder="We're launching an AI tool for finance teams at $49 per seat. Will CFOs in the US and analysts at Indian IT firms adopt it within a year?"
-                className="border-0 bg-transparent px-0 text-[16px] leading-relaxed focus:ring-0"
-              />
+      <div className="grid items-start gap-6 lg:grid-cols-12">
+        <div className="flex flex-col gap-6 lg:col-span-7">
+          <Card>
+            <Field label="What do you want to know?" hint="Name the product or idea, the price if there is one, who it is for, where, and the time frame.">
+              {(id) => (
+                <Textarea
+                  id={id}
+                  rows={7}
+                  value={prompt}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    if (spec) setSpec(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGo) run();
+                  }}
+                  placeholder="We're launching an AI tool for finance teams at $49 per seat. Will CFOs in the US and analysts at Indian IT firms adopt it within a year?"
+                  className="text-[15px]"
+                />
+              )}
+            </Field>
+            <div className="mt-5">
+              <Field label="Target countries" hint="Optional. Leave empty and Oracle picks the markets that matter.">
+                {(id) => <CountryPicker id={id} value={spec?.targets ?? targets} onChange={(v) => (spec ? setSpec({ ...spec, targets: v, target_weights: {} }) : setTargets(v))} />}
+              </Field>
             </div>
-            <div className="border-t border-line px-4 py-3 md:px-5">
-              <CountryPicker meta={meta} value={spec?.targets ?? targets} onChange={(v) => (spec ? setSpec({ ...spec, targets: v, target_weights: {} }) : setTargets(v))} placeholder="Target countries (optional, we'll pick if empty)" />
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 md:px-5">
-              <div role="radiogroup" aria-label="Simulation size" className="flex rounded-lg bg-panel-2 p-0.5">
-                {SIZES.map((s) => (
-                  <button
-                    key={s.id}
-                    role="radio"
-                    aria-checked={size === s.id}
-                    onClick={() => {
-                      setSize(s.id);
-                      if (config) setConfig({ ...config, agents: s.agents, runs_per_agent: s.runs });
-                    }}
-                    className={cx("rounded-md px-3 py-1.5 text-left transition-colors", size === s.id ? "bg-panel shadow-lift" : "text-ink-3 hover:text-ink")}
-                  >
-                    <div className="text-[13px] font-semibold leading-tight">{s.label}</div>
-                    <div className="t-tiny text-ink-3">{s.sub}</div>
-                  </button>
-                ))}
+            <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <div className="mb-2 text-[14px] font-medium">Size</div>
+                <Segmented
+                  label="Simulation size"
+                  value={size}
+                  onChange={(v) => {
+                    setSize(v);
+                    const s = SIZES.find((x) => x.value === v)!;
+                    if (config) setConfig({ ...config, agents: s.agents, runs_per_agent: s.runs });
+                  }}
+                  options={SIZES.map((s) => ({ value: s.value, label: s.label, sub: s.sub }))}
+                />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {!spec && (
-                  <Button onClick={review} disabled={!canGo || !!busy} busy={busy === "review"}>
+                  <Button size="lg" onClick={review} disabled={!canGo || !!busy} busy={busy === "review"}>
                     Review setup
                   </Button>
                 )}
-                <Button variant="primary" onClick={run} disabled={!canGo || !!busy} busy={busy === "run"}>
+                <Button size="lg" variant="primary" onClick={run} disabled={!canGo || !!busy} busy={busy === "run"}>
                   Run simulation
                 </Button>
               </div>
             </div>
-          </Panel>
-
-          {error && <ErrorNote>{error}</ErrorNote>}
+            {error && (
+              <div className="mt-4">
+                <ErrorNote>{error}</ErrorNote>
+              </div>
+            )}
+          </Card>
 
           {!spec && (
-            <div>
-              <h2 className="t-small mb-2 font-semibold text-ink-3">Try one of these</h2>
+            <Card>
+              <CardHead title="Start from an example" />
               <ul className="flex flex-col">
                 {EXAMPLES.map((ex) => (
-                  <li key={ex.label}>
+                  <li key={ex.label} className="border-b border-rule last:border-0">
                     <button
                       onClick={() => {
                         setPrompt(ex.text);
                         setTargets(ex.targets);
                         setSpec(null);
                       }}
-                      className="group flex w-full min-w-0 flex-col gap-0.5 border-b border-line py-2.5 text-left sm:flex-row sm:items-baseline sm:gap-3"
+                      className="group flex w-full flex-col gap-0.5 py-2.5 text-left"
                     >
-                      <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-ink group-hover:text-iris-ink">{ex.label}</span>
-                      <span className="min-w-0 truncate text-sm text-ink-3">{ex.text}</span>
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="text-[14px] text-text group-hover:underline">{ex.label}</span>
+                        <span className="hidden shrink-0 text-[12px] text-faint sm:block">{ex.targets.map(countryName).join(", ")}</span>
+                      </span>
+                      <span className="line-clamp-1 text-[13px] text-muted">{ex.text}</span>
                     </button>
                   </li>
                 ))}
               </ul>
-            </div>
+            </Card>
           )}
         </div>
 
-        <div className="min-w-0 lg:sticky lg:top-8">
-          <div className="relative overflow-hidden rounded-3xl border border-line bg-panel">
-            <WorldMap world={world} targets={activeTargets} />
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-line px-5 py-3 t-small text-ink-2">
-              {activeTargets.length ? (
-                <>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="inline-block size-3 rounded-sm border border-iris bg-[var(--land-target)]" aria-hidden />
-                    {activeTargets.length} target {activeTargets.length === 1 ? "country" : "countries"}
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <svg width="22" height="8" aria-hidden>
-                      <path d="M1 7 Q11 -2 21 7" fill="none" stroke="var(--iris)" strokeWidth="2" />
-                    </svg>
-                    {influencerCount} outside {influencerCount === 1 ? "influence" : "influences"}
-                  </span>
-                </>
-              ) : (
-                <span>Pick countries to see who shapes them.</span>
-              )}
-            </div>
+        <Card className="lg:col-span-5" pad={false}>
+          <div className="px-5 pt-5">
+            <CardHead title="Who shapes these markets" aside={influencers.length ? `${influencers.length} outside ${influencers.length === 1 ? "influence" : "influences"}` : undefined}>
+              {activeTargets.length ? "Arrows show outside countries and blocs that affect your target countries. Thicker means stronger." : "Pick a country to see who shapes it."}
+            </CardHead>
           </div>
-          {world && world.nodes.some((n) => n.role === "influencer") && (
-            <ul className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-              {world.nodes
-                .filter((n) => n.role === "influencer")
-                .slice(0, 6)
-                .map((n) => {
-                  const link = world.links.find((l) => l.source === n.id);
+          <div className="px-2">{meta ? <WorldMap world={world} targets={activeTargets} label="Target countries and the influences on them" /> : <Skeleton className="mx-3 aspect-[2/1]" />}</div>
+          <div className="px-5 pb-5 pt-2">
+            {activeTargets.length === 0 ? (
+              <div>
+                <div className="mb-2 text-[13px] text-muted">Common markets</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {QUICK_PICKS.map((c) => (
+                    <button key={c} onClick={() => setTargets([...targets, c])} className="h-6 rounded border border-control px-2 text-[13px] text-muted hover:bg-active hover:text-text">
+                      {countryName(c)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <ul className="flex flex-col">
+                {influencers.slice(0, 5).map((n) => {
+                  const link = world!.links.find((l) => l.source === n.id);
                   return (
-                    <li key={n.id} className="text-sm">
-                      <span className="font-semibold text-ink">{n.name}</span>
-                      <span className="text-ink-3"> on {link?.target} through {link?.channel.replace("_", " ")}</span>
-                      {link && <p className="t-small line-clamp-2 text-ink-2">{link.note}</p>}
+                    <li key={n.id} className="border-b border-rule py-2 last:border-0">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-[14px] text-text">{n.name}</span>
+                        <span className="shrink-0 text-[12px] text-faint">
+                          {link ? `${link.channel.replace("_", " ")} on ${countryName(link.target)}` : ""}
+                        </span>
+                      </div>
+                      {link && <p className="line-clamp-2 text-[13px] leading-[18px] text-muted">{link.note}</p>}
                     </li>
                   );
                 })}
-            </ul>
-          )}
-        </div>
+                {influencers.length === 0 && <li className="py-2 text-[13px] text-muted">Looking for influences…</li>}
+              </ul>
+            )}
+          </div>
+        </Card>
       </div>
 
-      <AnimatePresence>
-        {spec && config && (
-          <motion.div ref={editorRef} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-12 scroll-mt-6">
-            <Panel>
-              <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <h2 className="t-1">Check the setup</h2>
-                  <p className="mt-1 max-w-2xl text-sm text-ink-2">This is how Oracle understood your question. Change anything, then run it.</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => setSpec(null)}>
-                    Discard
-                  </Button>
-                  <Button variant="primary" size="lg" onClick={run} busy={busy === "run"}>
-                    Run simulation
-                  </Button>
-                </div>
-              </div>
-              <ScenarioEditor meta={meta} spec={spec} onSpec={setSpec} config={config} onConfig={setConfig} />
-            </Panel>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {recent.length > 0 && !spec && (
-        <section className="mt-14">
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="t-2">Recent runs</h2>
-            <Link href="/runs" className="text-sm font-semibold text-iris-ink hover:underline">
-              See all
-            </Link>
+      {spec && config && (
+        <div ref={editorRef} className="mt-10 scroll-mt-4">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-t border-border pt-8">
+            <div>
+              <h2 className="t-title">Check the setup</h2>
+              <p className="mt-1 max-w-2xl text-[14px] text-muted">This is how Oracle understood your question. Change anything, then run it.</p>
+            </div>
           </div>
-          <RunTable runs={recent} />
-        </section>
+          <ScenarioEditor spec={spec} onSpec={setSpec} config={config} onConfig={setConfig} />
+          <div className="sticky bottom-0 -mx-4 mt-2 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-surface px-4 py-3 md:-mx-6 md:px-6">
+            <span className="mr-auto text-[13px] text-muted">
+              {config.agents.toLocaleString()} people, about <span className="num">{int(estimateCalls(spec, config))}</span> model calls
+            </span>
+            <Button variant="ghost" onClick={() => setSpec(null)}>
+              Discard changes
+            </Button>
+            <Button variant="primary" size="lg" onClick={run} busy={busy === "run"} disabled={!spec.targets.length}>
+              Run simulation
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!spec && (
+        <Card className="mt-6">
+          <CardHead
+            title="Recent simulations"
+            aside={
+              <Link href="/runs" className="font-medium text-text hover:underline">
+                View all
+              </Link>
+            }
+          />
+          {recent === null ? (
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-5 w-full" />
+              ))}
+            </div>
+          ) : recent.length === 0 ? (
+            <p className="text-[13px] text-muted">No simulations yet. Your runs are saved here.</p>
+          ) : (
+            <RunTable runs={recent} compact />
+          )}
+        </Card>
       )}
     </div>
   );

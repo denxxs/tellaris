@@ -125,7 +125,6 @@ class Aggregator:
         for p in self.focus:
             for e in p.exposures:
                 sources[(e.source, e.channel)] = e.source_name
-        mentions = Counter(code.strip().upper() for p in self.focus for r in self.by_person[p.id] for code in r.influences)
         out = []
         for (src, ch), name in sources.items():
             exposed = [p for p in self.focus if any(e.source == src and e.channel == ch for e in p.exposures)]
@@ -140,6 +139,8 @@ class Aggregator:
                 om = _wmean(po, self._weights(others))
             else:
                 om = float("nan")
+            # Mentions: answers from people who feel this force that name its source.
+            mentions = sum(1 for p in exposed for r in self.by_person[p.id] if any(c.strip().upper() == src.upper() for c in r.influences))
             note = next(e.note for p in exposed for e in p.exposures if e.source == src and e.channel == ch)
             direction = next(e.direction for p in exposed for e in p.exposures if e.source == src and e.channel == ch)
             out.append(
@@ -149,7 +150,7 @@ class Aggregator:
                     "exposed_value": round(em * self.reach, 4),
                     "others_value": None if np.isnan(om) else round(om * self.reach, 4),
                     "delta": None if np.isnan(om) else round((em - om) * self.reach, 4),
-                    "mentions": mentions.get(src.upper(), 0),
+                    "mentions": mentions,
                     "countries": sorted({p.country for p in exposed}),
                 }
             )

@@ -36,6 +36,11 @@ export const api = {
   meta: () => req<Meta>("/api/meta"),
   preview: (prompt: string, targets: string[]) =>
     req<{ spec: Spec; world: World }>("/api/scenario/preview", { method: "POST", body: JSON.stringify({ prompt, targets }) }),
+  headcount: (spec: Spec) =>
+    req<{ segments: { name: string; total: number; by_country: Record<string, number> }[]; total: number }>("/api/scenario/headcount", {
+      method: "POST",
+      body: JSON.stringify({ spec }),
+    }),
   world: (targets: string[], spec?: Spec) =>
     req<World>("/api/world/influence", { method: "POST", body: JSON.stringify({ targets, sectors: spec?.sectors ?? [], spec }) }),
   createRun: (body: { prompt: string; targets?: string[]; config?: Partial<RunConfig>; spec?: Spec }) =>

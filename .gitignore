@@ -24,3 +24,7 @@ next-env.d.ts
 Thumbs.db
 .vscode/
 .idea/
+
+# Design skill working files
+.taste-skill/*
+!.taste-skill/direction.json

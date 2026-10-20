@@ -59,10 +59,24 @@ KEYWORD_OCCUPATIONS = [
 ]
 
 
+_COMMON = {"We", "We're", "Our", "Will", "The", "If", "Target", "AI", "B2B", "SaaS", "Is", "Should", "How", "What", "Would", "In", "My", "It", "This", "Outcomes", "Yes", "No", "CFOs", "EU"}
+
+
 def _title(prompt: str) -> str:
+    """A short title: the product's name if one is given, else the opening words."""
+    from ..world.countries import resolve
+
+    body = re.split(r"outcomes?:", prompt, flags=re.IGNORECASE)[0]
+    for m in re.finditer(r"\b[A-Z][a-zA-Z]{2,}\b", body):
+        word = m.group(0)
+        if word in _COMMON or resolve(word) or re.search(r"(^|[.?!:]\s*)$", body[: m.start()]):
+            continue  # common words, places, and words that just start a sentence
+        if re.search(rf"\b(in|from|across|to|at)\s+{word}\b", prompt):
+            continue  # a place or an employer, not the product
+        return f"{word}: will people adopt it?"
     first = re.split(r"[.\n!?]", prompt.strip())[0]
     words = first.split()
-    return " ".join(words[:7]).strip(" ,:;") or "Untitled scenario"
+    return (" ".join(words[:6]).strip(" ,:;") + "…") if len(words) > 6 else (first or "Untitled scenario")
 
 
 def compile_scenario(ctx: dict[str, Any]) -> dict[str, Any]:
@@ -427,6 +441,10 @@ def themes(ctx: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _p(v: float) -> str:
+    return f"{v * 100:.1f}%" if v < 0.1 else f"{v:.0%}"
+
+
 def report(ctx: dict[str, Any]) -> dict[str, Any]:
     spec, res = ctx["spec"], ctx["results"]
     h = res["headline"]
@@ -452,7 +470,7 @@ def report(ctx: dict[str, Any]) -> dict[str, Any]:
     levers.append({"label": "Add EU data residency + SOC 2", "description": "Remove the compliance objection", "changes": {"subject_append": "It is SOC 2 Type II certified and offers EU data residency with a standard DPA."}})
     levers.append({"label": "Double awareness", "description": "Stronger distribution", "changes": {"assumed_reach": min(1.0, spec.get("assumed_reach", 0.4) * 2)}})
     return {
-        "headline": f"{h['label']}: about {v:.0%} (range {h['ci'][0]:.0%}-{h['ci'][1]:.0%}).",
+        "headline": f"{h['label']}: about {_p(v)} (likely {_p(h['ci'][0])} to {_p(h['ci'][1])}).",
         "verdict": verdict,
         "summary": (
             f"This is an offline demo run using the mock model, so treat the numbers as illustrative only. "
@@ -474,7 +492,7 @@ def report(ctx: dict[str, Any]) -> dict[str, Any]:
 
 
 def text(task: str, messages: list[dict[str, str]], ctx: dict[str, Any]) -> str:
-    p = ctx.get("persona") or {}
+    p = ctx.get("persona") or ctx
     last = messages[-1]["content"] if messages else ""
     r = _rng("chat", p.get("id"), last)
     name = (p.get("name") or "I").split(" ")[0]

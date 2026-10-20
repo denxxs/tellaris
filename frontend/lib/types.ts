@@ -60,11 +60,13 @@ export type RunConfig = {
   influence_threshold: number;
   seed: number | null;
   temperature: number;
+  weighting: "population" | "equal";
 };
 
 export type WorldNode = {
   id: string;
   name: string;
+  anchor?: [number, number] | null;
   role: "target" | "influencer";
   kind?: "country" | "bloc";
   strength?: number;
@@ -84,6 +86,8 @@ export type World = { nodes: WorldNode[]; links: WorldLink[]; channels: Record<s
 
 export type Summary = {
   n: number;
+  people?: number;
+  adopters?: number;
   stated: number;
   calibrated: number;
   value: number;
@@ -290,6 +294,7 @@ export type Persona = {
   exposures: Exposure[];
   is_buyer: boolean;
   weight: number;
+  represents: number;
   influencer_voice: string | null;
   name: string;
   bio: string;
@@ -341,8 +346,21 @@ export type Committee = {
 export type Meta = {
   version: string;
   mock: boolean;
-  countries: { iso3: string; name: string; region: string; blocs: string[]; population_m: number; gdp_pc_usd: number }[];
-  blocs: { id: string; name: string; members: string[]; description: string }[];
+  countries: {
+    iso3: string;
+    iso_num: string | null;
+    name: string;
+    region: string;
+    income: string;
+    blocs: string[];
+    population_m: number;
+    workforce_m: number;
+    gdp_pc_usd: number;
+    anchor: [number, number] | null;
+    internet_pct: number;
+    isco_source: string;
+  }[];
+  blocs: { id: string; name: string; members: string[]; description: string; anchor: [number, number] | null }[];
   occupations: { id: string; title: string; isco: number; buyer_role: string }[];
   company_types: Record<string, { label: string; employees: number[] }>;
   sectors: string[];

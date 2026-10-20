@@ -180,3 +180,14 @@ def test_normalize_overrides_and_forces():
     assert abs(sum(out.target_weights.values()) - 1) < 1e-3
     assert out.forces[0].origin == "EU" and out.forces[0].affects == ["IND"]
     assert out.segments[0].custom_occupation == "not a real job"
+
+
+def test_scenario_force_is_felt_once():
+    from oracle.world.influence import InfluenceEdge
+    spec = make_spec(forces=[Force(name="AI Act", origin="EU", affects=[], sectors=["all"], strength=0.9, direction="hurts", description="x")])
+    extra = [InfluenceEdge(source="EU", target=t, channel="regulation", strength=0.9, sectors=["all"], note="AI Act: x", origin="scenario") for t in spec.targets]
+    infl = expand(spec.targets, extra, sectors=spec.sectors)
+    people = PopulationBuilder(spec, infl, seed=5).build(200)
+    for p in people:
+        notes = [e.note for e in p.exposures]
+        assert len(notes) == len(set(notes)), notes

@@ -2,7 +2,7 @@
 
 Simulate a world of people to see how a product, price, policy or any idea will land.
 
-Describe what you want to know in plain words. Oracle builds a population across the countries you pick (founders, CFOs, analysts at Indian IT firms, teachers, farmers, any job), works out which outside countries and blocs shape those markets (for example, EU rules reaching Indian IT firms with EU clients), lets every person decide for themselves, and tells you what is likely to happen, why, and what would change it.
+Describe what you want to know in plain words. Oracle builds a population across any of 202 countries you pick (founders, CFOs, analysts at Indian IT firms, teachers, farmers, any job), works out which outside countries and blocs shape those markets (for example, EU rules reaching Indian IT firms with EU clients), lets every person decide for themselves, and tells you what is likely to happen, why, and what would change it.
 
 ## Run it
 
@@ -30,8 +30,8 @@ cd frontend && npm run dev              # app on :3000
 
 1. **Scenario**: a planner model turns your paragraph into a precise question, the groups of people to simulate (tied to specific countries if you say so), outside factors, price and time frame. You can review and edit all of it before running.
 2. **Research**: web search (DuckDuckGo free, or Tavily) for current facts, competitors and prices. People only see facts with sources.
-3. **Influence map**: a graph of countries and blocs linked by regulation, outsourcing, capital, trade, technology and more. Targets pull in their direct and indirect influencers.
-4. **Population**: people are sampled from real labour-market structure (ISCO job mix, income levels, digital maturity) and weighted to represent their country and group. Each one feels the outside forces that touch their sector. A model then gives them a name, backstory and point of view.
+3. **Influence map**: every country and bloc linked by regulation, outsourcing, capital, trade, technology, remittances and more (hand-written links plus rules covering all countries). Targets pull in their direct and indirect influencers.
+4. **Population**: people are sampled from each country's real labour-market structure (World Bank and ILO data: job mix, income, digital adoption, age) and weighted by the real headcount they stand for, so the answer comes out as a share and as a number of people. Each one feels the outside forces that touch their sector. A model then gives them a name, backstory and point of view.
 5. **Reactions**: every person answers in character, several times across different models, on the Juster probability scale.
 6. **Buying committees** (B2B): champion, budget owner, technical and security reviewers argue it out over rounds, then a deal decision is made.
 7. **Word of mouth**: people talk over a small-world network, news arrives mid-way, views shift. The result drives a Bass adoption projection over your time frame.
@@ -52,6 +52,10 @@ Keys are saved in `backend/var/settings.json` on your machine and never committe
 The **Accuracy** page runs Oracle on questions with known outcomes, scores the error, and fits the say/do correction from the results. Built-in cases are famous votes and adoption numbers that models may already know, so their scores are optimistic. Add cases from after your models' training cutoff for an honest test.
 
 Simulations are not ground truth. Treat results as a well-structured, explainable estimate, and check them against real-world tests.
+
+## Country data
+
+`backend/scripts/build_world.py` rebuilds the country file from the World Bank and ILOSTAT open APIs (no keys). 168 countries use surveyed occupation data; the rest use a model fitted on those surveys. Taiwan comes from national statistics. Run it again to refresh the numbers.
 
 ## Project layout
 

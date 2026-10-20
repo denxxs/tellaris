@@ -201,6 +201,8 @@ class PopulationBuilder:
         out: list[Exposure] = []
         for inf in self.influencers:
             for e in inf.edges:
+                if e.origin == "scenario":
+                    continue  # scenario forces are applied below, once, with their direction
                 if inf.order == 1:
                     hits_me = e.target == iso
                 else:

@@ -1,33 +1,37 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Meta } from "@/lib/types";
 import { Chip } from "@/components/ui";
-import { cx } from "@/lib/format";
+import { useMeta } from "@/lib/meta";
+import { cx, people } from "@/lib/format";
 
 type Props = {
-  meta: Meta | null;
   value: string[];
   onChange: (v: string[]) => void;
   placeholder?: string;
+  id?: string;
 };
 
-export function CountryPicker({ meta, value, onChange, placeholder = "Add a country or region" }: Props) {
+/** Search every country and bloc; a bloc adds its members. */
+export function CountryPicker({ value, onChange, placeholder = "Add a country or region", id }: Props) {
+  const { meta, countryName } = useMeta();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const box = useRef<HTMLDivElement>(null);
 
-  const names = useMemo(() => Object.fromEntries((meta?.countries ?? []).map((c) => [c.iso3, c.name])), [meta]);
-
   const options = useMemo(() => {
     if (!meta) return [];
     const term = q.trim().toLowerCase();
-    const blocs = meta.blocs.map((b) => ({ id: b.id, label: b.name, sub: `${b.members.length} countries`, members: b.members }));
-    const countries = meta.countries.map((c) => ({ id: c.iso3, label: c.name, sub: c.region, members: [c.iso3] }));
-    return [...blocs, ...countries]
-      .filter((o) => !term || o.label.toLowerCase().includes(term) || o.id.toLowerCase() === term)
-      .filter((o) => o.members.some((m) => !value.includes(m)))
+    const blocs = meta.blocs
+      .filter((b) => b.members.length > 1)
+      .map((b) => ({ id: b.id, label: b.name, sub: `${b.members.length} countries`, members: b.members, size: 0 }));
+    const countries = meta.countries.map((c) => ({ id: c.iso3, label: c.name, sub: `${people(c.population_m * 1e6)} people`, members: [c.iso3], size: c.population_m }));
+    const all = [...blocs, ...countries].filter((o) => o.members.some((m) => !value.includes(m)));
+    if (!term) return countries.filter((c) => !value.includes(c.id)).sort((a, b) => b.size - a.size).slice(0, 8);
+    return all
+      .filter((o) => o.label.toLowerCase().includes(term) || o.id.toLowerCase() === term)
+      .sort((a, b) => Number(!a.label.toLowerCase().startsWith(term)) - Number(!b.label.toLowerCase().startsWith(term)) || b.size - a.size)
       .slice(0, 9);
   }, [meta, q, value]);
 
@@ -45,13 +49,14 @@ export function CountryPicker({ meta, value, onChange, placeholder = "Add a coun
 
   return (
     <div ref={box} className="relative">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1.5 focus-within:border-control">
         {value.map((iso) => (
-          <Chip key={iso} tone="iris" onRemove={() => onChange(value.filter((v) => v !== iso))}>
-            {names[iso] ?? iso}
+          <Chip key={iso} onRemove={() => onChange(value.filter((v) => v !== iso))}>
+            {countryName(iso)}
           </Chip>
         ))}
         <input
+          id={id}
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
@@ -74,25 +79,30 @@ export function CountryPicker({ meta, value, onChange, placeholder = "Add a coun
             } else if (e.key === "Escape") setOpen(false);
           }}
           placeholder={value.length ? "Add another" : placeholder}
-          aria-label="Add a target country"
+          aria-label="Add a target country or region"
           role="combobox"
           aria-expanded={open}
-          aria-controls="country-options"
-          className="h-7 min-w-[160px] flex-1 bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none"
+          aria-controls={`${id ?? "country"}-options`}
+          className="h-6 min-w-[140px] flex-1 bg-transparent px-1 text-[14px] text-text placeholder:text-faint focus:outline-none"
         />
       </div>
       {open && options.length > 0 && (
-        <ul id="country-options" role="listbox" className="absolute left-0 top-full z-30 mt-2 w-[320px] max-w-[calc(100vw-48px)] overflow-hidden rounded-xl border border-line bg-panel py-1 shadow-lift">
+        <ul
+          id={`${id ?? "country"}-options`}
+          role="listbox"
+          className="absolute left-0 top-full z-30 mt-1 max-h-80 w-[340px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+        >
+          {!q && <li className="px-3 pb-1 pt-1.5 text-[12px] text-faint">Largest countries. Type to search all {meta?.countries.length} and regional blocs.</li>}
           {options.map((o, i) => (
             <li key={o.id} role="option" aria-selected={i === hi}>
               <button
                 type="button"
                 onMouseEnter={() => setHi(i)}
                 onClick={() => pick(o.members)}
-                className={cx("flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-sm", i === hi && "bg-panel-2")}
+                className={cx("flex w-full items-baseline justify-between gap-3 px-3 py-1.5 text-left", i === hi && "bg-active")}
               >
-                <span className="font-medium text-ink">{o.label}</span>
-                <span className="t-tiny text-ink-3">{o.sub}</span>
+                <span className="text-[14px] text-text">{o.label}</span>
+                <span className="num text-[12px] text-faint">{o.sub}</span>
               </button>
             </li>
           ))}

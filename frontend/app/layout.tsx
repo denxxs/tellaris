@@ -1,19 +1,11 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
-import { Rail } from "@/components/shell/Rail";
-import { ModeBanner } from "@/components/shell/ModeBanner";
+import { Shell } from "@/components/shell/Shell";
+import { MetaProvider } from "@/lib/meta";
 
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-bricolage",
-  axes: ["wdth", "opsz"],
-});
-const plex = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plex",
-});
+const plex = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono" });
 
 export const metadata: Metadata = {
   title: "Oracle",
@@ -24,18 +16,14 @@ const themeScript = `try{var t=localStorage.getItem('oracle-theme');if(t)documen
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${plex.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${plex.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-dvh">
-        <div className="flex min-h-dvh">
-          <Rail />
-          <main className="min-w-0 flex-1 pb-20 md:pb-0">
-            <ModeBanner />
-            {children}
-          </main>
-        </div>
+      <body>
+        <MetaProvider>
+          <Shell>{children}</Shell>
+        </MetaProvider>
       </body>
     </html>
   );
