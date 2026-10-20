@@ -67,10 +67,22 @@ class ModelRoles(BaseModel):
     analyst: str = "mock/oracle"
 
 
+# Secrets that are never exported to the environment; they are passed straight to
+# the calls that need them (AWS Bedrock), so nothing else on the machine sees them.
+SECRET_FIELDS = {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"}
+# Plain Bedrock settings, also passed per call rather than exported.
+BEDROCK_PLAIN = {"AWS_REGION_NAME", "AWS_PROFILE"}
+
+
 class UserSettings(BaseModel):
     roles: ModelRoles = Field(default_factory=ModelRoles)
     keys: dict[str, str] = Field(default_factory=dict)
     extra: dict[str, str] = Field(default_factory=dict)
+    secrets: dict[str, str] = Field(default_factory=dict)
+    bedrock_machine_credentials: bool = Field(
+        default=False,
+        description="Allow Bedrock to use this computer's AWS credentials (default chain or AWS_PROFILE) when no keys are saved",
+    )
     search_provider: str = "duckduckgo"  # duckduckgo | tavily | none
     max_concurrency: int = 16
     request_timeout_s: int = 90
@@ -99,7 +111,7 @@ class SettingsStore:
             if var and value:
                 os.environ[var] = value
         for var, value in self._settings.extra.items():
-            if value:
+            if value and var not in BEDROCK_PLAIN:
                 os.environ[var] = value
 
     def get(self) -> UserSettings:
@@ -111,6 +123,7 @@ class SettingsStore:
             data = self._settings.model_dump()
             keys = patch.pop("keys", None)
             extra = patch.pop("extra", None)
+            secrets = patch.pop("secrets", None)
             data.update({k: v for k, v in patch.items() if v is not None})
             if keys is not None:
                 for provider, value in keys.items():
@@ -128,6 +141,14 @@ class SettingsStore:
                     else:
                         data["extra"].pop(var, None)
                         os.environ.pop(var, None)
+            if secrets is not None:
+                for var, value in secrets.items():
+                    if var not in SECRET_FIELDS:
+                        continue
+                    if value is None or value == "":
+                        data["secrets"].pop(var, None)
+                    elif not str(value).startswith("••"):
+                        data["secrets"][var] = value.strip()
             self._settings = UserSettings.model_validate(data)
             self._path.write_text(self._settings.model_dump_json(indent=2), encoding="utf-8")
             self._apply_env()
@@ -144,9 +165,18 @@ class SettingsStore:
                 "source": "settings" if s.keys.get(provider) else ("environment" if value else None),
                 "masked": f"••••{value[-4:]}" if len(value) >= 8 else ("••••" if value else ""),
             }
+        secrets = {
+            var: {
+                "set": bool(s.secrets.get(var)),
+                "masked": f"••••{s.secrets[var][-4:]}" if len(s.secrets.get(var, "")) >= 8 else ("••••" if s.secrets.get(var) else ""),
+            }
+            for var in sorted(SECRET_FIELDS)
+        }
         return {
             "roles": s.roles.model_dump(),
             "keys": keys,
+            "secrets": secrets,
+            "bedrock_machine_credentials": s.bedrock_machine_credentials,
             "extra": s.extra,
             "search_provider": s.search_provider,
             "max_concurrency": s.max_concurrency,
@@ -159,3 +189,26 @@ settings_store = SettingsStore()
 
 def load_json(name: str) -> Any:
     return json.loads((DATA_DIR / name).read_text(encoding="utf-8"))
+
+
+def bedrock_kwargs(s: UserSettings) -> dict[str, Any]:
+    """Credentials for one Bedrock call. Saved keys win; otherwise the machine's AWS
+    credentials, but only when the user has explicitly allowed that."""
+    region = s.extra.get("AWS_REGION_NAME") or "us-east-1"
+    if s.secrets.get("AWS_ACCESS_KEY_ID") and s.secrets.get("AWS_SECRET_ACCESS_KEY"):
+        out: dict[str, Any] = {
+            "aws_access_key_id": s.secrets["AWS_ACCESS_KEY_ID"],
+            "aws_secret_access_key": s.secrets["AWS_SECRET_ACCESS_KEY"],
+            "aws_region_name": region,
+        }
+        if s.secrets.get("AWS_SESSION_TOKEN"):
+            out["aws_session_token"] = s.secrets["AWS_SESSION_TOKEN"]
+        return out
+    if s.bedrock_machine_credentials:
+        out = {"aws_region_name": region}
+        if s.extra.get("AWS_PROFILE"):
+            out["aws_profile_name"] = s.extra["AWS_PROFILE"]
+        return out
+    raise PermissionError(
+        "AWS Bedrock has no keys. Add an access key on the Models page, or allow this computer's AWS credentials there."
+    )

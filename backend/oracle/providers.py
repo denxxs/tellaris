@@ -15,6 +15,25 @@ PROVIDERS: list[dict] = [
         "note": "Hosted NIM endpoints at build.nvidia.com, or point the endpoint at your own NIM deployment.",
     },
     {
+        "id": "bedrock", "label": "AWS Bedrock", "key_env": None, "key_url": "https://console.aws.amazon.com/bedrock",
+        "models": [
+            "anthropic.claude-3-5-haiku-20241022-v1:0",
+            "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+            "amazon.nova-lite-v1:0",
+            "amazon.nova-pro-v1:0",
+            "meta.llama3-1-70b-instruct-v1:0",
+            "mistral.mistral-large-2407-v1:0",
+        ],
+        "fields": [
+            {"env": "AWS_ACCESS_KEY_ID", "label": "Access key ID", "secret": True},
+            {"env": "AWS_SECRET_ACCESS_KEY", "label": "Secret access key", "secret": True},
+            {"env": "AWS_SESSION_TOKEN", "label": "Session token (only for temporary credentials)", "secret": True, "optional": True},
+            {"env": "AWS_REGION_NAME", "label": "Region", "placeholder": "us-east-1"},
+        ],
+        "machine_credentials": True,
+        "note": "Use any model ID enabled in your Bedrock console for this region. IDs starting with us. or eu. are cross-region inference profiles.",
+    },
+    {
         "id": "openai", "label": "OpenAI", "key_env": "OPENAI_API_KEY", "key_url": "https://platform.openai.com/api-keys",
         "models": ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "o4-mini"],
     },

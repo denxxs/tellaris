@@ -90,6 +90,8 @@ export const api = {
 export type Settings = {
   roles: { planner: string; crowd: string[]; analyst: string };
   keys: Record<string, { set: boolean; source: string | null; masked: string }>;
+  secrets: Record<string, { set: boolean; masked: string }>;
+  bedrock_machine_credentials: boolean;
   extra: Record<string, string>;
   search_provider: "duckduckgo" | "tavily" | "none";
   max_concurrency: number;

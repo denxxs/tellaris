@@ -50,6 +50,8 @@ All model calls go through [LiteLLM](https://docs.litellm.ai/docs/providers): NV
 
 For NVIDIA NIM, paste a key from build.nvidia.com, or point the endpoint at your own NIM deployment.
 
+For AWS Bedrock, save an access key ID, secret key and region (plus a session token for temporary credentials). Bedrock keys are passed only to Bedrock calls and never exported to the environment. Using this computer's own AWS credentials or a named profile is off by default and must be switched on explicitly, so a run never bills an AWS account you didn't choose.
+
 Keys are saved in `backend/var/settings.json` on your machine and never committed.
 
 ## Accuracy

@@ -44,6 +44,7 @@ MODEL_EXAMPLES = {
     "xai": ["xai/grok-3-mini"],
     "together_ai": ["together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"],
     "azure": ["azure/<your-deployment-name>"],
+    "bedrock": ["bedrock/anthropic.claude-3-5-haiku-20241022-v1:0", "bedrock/amazon.nova-lite-v1:0", "bedrock/meta.llama3-1-70b-instruct-v1:0"],
     "nvidia_nim": ["nvidia_nim/meta/llama-3.3-70b-instruct", "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct", "nvidia_nim/meta/llama-3.1-8b-instruct"],
     "ollama": ["ollama/llama3.1", "ollama/qwen2.5"],
     "mock": ["mock/oracle"],
@@ -428,6 +429,8 @@ async def get_settings() -> dict[str, Any]:
 class SettingsPatch(BaseModel):
     roles: dict[str, Any] | None = None
     keys: dict[str, str | None] | None = None
+    secrets: dict[str, str | None] | None = None
+    bedrock_machine_credentials: bool | None = None
     extra: dict[str, str | None] | None = None
     search_provider: str | None = None
     max_concurrency: int | None = Field(default=None, ge=1, le=256)

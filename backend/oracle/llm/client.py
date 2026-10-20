@@ -24,7 +24,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from ..config import settings_store
+from ..config import bedrock_kwargs, settings_store
 from . import mock
 
 log = logging.getLogger("oracle.llm")
@@ -197,6 +197,14 @@ class LLM:
         }
         if max_tokens:
             kwargs["max_tokens"] = max_tokens
+        if model.startswith("bedrock/"):
+            try:
+                kwargs.update(bedrock_kwargs(s))
+            except PermissionError as exc:
+                u = current_usage.get()
+                if u is not None:
+                    u.failures += 1
+                raise LLMError(str(exc)) from exc
         if json_mode and _supports_json_mode(model):
             kwargs["response_format"] = {"type": "json_object"}
 

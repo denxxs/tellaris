@@ -37,6 +37,10 @@ function ModelPicker({
   setKeys,
   extra,
   setExtra,
+  secrets,
+  setSecrets,
+  machine,
+  setMachine,
 }: {
   id: string;
   value: string;
@@ -47,6 +51,10 @@ function ModelPicker({
   setKeys: (k: Record<string, string>) => void;
   extra: Record<string, string>;
   setExtra: (e: Record<string, string>) => void;
+  secrets: Record<string, string>;
+  setSecrets: (s: Record<string, string>) => void;
+  machine: boolean;
+  setMachine: (v: boolean) => void;
 }) {
   const [provider, model] = split(value);
   const info = catalog.find((c) => c.id === provider);
@@ -97,6 +105,52 @@ function ModelPicker({
         </Field>
       </div>
       {info?.note && <p className="-mt-2 text-[12px] text-faint">{info.note}</p>}
+      {info?.fields && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {info.fields.map((f) => {
+            const saved = settings.secrets?.[f.env];
+            return (
+              <Field
+                key={f.env}
+                label={f.label}
+                hint={f.secret ? (secrets[f.env] === "" ? "Will be removed when you save." : saved?.set ? `Saved, ending ${saved.masked.replace(/•/g, "")}. Never shown or shared.` : f.optional ? "Optional." : undefined) : undefined}
+              >
+                {(fid) =>
+                  f.secret ? (
+                    <div className="flex gap-2">
+                      <Input id={fid} type="password" autoComplete="off" placeholder={saved?.set ? saved.masked : f.optional ? "Optional" : "Paste it here"} value={secrets[f.env] ?? ""} onChange={(e) => setSecrets({ ...secrets, [f.env]: e.target.value })} />
+                      {saved?.set && (
+                        <Button variant="ghost" onClick={() => setSecrets({ ...secrets, [f.env]: "" })}>
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <Input id={fid} value={extra[f.env] ?? ""} onChange={(e) => setExtra({ ...extra, [f.env]: e.target.value })} placeholder={f.placeholder} />
+                  )
+                }
+              </Field>
+            );
+          })}
+        </div>
+      )}
+      {info?.machine_credentials && (
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <Toggle
+            checked={machine}
+            onChange={setMachine}
+            label="Allow this computer's AWS credentials"
+            description="Only used when no access key is saved above. Bedrock would then bill whichever AWS account this computer is signed in to (its default profile, or the profile you name below). Leave this off if that might be a client's account."
+          />
+          {machine && (
+            <div className="mt-4 max-w-sm">
+              <Field label="AWS profile" hint="Optional. Leave empty for the default profile.">
+                {(fid) => <Input id={fid} value={extra.AWS_PROFILE ?? ""} onChange={(e) => setExtra({ ...extra, AWS_PROFILE: e.target.value })} placeholder="default" />}
+              </Field>
+            </div>
+          )}
+        </div>
+      )}
       {info && (info.key_env || info.base_env) && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {info.key_env && (
@@ -151,7 +205,9 @@ function ModelPicker({
           Test connection
         </Button>
         {test && <span className={cx("text-[13px]", test.ok ? "text-positive" : "text-negative")}>{test.ok ? `Connected, replied in ${test.latency_ms} ms` : test.error}</span>}
-        {!test && (keys[provider] || extra[info?.base_env ?? ""]) && <span className="text-[12px] text-faint">Save first to test a new key or endpoint.</span>}
+        {!test && (keys[provider] || extra[info?.base_env ?? ""] || (info?.fields ?? []).some((f) => secrets[f.env] || (!f.secret && (extra[f.env] ?? "") !== (settings.extra[f.env] ?? "")))) && (
+          <span className="text-[12px] text-faint">Save first to test new credentials.</span>
+        )}
       </div>
     </div>
   );
@@ -165,6 +221,8 @@ export default function ModelsPage() {
   const [roles, setRoles] = useState<{ planner: string; crowd: string[]; analyst: string } | null>(null);
   const [splitAnalyst, setSplitAnalyst] = useState(false);
   const [keys, setKeys] = useState<Record<string, string>>({});
+  const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const [machine, setMachine] = useState(false);
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [search, setSearch] = useState<Settings["search_provider"]>("duckduckgo");
   const [concurrency, setConcurrency] = useState(16);
@@ -175,6 +233,7 @@ export default function ModelsPage() {
     setRoles(x.roles);
     setSplitAnalyst(x.roles.analyst !== x.roles.planner);
     setExtra(x.extra);
+    setMachine(x.bedrock_machine_credentials);
     setSearch(x.search_provider);
     setConcurrency(x.max_concurrency);
     setTimeoutS(x.request_timeout_s);
@@ -188,16 +247,26 @@ export default function ModelsPage() {
   const dirty =
     !!s &&
     !!effective &&
-    (JSON.stringify(effective) !== JSON.stringify(s.roles) || Object.keys(keys).length > 0 || JSON.stringify(extra) !== JSON.stringify(s.extra) || search !== s.search_provider || concurrency !== s.max_concurrency || timeout !== s.request_timeout_s);
+    (JSON.stringify(effective) !== JSON.stringify(s.roles) || Object.keys(keys).length > 0 || Object.keys(secrets).length > 0 || machine !== s.bedrock_machine_credentials || JSON.stringify(extra) !== JSON.stringify(s.extra) || search !== s.search_provider || concurrency !== s.max_concurrency || timeout !== s.request_timeout_s);
 
   const save = async () => {
     if (!effective) return;
     setSaving(true);
     setError(null);
     try {
-      const next = await api.saveSettings({ roles: { ...effective, crowd: effective.crowd.filter(Boolean) }, keys, extra, search_provider: search, max_concurrency: concurrency, request_timeout_s: timeout });
+      const next = await api.saveSettings({
+        roles: { ...effective, crowd: effective.crowd.filter(Boolean) },
+        keys,
+        secrets,
+        bedrock_machine_credentials: machine,
+        extra,
+        search_provider: search,
+        max_concurrency: concurrency,
+        request_timeout_s: timeout,
+      });
       load(next);
       setKeys({});
+      setSecrets({});
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {
@@ -215,12 +284,16 @@ export default function ModelsPage() {
       </div>
     );
 
-  const pickerProps = { catalog, settings: s, keys, setKeys, extra, setExtra };
+  const pickerProps = { catalog, settings: s, keys, setKeys, extra, setExtra, secrets, setSecrets, machine, setMachine };
   /** Demo, missing a key, or ready to go, for the badge beside each role. */
   const status = (model: string) => {
     const [prov] = split(model);
     if (prov === "mock") return <Pill tone="warning">Demo model</Pill>;
     const info = catalog.find((c) => c.id === prov);
+    if (prov === "bedrock") {
+      const keyed = (s.secrets.AWS_ACCESS_KEY_ID?.set || !!secrets.AWS_ACCESS_KEY_ID) && (s.secrets.AWS_SECRET_ACCESS_KEY?.set || !!secrets.AWS_SECRET_ACCESS_KEY);
+      return keyed ? <Pill tone="positive">Ready</Pill> : machine ? <Pill tone="warning">Using this computer&apos;s AWS account</Pill> : <Pill tone="negative">Needs AWS keys</Pill>;
+    }
     const hasKey = !info?.key_env || s.keys[prov]?.set || !!keys[prov];
     return hasKey ? <Pill tone="positive">Ready</Pill> : <Pill tone="negative">Needs a key</Pill>;
   };
@@ -241,7 +314,7 @@ export default function ModelsPage() {
           </>
         }
       >
-        Choose who runs the simulation. Any provider works, including NVIDIA NIM and models on your own machine. Keys stay on this computer.
+        Choose who runs the simulation. Any provider works, including NVIDIA NIM, AWS Bedrock and models on your own machine. Keys stay on this computer.
       </PageHead>
       {error && (
         <div className="mb-6">
@@ -332,7 +405,11 @@ export default function ModelsPage() {
             <dd>
               {providers
                 .filter((p) => p !== "mock" && p !== "ollama")
-                .map((p) => `${catalog.find((c) => c.id === p)?.label ?? p}: ${s.keys[p]?.set || keys[p] ? "ready" : "missing"}`)
+                .map((p) =>
+                  p === "bedrock"
+                    ? `AWS Bedrock: ${s.secrets.AWS_ACCESS_KEY_ID?.set ? "access key saved" : s.bedrock_machine_credentials ? "this computer's AWS credentials" : "missing"}`
+                    : `${catalog.find((c) => c.id === p)?.label ?? p}: ${s.keys[p]?.set || keys[p] ? "ready" : "missing"}`,
+                )
                 .join(", ") || "None needed"}
             </dd>
           </div>

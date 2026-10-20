@@ -200,3 +200,38 @@ async def test_names_are_unique_within_a_run():
     await enrich(people, "mock/oracle", "test")
     names = [p.name for p in people]
     assert len(names) == len(set(names))
+
+
+def test_bedrock_credentials_are_explicit(tmp_path):
+    import os
+
+    from oracle.config import SettingsStore, UserSettings, bedrock_kwargs
+
+    # No keys and no permission: refuse, never fall back to the machine's AWS account.
+    with pytest.raises(PermissionError):
+        bedrock_kwargs(UserSettings())
+
+    store = SettingsStore(tmp_path / "s.json")
+    store.update({"secrets": {"AWS_ACCESS_KEY_ID": "AKIATESTTESTTEST1234", "AWS_SECRET_ACCESS_KEY": "secretsecretsecret9876", "NOT_ALLOWED": "x"}, "extra": {"AWS_REGION_NAME": "eu-west-1"}})
+    s = store.get()
+    assert "NOT_ALLOWED" not in s.secrets
+    kw = bedrock_kwargs(s)
+    assert kw == {"aws_access_key_id": "AKIATESTTESTTEST1234", "aws_secret_access_key": "secretsecretsecret9876", "aws_region_name": "eu-west-1"}
+    # Secrets never reach the process environment or the browser.
+    assert os.environ.get("AWS_SECRET_ACCESS_KEY") != "secretsecretsecret9876"
+    pub = store.public()
+    assert pub["secrets"]["AWS_SECRET_ACCESS_KEY"] == {"set": True, "masked": "••••9876"}
+    assert "secretsecretsecret9876" not in str(pub)
+    # A masked value sent back unchanged keeps the saved secret.
+    store.update({"secrets": {"AWS_SECRET_ACCESS_KEY": "••••9876"}})
+    assert store.get().secrets["AWS_SECRET_ACCESS_KEY"] == "secretsecretsecret9876"
+    # Clearing removes it; then machine credentials only with explicit permission.
+    store.update({"secrets": {"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": ""}, "bedrock_machine_credentials": True, "extra": {"AWS_PROFILE": "personal"}})
+    assert bedrock_kwargs(store.get()) == {"aws_region_name": "eu-west-1", "aws_profile_name": "personal"}
+
+
+async def test_bedrock_call_without_credentials_fails_cleanly():
+    from oracle.llm import LLMError, llm
+
+    with pytest.raises(LLMError, match="Bedrock has no keys"):
+        await llm.text(task="t", model="bedrock/amazon.nova-lite-v1:0", messages=[{"role": "user", "content": "hi"}])

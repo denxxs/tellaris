@@ -439,4 +439,6 @@ export type ProviderInfo = {
   key_url?: string;
   models: string[];
   note?: string;
+  fields?: { env: string; label: string; secret?: boolean; optional?: boolean; placeholder?: string }[];
+  machine_credentials?: boolean;
 };
