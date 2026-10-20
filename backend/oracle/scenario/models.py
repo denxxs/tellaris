@@ -138,6 +138,7 @@ class RunConfig(BaseModel):
     influencer_voices: int = Field(default=12, ge=0, le=200, description="Extra agents from influencer countries")
     research: bool = True
     memory: bool = Field(default=True, description="People in the society remember what they saw and reflect once at the end")
+    knowledge_graph: bool = Field(default=True, description="Map the topic as a knowledge graph and ground each person in the parts that touch them")
     influence_threshold: float = Field(default=0.25, ge=0, le=1)
     seed: int | None = None
     temperature: float = Field(default=0.9, ge=0, le=1.5)

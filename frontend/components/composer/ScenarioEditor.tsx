@@ -43,6 +43,7 @@ export function estimateCalls(spec: Spec, c: RunConfig) {
   if (spec.modes.includes("committee")) calls += c.committees * (spec.committee_roles.length * c.committee_rounds + 1);
   if (spec.modes.includes("diffusion")) calls += Math.min(c.diffusion_agent_cap, c.agents) * (c.diffusion_rounds + (c.memory === false ? 0 : 1));
   if (c.research) calls += 1;
+  if (c.knowledge_graph !== false) calls += 1;
   return calls;
 }
 
@@ -372,6 +373,12 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
             />
           )}
           <Toggle checked={config.research} onChange={(v) => onConfig({ ...config, research: v })} label="Web research" description="Ground people in current facts, prices and competitors." />
+          <Toggle
+            checked={config.knowledge_graph ?? true}
+            onChange={(v) => onConfig({ ...config, knowledge_graph: v })}
+            label="Knowledge graph"
+            description="Map who and what the question involves, and tell each person the parts that touch them. One extra model call."
+          />
           <Field label="Awareness" hint="Share of the audience who would realistically hear about it in the time frame.">
             {(id) => <Slider id={id} value={spec.assumed_reach} min={0.02} max={1} step={0.01} onChange={(v) => set("assumed_reach", v)} format={(v) => pct(v)} />}
           </Field>

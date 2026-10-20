@@ -67,6 +67,7 @@ export type RunConfig = {
   influencer_voices: number;
   research: boolean;
   memory?: boolean;
+  knowledge_graph?: boolean;
   influence_threshold: number;
   seed: number | null;
   temperature: number;
@@ -206,8 +207,29 @@ export type Results = {
   };
   themes?: { objections: Theme[]; reasons: Theme[]; change_mind: Theme[] };
   splits?: Splits;
+  graph?: KGraph;
   comparison?: { parent_id: string; parent_title: string; parent_value: number; delta: number };
 };
+
+export type KGKind = "product" | "competitor" | "company" | "regulator" | "policy" | "technology" | "customer" | "place" | "event" | "concept";
+export type KGSource = { statement: string; urls: string[]; public: boolean };
+export type KGEntity = {
+  id: string;
+  name: string;
+  type: KGKind;
+  summary: string;
+  aliases: string[];
+  countries: string[];
+  public: boolean;
+  sources: KGSource[];
+  mentions?: {
+    people: number;
+    lean: number | null;
+    samples: { persona_id: string; name: string; country: string; occupation: string; kind: "answer" | "post"; text: string; p: number }[];
+  };
+};
+export type KGRelation = { source: string; target: string; label: string; detail: string; public: boolean; sources: KGSource[] };
+export type KGraph = { product: string; entities: KGEntity[]; relations: KGRelation[] };
 
 export type SplitCell = { label: string; dims: string[]; keys?: Record<string, string>; n: number; value: number; ci: [number, number]; people?: number; vs_overall?: number };
 export type Splits = {

@@ -7,8 +7,8 @@ Ten features borrowed (as ideas only) from other simulation projects: MiroFish, 
 | 1 | [Track record](#1-track-record) | Aaru and other commercial tools (published predictions) | Done |
 | 2 | [Memory and reflection](#2-memory-and-reflection) | Generative Agents, AgentSociety | Done |
 | 3 | [Asking a group](#3-asking-a-group) | TinyTroupe, Synthetic Users | Done |
-| 4 | Knowledge graph for each simulation (from your prompt, files and research) | MiroFish | Next |
-| 5 | Ranked feed | OASIS | Planned |
+| 4 | [Knowledge graph](#4-knowledge-graph) for each simulation | MiroFish | Done |
+| 5 | Ranked feed | OASIS | Next |
 | 6 | Timeline of events | AgentSociety, Concordia | Planned |
 | 7 | Mid-run news | MiroFish | Planned |
 | 8 | Personas from your customer data | Electric Twin, Synthetic Users | Planned |
@@ -201,3 +201,97 @@ By hand:
 - People answer from what they decided and remember in this run, not from new research. Questions far from the topic get plausible but ungrounded answers.
 - Results are not tracked like predictions yet. A "track this answer" option would be a small addition to feature 1.
 - With the demo model, answers and themes are canned; real models answer in each person's voice.
+
+---
+
+## 4. Knowledge graph
+
+### What it does
+
+Every simulation maps the world around the question:
+- **entities:** the product, competitors and alternatives, companies, regulators and rules, technologies, kinds of people, places, events, and the ideas people argue about (price, trust, privacy, habit);
+- **links:** how they relate ("competes with", "regulates", "aimed at", "slows").
+
+The map does three jobs:
+- **Grounding:** each simulated person is told the few links that touch *them*, such as the competitor popular in their country or the rule that applies to their kind of company, not the whole map.
+- **Counting:** after the run, Oracle counts which entities people brought up in their answers and posts, and how those people leaned.
+- **Exploring:** a new **Knowledge graph** tab lets you explore it all.
+
+### What was done
+
+- **The Knowledge graph tab:**
+  - **An interactive map:**
+    - the product sits in the centre;
+    - nodes are coloured by kind and sized by how many people talked about them (or by number of connections; switch with **Size by**);
+    - links have arrows, and links that come only from your private files are dashed.
+  - **Moving around:** drag the background to move, drag a node to place it (it stays where you drop it), pinch or Ctrl + scroll to zoom, or use **+**, **−**, **Fit** and **All labels**.
+  - **Hover** a node to highlight its neighbours and see a tooltip: kind, number of links, how many people brought it up and how they leaned.
+  - **Select** a node to open it in the side panel:
+    - what it is, and where it mainly applies;
+    - **What people said**: how many people brought it up, their average leaning, and quotes with avatars that link to profiles;
+    - **Connections**: each link in plain words with the fact behind it; select one to jump to that node;
+    - **Where this comes from**: the facts it was built from, with source links, and private sources from your files marked.
+  - **Legend chips** double as filters: select a kind to hide or show it.
+  - **Find…** highlights matching nodes; Enter selects the first match.
+  - **Show as a list** gives a sortable table of every entity (kind, people, leaning, links), for accessibility and quick scanning.
+  - With nothing selected, the side panel shows **Most talked about**, ranked.
+  - It works with a keyboard (Tab to a node, Enter to select), in dark mode, and on phones, where the map uses a taller layout.
+- **Setup:** a **Knowledge graph** switch under How to simulate, on by default. It adds one model call.
+- **Live progress:** a new stage, "Mapping the topic", between research and influence.
+
+### How it works
+
+1. **Building it** (`backend/oracle/research/graph.py`, `build_graph`). One orchestrator call reads:
+   - the title, question, what people see, countries, alternatives, groups and outside factors;
+   - every fact from your files and the web, numbered, with internal facts marked.
+
+   It returns up to 30 entities and 60 links, citing fact numbers.
+2. **Cleaning it** (`clean`):
+   - names are de-duplicated and every entity gets a unique id;
+   - there is exactly one product node;
+   - links to unknown entities and repeated links are dropped, and so are entities nothing connects to;
+   - cited facts are attached as sources.
+3. **Privacy:**
+   - a link is private if it cites any internal fact from your files;
+   - an entity is private only if everything known about it is internal;
+   - the product is always public;
+   - private items are drawn for you, dashed and marked, and never reach simulated people.
+4. **Grounding people** (`context_for`). For each person, public links are scored by what touches them:
+   - the product;
+   - their country (named place, or an entity that applies there);
+   - their kind of work matching a customer or company entity;
+   - competitors and rules.
+
+   Links that apply only to other countries are skipped. The top four are added to their prompt as "What someone in your position would likely know about who and what is involved". **The business lens keeps its locked prompt and doesn't get this yet**: the B2B golden test confirms B2B results are unchanged. Once tracked predictions (feature 1) show grounding helps, it can be switched on for B2B too.
+5. **Counting mentions** (`mentions`). Each entity's name and aliases (e.g. "price" also matches "cost", "budget") are searched in every person's answer (quote, reasons, objections) and every post and reply. For each entity it records how many distinct people mentioned it, their average leaning, and up to six example snippets cut at word boundaries.
+6. **Storage:** saved in the run's results (`results.graph`). No new table.
+7. **Drawing** (`frontend/components/run/KnowledgeGraph.tsx`):
+   - **Layout:** `d3-force` (a new dependency) runs the physics: links, repulsion, collision padding and gentle centring. The layout is computed once up front, then stays live while dragging.
+   - **Sharp at every size:** the drawing uses real pixels, so text and lines stay crisp at any zoom and panel size.
+   - **Colours:** one fixed palette by kind, checked with the data-visualisation palette validator for light and dark mode. Light mode has one colour-blind warning (red vs green); it's allowed because every node has a text label and the legend names each kind. The product is drawn in ink and ideas in neutral grey. New `--kg-1`…`--kg-7` tokens are in `globals.css`.
+
+**Files:** `backend/oracle/research/graph.py` (new), `backend/oracle/pipeline.py` (graph stage, grounding, mentions), `backend/oracle/simulate/reaction.py` (optional "what you'd know" lines), `backend/oracle/scenario/models.py` (`knowledge_graph` setting), `backend/oracle/llm/mock.py` (offline `knowledge_graph`), `backend/tests/test_graph.py`, `frontend/components/run/KnowledgeGraph.tsx` (new), `frontend/app/runs/[id]/page.tsx`, `frontend/components/composer/ScenarioEditor.tsx`, `frontend/lib/types.ts`, `frontend/app/globals.css`, `frontend/package.json` (`d3-force`).
+
+### How to test
+
+Automated: `cd backend && python -m pytest tests/test_graph.py tests/test_golden.py`. It checks:
+- cleaning merges duplicates, drops unlinked entities and broken links, and keeps one product;
+- links citing internal facts are private, while the product stays public with its private sources marked;
+- an Indian person is told about the Indian competitor and not the US one (and the reverse), and never about private links;
+- a run has a graph whose links all point at real entities, and mentions with examples;
+- switching the graph off removes it;
+- B2B results are unchanged.
+
+By hand:
+1. Run a simulation. Naming competitors or a rule in the question gives a richer map, e.g. "Would people in India, Brazil and the US pay $4 a month for Penny, an app that tracks spending? Competitors: Walnut, Mint."
+2. Open the **Knowledge graph** tab. Hover nodes, drag a few, use **Fit** and **All labels**, and pinch or Ctrl + scroll to zoom.
+3. Select the most talked-about node. Read the quotes and select a person to open their profile. Back on the graph, select a connection in the side panel to jump along the map.
+4. Turn a kind off with its legend chip, search with **Find…**, switch **Size by** to Connections, then try **Show as a list**.
+5. Attach a document with an internal number (say, your monthly burn) and run again. Anything built only from it is dashed and marked "Only you see this".
+6. **Adjust setup first** → How to simulate → switch **Knowledge graph** off. The tab disappears.
+
+### Known limits
+
+- With the demo model, the map is built from the setup alone (product, groups, places, outside factors and four common ideas), so it's small. Real models produce up to 30 entities with facts.
+- Mentions are matched by name and alias, so a person who describes a competitor without naming it isn't counted.
+- The graph is built once per run, before people react. It doesn't grow from what people say yet.
