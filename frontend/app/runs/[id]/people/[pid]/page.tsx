@@ -12,6 +12,15 @@ import { useMeta } from "@/lib/meta";
 import { companyLabel, cx, int, money, people, pctSmart, shortJob, stanceFill, stanceText, titleCase } from "@/lib/format";
 import type { FeedItem, Profile, Run } from "@/lib/types";
 
+const FACT_TEXT: Record<string, [string, string]> = {
+  internet_daily: ["Uses the internet every day", "Doesn't use the internet every day"],
+  smartphone: ["Main phone is a smartphone", "Main phone isn't a smartphone"],
+  account: ["Has a bank or mobile-money account", "Has no bank or mobile-money account"],
+  credit_card: ["Has a credit card", "Has no credit card"],
+  emergency_hard: ["Would struggle to find emergency money within a month", "Could find emergency money within a month"],
+  news_online: ["Read news online in the past three months", "Hasn't read news online lately"],
+};
+
 const TRAIT_LABEL: Record<string, string> = {
   tech_affinity: "Comfort with technology",
   skepticism: "Scepticism",
@@ -271,8 +280,16 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                       {p.company_size > 1 && <span className="text-muted">, {int(p.company_size)} staff</span>}
                     </Fact>
                     <Fact label="Sector">{titleCase(p.sector)}</Fact>
-                    <Fact label="Income">
-                      <span className="num">{money(p.income_usd)}</span> a year, {p.income_band}
+                    <Fact label="Earnings">
+                      {p.income_usd != null ? (
+                        <>
+                          <span className="num">{money(p.income_usd)}</span> a year, {p.income_band}
+                        </>
+                      ) : p.seniority === "none" ? (
+                        "None of their own"
+                      ) : (
+                        <span className="text-muted">No data for this kind of work</span>
+                      )}
                     </Fact>
                     <Fact label="In buying decisions">{ROLE_LABEL[p.buyer_role] ?? titleCase(p.buyer_role)}</Fact>
                   </dl>
@@ -282,7 +299,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                       <div className="flex flex-wrap gap-1.5">{p.tools_today.map((t) => <Chip key={t}>{t}</Chip>)}</div>
                     </div>
                   )}
-                  <p className="mt-4 text-[12px] leading-4 text-faint">Job drawn from ILOSTAT employment data for {p.country_name}; income estimated from World Bank income per person and the job.</p>
+                  <p className="mt-4 text-[12px] leading-4 text-faint">Job, gender and age drawn from ILOSTAT employment data for {p.country_name}; earnings from ILOSTAT mean earnings for the job group, spread by the World Bank Gini index.</p>
                 </Card>
                 {(p.priorities.length > 0 || p.frustrations.length > 0 || p.info_sources.length > 0) && (
                   <Card>
@@ -294,10 +311,24 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                     </dl>
                   </Card>
                 )}
+                {p.facts && Object.keys(p.facts).length > 0 && (
+                  <Card>
+                    <CardHead title="Everyday facts">Drawn from World Bank Global Findex rates for people of their country, gender, age and income.</CardHead>
+                    <ul className="flex flex-col gap-1.5 text-[14px] leading-5">
+                      {Object.entries(p.facts).map(([k, v]) => (
+                        <li key={k} className="flex gap-2">
+                          <span aria-hidden className={cx("mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full", v ? "bg-text" : "bg-control")} />
+                          {FACT_TEXT[k]?.[v ? 0 : 1] ?? titleCase(k)}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+                {Object.values(p.traits).some((v) => v != null) && (
                 <Card>
-                  <CardHead title="How they think">Traits that shape every decision they make, from 0 to 100.</CardHead>
+                  <CardHead title="How they think">Personality measures from survey data, from 0 to 100.</CardHead>
                   <div className="flex flex-col gap-2.5">
-                    {Object.entries(p.traits).map(([k, v]) => (
+                    {(Object.entries(p.traits).filter(([, v]) => v != null) as [string, number][]).map(([k, v]) => (
                       <div key={k}>
                         <div className="flex justify-between text-[13px]">
                           <span className="text-muted">{TRAIT_LABEL[k] ?? titleCase(k)}</span>
@@ -310,6 +341,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                     ))}
                   </div>
                 </Card>
+                )}
               </div>
 
               {p.exposures.length > 0 && (

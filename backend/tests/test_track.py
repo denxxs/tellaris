@@ -25,7 +25,7 @@ def test_track_resolve_and_fit(client):
     head = r["results"]["headline"]
 
     # Dates in the past are refused: the prediction must come before the outcome.
-    bad = client.post(f"/api/runs/{rid}/track", json={"resolves_on": date.today().isoformat()})
+    bad = client.post(f"/api/runs/{rid}/track", json={"resolves_on": (date.today() - timedelta(days=2)).isoformat()})
     assert bad.status_code == 400
 
     p = client.post(f"/api/runs/{rid}/track", json={"resolves_on": future(), "note": "Bundestag vote"}).json()

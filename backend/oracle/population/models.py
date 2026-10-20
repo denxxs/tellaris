@@ -16,13 +16,26 @@ class Exposure(BaseModel):
 
 
 class Traits(BaseModel):
-    tech_affinity: float
-    skepticism: float
-    risk_appetite: float
-    price_sensitivity: float
-    conformity: float
-    openness: float
-    budget_authority: float
+    """Personality measures, only where survey data supplies them (None = no data, left out)."""
+
+    tech_affinity: float | None = None
+    skepticism: float | None = None
+    risk_appetite: float | None = None
+    price_sensitivity: float | None = None
+    conformity: float | None = None
+    openness: float | None = None
+    budget_authority: float | None = None
+
+
+FACT_TEXT = {
+    "internet_daily": ("Uses the internet every day", "Doesn't use the internet every day"),
+    "smartphone": ("Main phone is a smartphone", "Main phone isn't a smartphone"),
+    "account": ("Has a bank or mobile-money account", "Has no bank or mobile-money account"),
+    "credit_card": ("Has a credit card", "Has no credit card"),
+    "emergency_hard": ("Would struggle to find emergency money within a month", "Could find emergency money within a month"),
+    "news_online": ("Read news online in the past three months", "Hasn't read news online lately"),
+}
+SENIORITY_TEXT = {"executive": "executive", "senior": "manager", "staff": "", "none": ""}
 
 
 class Persona(BaseModel):
@@ -41,9 +54,10 @@ class Persona(BaseModel):
     buyer_role: str
     age: int
     gender: str
-    income_usd: int
-    income_band: str
-    traits: Traits
+    income_usd: int | None = None
+    income_band: str = ""
+    traits: Traits = Field(default_factory=Traits)
+    facts: dict[str, bool] = Field(default_factory=dict)  # digital and money facts, drawn from Global Findex
     exposures: list[Exposure] = Field(default_factory=list)
     is_buyer: bool = True
     weight: float = 1.0
@@ -68,17 +82,34 @@ class Persona(BaseModel):
     def card(self) -> str:
         """Compact description for prompts."""
         t = self.traits
-        lines = [
-            f"Name: {self.name or 'unnamed'} | {self.age}-year-old {self.gender} in {self.country_name}",
-            f"Job: {self.occupation} ({self.seniority}) at a {self.company_type.replace('_', ' ')}"
-            + (f" with ~{self.company_size:,} people" if self.company_size > 1 else "")
-            + f", sector: {self.sector.replace('_', ' ')}",
-            f"Income: ~${self.income_usd:,}/year ({self.income_band} for {self.country_name})",
-            f"Buying role: {self.buyer_role.replace('_', ' ')}; budget authority {t.budget_authority:.0%}",
-            "Traits (0-1): "
-            f"tech affinity {t.tech_affinity:.2f}, skepticism {t.skepticism:.2f}, risk appetite {t.risk_appetite:.2f}, "
-            f"price sensitivity {t.price_sensitivity:.2f}, follows peers {t.conformity:.2f}, openness {t.openness:.2f}",
-        ]
+        level = SENIORITY_TEXT.get(self.seniority, self.seniority)
+        working = self.seniority != "none"
+        lines = [f"Name: {self.name or 'unnamed'} | {self.age}-year-old {self.gender} in {self.country_name}"]
+        if working:
+            lines.append(
+                f"Job: {self.occupation}{f' ({level})' if level else ''}"
+                + (f" at a {self.company_type.replace('_', ' ')}" if self.company_type not in ("none", "") else "")
+                + (f" with ~{self.company_size:,} people" if self.company_size > 1 else "")
+                + (f", sector: {self.sector.replace('_', ' ')}" if self.sector not in ("none", "") else "")
+            )
+        else:
+            lines.append(f"Situation: {self.occupation}")
+        if self.income_usd is not None:
+            lines.append(f"Earnings: ~${self.income_usd:,}/year ({self.income_band} in {self.country_name})")
+        elif not working:
+            lines.append("No earnings of their own")
+        if self.buyer_role not in ("none", ""):
+            lines.append(f"Role in buying decisions: {self.buyer_role.replace('_', ' ')}")
+        known = [FACT_TEXT[k][0 if v else 1] for k, v in self.facts.items() if k in FACT_TEXT]
+        if known:
+            lines.append("Facts: " + "; ".join(known))
+        measured = {
+            "tech affinity": t.tech_affinity, "scepticism": t.skepticism, "risk appetite": t.risk_appetite,
+            "price sensitivity": t.price_sensitivity, "follows peers": t.conformity, "openness": t.openness,
+        }
+        shown = [f"{k} {v:.2f}" for k, v in measured.items() if v is not None]
+        if shown:
+            lines.append("Traits (0-1, from survey data): " + ", ".join(shown))
         # Only facts from data or from the user reach the prompt; the model-written face (name aside) does not.
         if self.group_trait:
             lines.append(f"Also true about you: {self.group_trait}")

@@ -1,30 +1,37 @@
-"""Population builder: draws a realistic, weighted set of people.
+"""Population builder: draws a realistic, weighted set of people from published statistics.
 
-Structure comes from data (country labour mix, income levels, digital maturity,
-regulation), so the crowd is not whatever an LLM imagines. The LLM only adds
-names and backstories afterwards (see enrich.py).
+Who they are comes from data: which jobs exist and how many people do them, their gender and age
+mix, earnings and spread, and digital and money facts (ILOSTAT, World Bank, Global Findex; see
+realdata.py). Where no data exists, the attribute is left out rather than made up. The model
+only adds names and a short story afterwards (see enrich.py).
 """
 
 from __future__ import annotations
 
 import math
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from statistics import NormalDist
 
 import numpy as np
 
 from ..scenario.models import Force, ScenarioSpec, Segment
 from ..world.countries import Country, Occupation, blocs, company_types, countries, occupations
 from ..world.influence import Influencer
-from .headcount import seg_headcount
+from . import realdata
+from .headcount import _POP_AGES, occupation_headcount, seg_headcount
 from .models import Exposure, Persona, Traits
 
-SENIORITY = ["junior", "mid", "senior", "executive"]
-SENIORITY_INCOME = {"junior": 0.7, "mid": 1.0, "senior": 1.5, "executive": 2.6}
-SENIORITY_AGE = {"junior": (21, 30), "mid": (27, 42), "senior": (34, 56), "executive": (38, 66)}
-SENIORITY_AUTHORITY = {"junior": 0.05, "mid": 0.2, "senior": 0.5, "executive": 0.85}
-OWNER_OCCUPATIONS = {"founder_b2b_saas", "founder_d2c", "smb_owner", "farmer", "freelancer", "electrician"}
+# Seniority is part of the job's definition, not drawn at random.
+EXECUTIVE_JOBS = {"founder_b2b_saas", "founder_d2c", "smb_owner", "ceo_enterprise", "cfo", "cto", "cio", "ciso", "vp_sales", "vc_investor"}
+OWNER_OCCUPATIONS = {"founder_b2b_saas", "founder_d2c", "smb_owner", "freelancer"}
 NON_WORKERS = {"student", "retiree", "homemaker", "unemployed"}
+FACT_GROUPS = ("female", "male", "young", "older", "poorest40", "richest60", "out_lf", "in_lf")
+
+
+def _logit(p: float) -> float:
+    p = min(max(p, 1e-4), 1 - 1e-4)
+    return math.log(p / (1 - p))
 
 
 @dataclass
@@ -36,13 +43,17 @@ class _Occ:
     isco: int
     sectors: list[str]
     company_types: list[str]
-    income_mult: float
-    tech: float
     buyer_role: str
+    isco08: list[str] = field(default_factory=list)
+    population: str | None = None
 
     @classmethod
     def of(cls, o: Occupation) -> "_Occ":
-        return cls(o.id, o.title, o.isco, o.sectors, o.company_types, o.income_mult, o.tech, o.buyer_role)
+        return cls(o.id, o.title, o.isco, o.sectors, o.company_types, o.buyer_role, list(o.isco08), o.population)
+
+    @property
+    def major(self) -> int | None:
+        return int(self.isco08[0][0]) if self.isco08 else None
 
 
 def _clip(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -74,6 +85,7 @@ def _allocate(total: int, weights: dict[str, float]) -> dict[str, int]:
 
 class PopulationBuilder:
     def __init__(self, spec: ScenarioSpec, influencers: list[Influencer], seed: int | None = None, weighting: str = "population"):
+        self.unknown_sizes: set[str] = set()
         self.spec = spec
         self.weighting = weighting
         self.influencers = influencers
@@ -89,35 +101,53 @@ class PopulationBuilder:
 
     def _segment_pool(self, seg: Segment, country: Country) -> list[tuple[_Occ, float]]:
         if seg.occupations:
-            shares = country.isco_shares()
             pool = []
             for oid in seg.occupations:
                 o = self.occ[oid]
-                # Within a segment, lean slightly on how common the job group is in this country.
-                group = shares.get(o.isco, 0.1) if o.isco else 0.1
-                pool.append((_Occ.of(o), o.weight * (0.5 + group)))
-            return pool
+                n = occupation_headcount(country.iso3, oid)
+                pool.append((_Occ.of(o), n))
+            if any(n is None for _, n in pool):
+                # No real size for some job: pick among them evenly and say so.
+                self.unknown_sizes.add(seg.name)
+                return [(o, 1.0) for o, _ in pool]
+            return [(o, max(n, 1e-9)) for o, n in pool]
         if seg.custom_occupation:
             title = seg.custom_occupation.strip().capitalize()
             sectors = self.spec.sectors[:2] or ["services"]
             ctypes = seg.company_types or ["smb", "midmarket", "enterprise"]
-            return [(_Occ(f"custom:{title.lower()}", title, 2, sectors, ctypes, 1.5, 0.6, "champion"), 1.0)]
+            self.unknown_sizes.add(seg.name)
+            return [(_Occ(f"custom:{title.lower()}", title, 2, sectors, ctypes, "champion"), 1.0)]
         return self._general_pool(country)
 
     def _general_pool(self, country: Country) -> list[tuple[_Occ, float]]:
-        """Representative adults: workers by ISCO mix, plus non-workers."""
-        shares = country.isco_shares()
-        adults = country.population_m * 0.72  # rough share aged 15+
-        worker_share = _clip(country.workforce_m / max(adults, 1), 0.3, 0.9)
-        by_group: dict[int, list[Occupation]] = {}
+        """Representative adults in their real proportions: the employed by occupation group (each
+        group voiced by the catalogue jobs in it), plus students, retirees, the unemployed and others
+        outside the labour force."""
+        iso = country.iso3
+        by2, _ = realdata.employed_2digit(iso, country.workforce_m * 1e6, country.isco_shares())
+        major_counts: dict[int, float] = {}
+        for g, n in by2.items():
+            major_counts[int(g[0])] = major_counts.get(int(g[0]), 0.0) + n
+        jobs_in: dict[int, list[Occupation]] = {}
         for o in self.occ.values():
-            by_group.setdefault(o.isco, []).append(o)
+            if o.isco08:
+                jobs_in.setdefault(int(o.isco08[0][0]), []).append(o)
         pool: list[tuple[_Occ, float]] = []
-        for g, members in by_group.items():
-            gw = worker_share * shares.get(g, 0) if g else (1 - worker_share)
-            total_w = sum(m.weight for m in members) or 1
-            for m in members:
-                pool.append((_Occ.of(m), gw * m.weight / total_w))
+        for g, n in major_counts.items():
+            members = jobs_in.get(g) or []
+            if not members:
+                continue
+            sizes = [occupation_headcount(iso, m.id) for m in members]
+            if all(x is not None for x in sizes) and sum(sizes) > 0:
+                rel = [x / sum(sizes) for x in sizes]
+            else:
+                rel = [1 / len(members)] * len(members)  # which job title voices the group, not how big it is
+            pool += [(_Occ.of(m), n * r) for m, r in zip(members, rel)]
+        for o in self.occ.values():
+            if o.population in ("students", "retirees", "unemployed", "outside_labour_force"):
+                n, _ = realdata.population_count(iso, o.population)
+                if n:
+                    pool.append((_Occ.of(o), n))
         return pool
 
     @staticmethod
@@ -136,17 +166,13 @@ class PopulationBuilder:
     # ---------- attributes ----------
 
     def _seniority(self, o: _Occ) -> str:
-        if o.id in OWNER_OCCUPATIONS:
+        if o.id in EXECUTIVE_JOBS:
             return "executive"
         if o.id in NON_WORKERS:
-            return "junior"
-        if o.isco == 1:
-            p = [0.0, 0.15, 0.45, 0.40]
-        elif o.isco in (2, 3):
-            p = [0.3, 0.4, 0.25, 0.05]
-        else:
-            p = [0.45, 0.4, 0.13, 0.02]
-        return SENIORITY[int(self.rng.choice(4, p=p))]
+            return "none"
+        if o.major == 1:
+            return "senior"
+        return "staff"
 
     def _company(self, o: _Occ, seg: Segment) -> tuple[str, int]:
         options = [c for c in (seg.company_types or []) if c in o.company_types] or o.company_types or ["smb"]
@@ -170,41 +196,61 @@ class PopulationBuilder:
             return self.spec.sectors[int(self.rng.integers(len(self.spec.sectors)))]
         return "services" if "all" in o.sectors else "none"
 
-    def _age(self, o: _Occ, seniority: str) -> int:
-        if o.id == "student":
-            return int(self.rng.integers(18, 26))
-        if o.id == "retiree":
-            return int(self.rng.integers(61, 82))
-        lo, hi = SENIORITY_AGE[seniority]
-        return int(self.rng.integers(lo, hi + 1))
+    def _sex(self, iso: str, o: _Occ, seg: Segment, lo: int, hi: int) -> str:
+        if seg.gender in ("woman", "man"):
+            return seg.gender
+        fs = realdata.female_share_job(iso, o.isco08) if o.isco08 else None
+        if fs is None:
+            fs = realdata.female_share(iso, lo, hi) or 0.5
+        return "woman" if self.rng.random() < fs else "man"
 
-    def _traits(self, o: _Occ, c: Country, seniority: str, age: int, ctype: str, size: int, income_rel: float) -> Traits:
-        r = self.rng
-        youth = _clip((45 - age) / 40, -0.5, 0.6)
-        tech = _clip(0.55 * o.tech + 0.2 * c.tech_trust + 0.15 * c.digital + 0.12 * youth + r.normal(0, 0.1))
-        skeptic = _clip(r.beta(2.6, 2.4) + 0.15 * (1 - c.tech_trust) - 0.1 + (0.05 if age > 50 else 0))
-        risk = _clip(r.beta(2.2, 2.8) + (0.25 if o.id.startswith("founder") or o.id == "vc_investor" else 0) + 0.08 * youth)
-        price = _clip(0.55 * c.price_sensitivity + 0.3 * (1 - _clip(income_rel / 3)) + r.normal(0, 0.1) + (0.1 if ctype in ("startup", "smb", "self_employed") else 0))
-        conformity = _clip(r.beta(2.4, 2.6) + (0.1 if c.region in ("East Asia", "South Asia", "Southeast Asia") else 0))
-        openness = _clip(r.beta(2.6, 2.2) + 0.1 * youth)
-        authority = SENIORITY_AUTHORITY[seniority]
-        if o.buyer_role == "economic_buyer":
-            authority += 0.15
-        if o.id in OWNER_OCCUPATIONS:
-            authority = 0.95
-        if ctype == "enterprise" and o.id not in OWNER_OCCUPATIONS:
-            authority *= 0.7
-        if o.id in NON_WORKERS:
-            authority = 0.0
-        return Traits(
-            tech_affinity=round(tech, 3),
-            skepticism=round(skeptic, 3),
-            risk_appetite=round(risk, 3),
-            price_sensitivity=round(price, 3),
-            conformity=round(conformity, 3),
-            openness=round(openness, 3),
-            budget_authority=round(_clip(authority + r.normal(0, 0.05)), 3),
-        )
+    def _age(self, iso: str, o: _Occ, sex: str, seg: Segment) -> int:
+        """Age band from the job's real age mix (ILOSTAT), year within it from the population shape."""
+        lo, hi = seg.age_min or 15, seg.age_max or 99
+        if o.population in _POP_AGES:
+            plo, phi = _POP_AGES[o.population]
+            lo, hi = max(lo, plo), min(hi, phi)
+            bands = [((lo, hi), 1.0)]
+        else:
+            bands = realdata.job_age_band_weights(iso, o.major) or [((15, 64), 1.0)]
+        cand = [((max(a, lo), min(b, hi)), w) for (a, b), w in bands if max(a, lo) <= min(b, hi) and w > 0]
+        if not cand:
+            cand = [((lo, max(lo, hi)), 1.0)]
+        weights = []
+        for (a, b), w in cand:
+            ages = realdata.age_weights(iso, a, b, sex)
+            band_total = realdata.people_aged(iso, a, b, sex) or 1.0
+            weights += [(age, w * n / band_total) for age, n in ages]
+        ws = np.array([max(x, 0.0) for _, x in weights]) + 1e-12
+        return int(weights[int(self.rng.choice(len(weights), p=ws / ws.sum()))][0])
+
+    def _income(self, iso: str, o: _Occ, c: Country) -> tuple[int | None, float | None, str]:
+        """Yearly earnings (USD) from ILOSTAT means and the country's Gini spread; None when no data
+        covers them (the self-employed, and people without a job)."""
+        if o.population or not o.isco08:
+            return None, None, "none" if o.id in NON_WORKERS else "unknown"
+        mean, _ = realdata.monthly_earnings(iso, o.major, c.gdp_pc_usd)
+        sigma, _ = realdata.income_sigma(iso)
+        x = mean * 12 * float(self.rng.lognormal(-sigma**2 / 2, sigma))  # mean-preserving
+        # Where they stand among all employees in the country.
+        national, _ = realdata.monthly_earnings(iso, None, c.gdp_pc_usd)
+        pct = NormalDist().cdf((math.log(max(x, 1) / (national * 12)) + sigma**2 / 2) / sigma)
+        band = "bottom 40% of earners" if pct < 0.4 else "middle 40% of earners" if pct < 0.8 else "top 20% of earners" if pct < 0.95 else "top 5% of earners"
+        return int(round(x, -2)), pct, band
+
+    def _facts(self, iso: str, sex: str, age: int, pct: float | None, working: bool) -> dict[str, bool]:
+        """Digital and money facts drawn from Global Findex rates for people like them."""
+        out: dict[str, bool] = {}
+        for fact, rates in (realdata.get(iso).get("findex") or {}).items():
+            base = rates.get("all")
+            if base is None:
+                continue
+            groups = ["female" if sex == "woman" else "male", "young" if age < 25 else "older", "in_lf" if working else "out_lf"]
+            if pct is not None:
+                groups.append("poorest40" if pct < 0.4 else "richest60")
+            z = _logit(base) + sum(_logit(rates[g]) - _logit(base) for g in groups if g in rates)
+            out[fact] = bool(self.rng.random() < 1 / (1 + math.exp(-z)))
+        return out
 
     def _exposures(self, iso: str, sector: str, o: _Occ, ctype: str) -> list[Exposure]:
         out: list[Exposure] = []
@@ -267,30 +313,17 @@ class PopulationBuilder:
         seniority = self._seniority(o)
         ctype, size = self._company(o, seg)
         sector = self._sector(o)
-        age = self._age(o, seniority)
-        if seg.age_min is not None or seg.age_max is not None:
-            lo, hi = seg.age_min or 15, max(seg.age_min or 15, seg.age_max or 95)
-            if not lo <= age <= hi:
-                age = int(self.rng.integers(lo, hi + 1))
-                # Keep seniority believable for the age we landed on.
-                if age < 26 and seniority in ("senior", "executive") and o.id not in OWNER_OCCUPATIONS:
-                    seniority = "junior"
-        income = c.gdp_pc_usd * o.income_mult * SENIORITY_INCOME[seniority] * float(self.rng.lognormal(0, 0.35))
-        if o.id in NON_WORKERS:
-            income = c.gdp_pc_usd * o.income_mult * float(self.rng.lognormal(0, 0.4))
-        rel = income / max(c.gdp_pc_usd, 1)
-        band = "low" if rel < 0.7 else "middle" if rel < 1.6 else "high" if rel < 4 else "very high"
-        traits = self._traits(o, c, seniority, age, ctype, size, rel)
-        if voice is None:
-            exposures = self._exposures(iso, sector, o, ctype)
-        else:
-            exposures = []
+        sex = self._sex(iso, o, seg, seg.age_min or 15, seg.age_max or 99)
+        age = self._age(iso, o, sex, seg)
+        income, pct, band = self._income(iso, o, c)
+        working = o.id not in NON_WORKERS or o.id == "unemployed"
+        facts = self._facts(iso, sex, age, pct, working)
+        exposures = self._exposures(iso, sector, o, ctype) if voice is None else []
         return Persona(
             id=idx, country=iso, country_name=c.name, segment=seg.name, segment_index=seg_index,
             occupation_id=o.id, occupation=o.title, isco=o.isco, sector=sector, company_type=ctype,
-            company_size=size, seniority=seniority, buyer_role=o.buyer_role, age=age,
-            gender=seg.gender if seg.gender in ("woman", "man") else str(self.rng.choice(["woman", "man", "non-binary person"], p=[0.475, 0.51, 0.015])),
-            income_usd=int(round(income, -2)), income_band=band, traits=traits, exposures=exposures,
+            company_size=size, seniority=seniority, buyer_role=o.buyer_role, age=age, gender=sex,
+            income_usd=income, income_band=band, traits=Traits(), facts=facts, exposures=exposures,
             is_buyer=seg.is_buyer if voice is None else False, influencer_voice=voice,
             group_trait=seg.trait if voice is None else None,
         )
@@ -318,16 +351,22 @@ class PopulationBuilder:
         }
         people: list[Persona] = []
         counter = 0
+        sizes = {
+            (iso, i): seg_headcount(iso, s)
+            for iso in country_w
+            for i, s in enumerate(segs)
+            if not s.countries or iso in s.countries
+        }
+        missing = {segs[k[1]].name for k, v in sizes.items() if v is None and segs[k[1]].is_buyer}
+        if self.weighting == "population" and missing:
+            # Some group has no published size: weight groups equally rather than invent one.
+            self.unknown_sizes |= missing
+            self.weighting = "equal"
         if self.weighting == "population":
             # Automatic sizing: every (country, group) cell gets agents in proportion to the
             # square root of its real headcount. Big groups get more agents, small ones still
             # get enough to say something, and the weights below put everyone back at true scale.
-            cell_heads = {
-                (iso, i): seg_headcount(iso, s)
-                for iso in country_w
-                for i, s in enumerate(segs)
-                if not s.countries or iso in s.countries
-            }
+            cell_heads = {k: v for k, v in sizes.items() if v is not None}
             buyer_cells = {f"{k[0]}|{k[1]}": math.sqrt(max(v, 1.0)) for k, v in cell_heads.items() if segs[k[1]].is_buyer}
             other_cells = {f"{k[0]}|{k[1]}": math.sqrt(max(v, 1.0)) for k, v in cell_heads.items() if not segs[k[1]].is_buyer}
             n_other = round(n * spec.general_population_share) if other_cells and buyer_cells else (n if other_cells else 0)
@@ -350,12 +389,9 @@ class PopulationBuilder:
         # How many real people each agent stands for: the cell's estimated headcount
         # split across the agents sampled into it.
         cells = Counter((p.country, p.segment_index) for p in people)
-        heads = {
-            key: seg_headcount(key[0], segs[key[1]])
-            for key in cells
-        }
         for p in people:
-            p.represents = round(heads[(p.country, p.segment_index)] / cells[(p.country, p.segment_index)], 1)
+            h = sizes.get((p.country, p.segment_index))
+            p.represents = round(h / cells[(p.country, p.segment_index)], 1) if h is not None else 0.0  # 0 = unknown
 
         if self.weighting == "population":
             # Weight = real people represented, normalised within buyers and within everyone else.

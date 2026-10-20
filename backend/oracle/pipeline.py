@@ -360,6 +360,7 @@ class Runner:
         themes = await extract_themes(agg.raw_lists(), roles.analyst, seed=self.cfg.seed)
         results["themes"] = themes.model_dump()
         results["seed"] = self.cfg.seed
+        results["sizes"] = getattr(self, "sizes", {"unknown": [], "weighting": self.cfg.weighting})
         results["as_of"] = as_of.isoformat()
         results["news_status"] = "ok" if news else news_status
         if news:
@@ -415,6 +416,9 @@ class Runner:
 
         builder = PopulationBuilder(spec, influencers, seed=self.cfg.seed, weighting=self.cfg.weighting)
         people = builder.build(self.cfg.agents, self.cfg.influencer_voices)
+        self.sizes = {"unknown": sorted(builder.unknown_sizes), "weighting": builder.weighting}
+        if builder.unknown_sizes:
+            await self.log(f"No published size for: {', '.join(sorted(builder.unknown_sizes))}. Groups are weighted equally.", "warn")
         await self.log(f"Sampled {len(people)} people across {len(spec.targets)} countries and {len(spec.segments)} segments")
         enriched = 0
 

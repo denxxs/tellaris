@@ -36,12 +36,11 @@ class EnrichedBatch(BaseModel):
 
 
 def _brief(p: Persona) -> str:
-    t = p.traits
     return (
         f"id={p.id} | {p.age} {p.gender} | {p.country_name} | {p.occupation} ({p.seniority}) | "
-        f"{p.company_type} ~{p.company_size} staff | sector {p.sector} | ${p.income_usd:,}/yr ({p.income_band}) | "
-        f"tech {t.tech_affinity:.2f} skeptic {t.skepticism:.2f} risk {t.risk_appetite:.2f} "
-        f"price-sens {t.price_sensitivity:.2f} authority {t.budget_authority:.2f}"
+        f"{p.company_type} ~{p.company_size} staff | sector {p.sector} | "
+        + (f"${p.income_usd:,}/yr ({p.income_band})" if p.income_usd is not None else "earnings: none or no data")
+        + (f" | {', '.join(k for k, v in p.facts.items() if v)}" if p.facts else "")
         + (f" | also: {p.group_trait}" if p.group_trait else "")
     )
 

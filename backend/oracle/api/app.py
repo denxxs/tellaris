@@ -181,15 +181,31 @@ class HeadcountRequest(BaseModel):
 @app.post("/api/scenario/headcount")
 async def headcount(req: HeadcountRequest) -> dict[str, Any]:
     """Estimated real people behind each group, per country."""
-    from ..population.headcount import seg_headcount, seg_is_estimated
+    from ..population.headcount import occupation_source, seg_headcount
 
     spec = req.spec
     out = []
     for seg in spec.segments:
         where = [c for c in (seg.countries or spec.targets) if c in countries()]
-        per = {c: round(seg_headcount(c, seg)) for c in where}
-        out.append({"name": seg.name, "total": sum(per.values()), "by_country": per, "estimated": seg_is_estimated(seg)})
-    return {"segments": out, "total": sum(s["total"] for s in out)}
+        raw = {c: seg_headcount(c, seg) for c in where}
+        per = {c: (round(v) if v is not None else None) for c, v in raw.items()}
+        known = all(v is not None for v in per.values())
+        why = None
+        if not known:
+            why = (
+                "no published figure for the share with this trait; add one if you know it" if seg.trait and seg.trait_share is None
+                else "no published count for this kind of job" if seg.custom_occupation or seg.occupations
+                else "no data"
+            )
+        sources = sorted({occupation_source(c, oid) for c in where for oid in seg.occupations}) if seg.occupations else []
+        if seg.trait and seg.trait_share is not None:
+            sources.append(f"Share with the trait: {seg.trait_source or 'your figure'}")
+        out.append({
+            "name": seg.name, "total": sum(v for v in per.values() if v is not None) if known else None, "by_country": per,
+            "known": known, "why_unknown": why, "sources": sources, "estimated": not known,
+        })
+    totals = [s["total"] for s in out]
+    return {"segments": out, "total": sum(totals) if all(t is not None for t in totals) else None}
 
 
 class WorldRequest(BaseModel):

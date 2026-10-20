@@ -97,10 +97,11 @@ class Aggregator:
             boots[b] = _wmean(apply_array(vals, self.cal), w[idx]) * self.reach
         lo, hi = np.nanpercentile(boots, [5, 95])
         heads = float(sum(p.represents for p in people))
+        known = all(p.represents > 0 for p in people)  # 0 = no published size for their group
         return {
             "n": n,
-            "people": round(heads),
-            "adopters": round(point * heads * self.aw) if self.aw is not None else None,
+            "people": round(heads) if known else None,
+            "adopters": round(point * heads * self.aw) if self.aw is not None and known else None,
             "stated": round(_wmean(stated, w), 4),
             "calibrated": round(_wmean(cal, w), 4),
             "value": round(point, 4),
@@ -190,18 +191,29 @@ class Aggregator:
         return sorted(out, key=lambda x: -x["n"])
 
     def drivers(self) -> list[dict[str, Any]]:
-        """Weighted correlation of each trait with the outcome."""
+        """Weighted correlation of each measured attribute with the outcome."""
         if len(self.focus) < 8:
             return []
         y = np.array([self._p(p.id) for p in self.focus])
         w = self._weights(self.focus)
         out = []
-        for trait in ["tech_affinity", "skepticism", "risk_appetite", "price_sensitivity", "conformity", "openness", "budget_authority"]:
-            x = np.array([getattr(p.traits, trait) for p in self.focus])
-            mx, my = _wmean(x, w), _wmean(y, w)
-            cov = _wmean((x - mx) * (y - my), w)
-            sx = np.sqrt(_wmean((x - mx) ** 2, w))
-            sy = np.sqrt(_wmean((y - my) ** 2, w))
+        # Survey traits where present, the person's Findex facts (yes = 1), and age.
+        candidates: dict[str, list[float | None]] = {}
+        for trait in ["tech_affinity", "skepticism", "risk_appetite", "price_sensitivity", "conformity", "openness"]:
+            candidates[trait] = [getattr(p.traits, trait) for p in self.focus]
+        for fact in sorted({k for p in self.focus for k in p.facts}):
+            candidates[fact] = [(1.0 if p.facts[fact] else 0.0) if fact in p.facts else None for p in self.focus]
+        candidates["age"] = [float(p.age) for p in self.focus]
+        for trait, vals in candidates.items():
+            if sum(v is not None for v in vals) < 0.8 * len(vals):
+                continue  # too few people have it to compare
+            keep = np.array([v is not None for v in vals])
+            x = np.array([v for v in vals if v is not None], dtype=float)
+            ww, yy = w[keep], y[keep]
+            mx, my = _wmean(x, ww), _wmean(yy, ww)
+            cov = _wmean((x - mx) * (yy - my), ww)
+            sx = np.sqrt(_wmean((x - mx) ** 2, ww))
+            sy = np.sqrt(_wmean((yy - my) ** 2, ww))
             r = cov / (sx * sy) if sx > 0 and sy > 0 else 0.0
             out.append({"trait": trait, "correlation": round(float(r), 3)})
         out.sort(key=lambda d: -abs(d["correlation"]))
@@ -448,10 +460,10 @@ class Aggregator:
         )
         heads = float(head.get("people") or 0)
         # Without a given awareness, scale is stated per 1% of the audience who hears about it.
-        per_point = round(head["value"] * heads / 100) if self.lens.reach and head.get("value") is not None else None
+        per_point = round(head["value"] * heads / 100) if self.lens.reach and head.get("value") is not None and heads else None
         revenue = None
         price = self.spec.price
-        if price and self.lens.revenue and head.get("value") is not None:
+        if price and self.lens.revenue and head.get("value") is not None and heads:
             per_month = {"month": 1.0, "per-seat-month": 1.0, "year": 1 / 12, "usage": 1.0}.get(price.period)
             if per_month is not None:
                 unit = price.amount * per_month

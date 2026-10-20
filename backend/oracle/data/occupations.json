@@ -22,7 +22,8 @@
    0.06,
    0.1
   ],
-  "adult_share": "Share of all adults (non-workers). Retirees use the country's 65+ share; job seekers use unemployment."
+  "adult_share": "Share of all adults (non-workers). Retirees use the country's 65+ share; job seekers use unemployment.",
+  "isco08": "isco08: official ISCO-08 unit groups for each job. population: jobs without an ISCO code are counted from another real source (ILO employers, own-account workers, students, retirees, unemployed) or marked unknown. A 2-digit code means the whole sub-major group."
  },
  "occupations": [
   {
@@ -40,7 +41,8 @@
    "income_mult": 2.2,
    "tech": 0.9,
    "buyer_role": "economic_buyer",
-   "base_share": 0.0003
+   "base_share": 0.0003,
+   "population": "unknown"
   },
   {
    "id": "founder_d2c",
@@ -57,7 +59,8 @@
    "income_mult": 1.8,
    "tech": 0.7,
    "buyer_role": "economic_buyer",
-   "base_share": 0.0003
+   "base_share": 0.0003,
+   "population": "unknown"
   },
   {
    "id": "smb_owner",
@@ -76,7 +79,8 @@
    "income_mult": 1.4,
    "tech": 0.45,
    "buyer_role": "economic_buyer",
-   "base_share": 0.03
+   "base_share": 0.03,
+   "population": "employers"
   },
   {
    "id": "ceo_enterprise",
@@ -92,7 +96,10 @@
    "income_mult": 8.0,
    "tech": 0.6,
    "buyer_role": "economic_buyer",
-   "base_share": 0.0005
+   "base_share": 0.0005,
+   "isco08": [
+    "1120"
+   ]
   },
   {
    "id": "cfo",
@@ -110,7 +117,10 @@
    "income_mult": 4.5,
    "tech": 0.55,
    "buyer_role": "economic_buyer",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "1211"
+   ]
   },
   {
    "id": "cto",
@@ -131,7 +141,10 @@
    "income_mult": 4.0,
    "tech": 0.95,
    "buyer_role": "technical",
-   "base_share": 0.0015
+   "base_share": 0.0015,
+   "isco08": [
+    "1330"
+   ]
   },
   {
    "id": "cio",
@@ -149,7 +162,10 @@
    "income_mult": 4.0,
    "tech": 0.85,
    "buyer_role": "economic_buyer",
-   "base_share": 0.001
+   "base_share": 0.001,
+   "isco08": [
+    "1330"
+   ]
   },
   {
    "id": "ciso",
@@ -169,7 +185,10 @@
    "income_mult": 4.0,
    "tech": 0.9,
    "buyer_role": "security_legal",
-   "base_share": 0.0002
+   "base_share": 0.0002,
+   "isco08": [
+    "1330"
+   ]
   },
   {
    "id": "vp_sales",
@@ -187,7 +206,10 @@
    "income_mult": 3.5,
    "tech": 0.6,
    "buyer_role": "champion",
-   "base_share": 0.003
+   "base_share": 0.003,
+   "isco08": [
+    "1221"
+   ]
   },
   {
    "id": "head_marketing",
@@ -206,7 +228,10 @@
    "income_mult": 3.2,
    "tech": 0.7,
    "buyer_role": "champion",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "1221"
+   ]
   },
   {
    "id": "head_hr",
@@ -223,7 +248,10 @@
    "income_mult": 3.0,
    "tech": 0.5,
    "buyer_role": "champion",
-   "base_share": 0.001
+   "base_share": 0.001,
+   "isco08": [
+    "1212"
+   ]
   },
   {
    "id": "head_ops",
@@ -241,7 +269,10 @@
    "income_mult": 3.6,
    "tech": 0.6,
    "buyer_role": "economic_buyer",
-   "base_share": 0.003
+   "base_share": 0.003,
+   "isco08": [
+    "1219"
+   ]
   },
   {
    "id": "product_manager",
@@ -263,7 +294,10 @@
    "income_mult": 2.6,
    "tech": 0.85,
    "buyer_role": "champion",
-   "base_share": 0.003
+   "base_share": 0.003,
+   "isco08": [
+    "1219"
+   ]
   },
   {
    "id": "procurement_manager",
@@ -281,7 +315,10 @@
    "income_mult": 2.4,
    "tech": 0.45,
    "buyer_role": "procurement",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "1324"
+   ]
   },
   {
    "id": "retail_store_manager",
@@ -300,7 +337,10 @@
    "income_mult": 1.5,
    "tech": 0.4,
    "buyer_role": "end_user",
-   "base_share": 0.01
+   "base_share": 0.01,
+   "isco08": [
+    "1420"
+   ]
   },
   {
    "id": "public_official",
@@ -316,7 +356,10 @@
    "income_mult": 2.5,
    "tech": 0.4,
    "buyer_role": "economic_buyer",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "1112"
+   ]
   },
   {
    "id": "software_engineer",
@@ -337,7 +380,14 @@
    "income_mult": 2.0,
    "tech": 0.95,
    "buyer_role": "technical",
-   "base_share": 0.012
+   "base_share": 0.012,
+   "isco08": [
+    "2511",
+    "2512",
+    "2513",
+    "2514",
+    "2519"
+   ]
   },
   {
    "id": "it_services_engineer",
@@ -353,7 +403,12 @@
    "income_mult": 1.6,
    "tech": 0.85,
    "buyer_role": "end_user",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "2522",
+    "2523",
+    "2529"
+   ]
   },
   {
    "id": "it_services_analyst",
@@ -370,7 +425,10 @@
    "income_mult": 1.5,
    "tech": 0.7,
    "buyer_role": "end_user",
-   "base_share": 0.001
+   "base_share": 0.001,
+   "isco08": [
+    "2511"
+   ]
   },
   {
    "id": "financial_analyst",
@@ -387,7 +445,10 @@
    "income_mult": 1.9,
    "tech": 0.65,
    "buyer_role": "end_user",
-   "base_share": 0.003
+   "base_share": 0.003,
+   "isco08": [
+    "2413"
+   ]
   },
   {
    "id": "investment_banker",
@@ -403,7 +464,10 @@
    "income_mult": 4.0,
    "tech": 0.6,
    "buyer_role": "none",
-   "base_share": 0.0005
+   "base_share": 0.0005,
+   "isco08": [
+    "2412"
+   ]
   },
   {
    "id": "vc_investor",
@@ -419,7 +483,8 @@
    "income_mult": 4.5,
    "tech": 0.8,
    "buyer_role": "none",
-   "base_share": 5e-05
+   "base_share": 5e-05,
+   "population": "unknown"
   },
   {
    "id": "accountant",
@@ -438,7 +503,10 @@
    "income_mult": 1.4,
    "tech": 0.5,
    "buyer_role": "end_user",
-   "base_share": 0.009
+   "base_share": 0.009,
+   "isco08": [
+    "2411"
+   ]
   },
   {
    "id": "data_scientist",
@@ -458,7 +526,10 @@
    "income_mult": 2.3,
    "tech": 0.97,
    "buyer_role": "technical",
-   "base_share": 0.0015
+   "base_share": 0.0015,
+   "isco08": [
+    "2120"
+   ]
   },
   {
    "id": "designer",
@@ -477,7 +548,11 @@
    "income_mult": 1.7,
    "tech": 0.85,
    "buyer_role": "end_user",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "2163",
+    "2166"
+   ]
   },
   {
    "id": "management_consultant",
@@ -494,7 +569,10 @@
    "income_mult": 2.6,
    "tech": 0.65,
    "buyer_role": "none",
-   "base_share": 0.006
+   "base_share": 0.006,
+   "isco08": [
+    "2421"
+   ]
   },
   {
    "id": "lawyer",
@@ -513,7 +591,10 @@
    "income_mult": 2.5,
    "tech": 0.45,
    "buyer_role": "security_legal",
-   "base_share": 0.005
+   "base_share": 0.005,
+   "isco08": [
+    "2611"
+   ]
   },
   {
    "id": "doctor",
@@ -531,7 +612,11 @@
    "income_mult": 2.8,
    "tech": 0.55,
    "buyer_role": "end_user",
-   "base_share": 0.006
+   "base_share": 0.006,
+   "isco08": [
+    "2211",
+    "2212"
+   ]
   },
   {
    "id": "nurse",
@@ -548,7 +633,11 @@
    "income_mult": 1.1,
    "tech": 0.45,
    "buyer_role": "end_user",
-   "base_share": 0.02
+   "base_share": 0.02,
+   "isco08": [
+    "2221",
+    "3221"
+   ]
   },
   {
    "id": "teacher",
@@ -565,7 +654,12 @@
    "income_mult": 1.0,
    "tech": 0.45,
    "buyer_role": "end_user",
-   "base_share": 0.025
+   "base_share": 0.025,
+   "isco08": [
+    "2330",
+    "2341",
+    "2342"
+   ]
   },
   {
    "id": "professor",
@@ -582,7 +676,10 @@
    "income_mult": 1.7,
    "tech": 0.65,
    "buyer_role": "none",
-   "base_share": 0.008
+   "base_share": 0.008,
+   "isco08": [
+    "2310"
+   ]
   },
   {
    "id": "civil_engineer",
@@ -600,7 +697,10 @@
    "income_mult": 1.6,
    "tech": 0.6,
    "buyer_role": "end_user",
-   "base_share": 0.006
+   "base_share": 0.006,
+   "isco08": [
+    "2142"
+   ]
   },
   {
    "id": "marketing_specialist",
@@ -619,7 +719,10 @@
    "income_mult": 1.3,
    "tech": 0.7,
    "buyer_role": "end_user",
-   "base_share": 0.006
+   "base_share": 0.006,
+   "isco08": [
+    "2431"
+   ]
   },
   {
    "id": "journalist",
@@ -636,7 +739,10 @@
    "income_mult": 1.1,
    "tech": 0.7,
    "buyer_role": "none",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "2642"
+   ]
   },
   {
    "id": "policy_analyst",
@@ -652,7 +758,10 @@
    "income_mult": 1.4,
    "tech": 0.5,
    "buyer_role": "none",
-   "base_share": 0.004
+   "base_share": 0.004,
+   "isco08": [
+    "2422"
+   ]
   },
   {
    "id": "it_support",
@@ -671,12 +780,16 @@
    "income_mult": 1.2,
    "tech": 0.8,
    "buyer_role": "technical",
-   "base_share": 0.006
+   "base_share": 0.006,
+   "isco08": [
+    "3511",
+    "3512"
+   ]
   },
   {
    "id": "sales_rep",
    "title": "B2B Sales Representative / Account Executive",
-   "isco": 3,
+   "isco": 2,
    "weight": 2.0,
    "sectors": [
     "all"
@@ -690,7 +803,11 @@
    "income_mult": 1.4,
    "tech": 0.6,
    "buyer_role": "end_user",
-   "base_share": 0.012
+   "base_share": 0.012,
+   "isco08": [
+    "2433",
+    "3322"
+   ]
   },
   {
    "id": "bookkeeper",
@@ -708,7 +825,11 @@
    "income_mult": 1.0,
    "tech": 0.5,
    "buyer_role": "end_user",
-   "base_share": 0.01
+   "base_share": 0.01,
+   "isco08": [
+    "3313",
+    "4311"
+   ]
   },
   {
    "id": "lab_technician",
@@ -725,7 +846,11 @@
    "income_mult": 1.0,
    "tech": 0.55,
    "buyer_role": "end_user",
-   "base_share": 0.003
+   "base_share": 0.003,
+   "isco08": [
+    "3111",
+    "3212"
+   ]
   },
   {
    "id": "real_estate_agent",
@@ -741,7 +866,10 @@
    "income_mult": 1.2,
    "tech": 0.5,
    "buyer_role": "end_user",
-   "base_share": 0.004
+   "base_share": 0.004,
+   "isco08": [
+    "3334"
+   ]
   },
   {
    "id": "freelancer",
@@ -758,12 +886,13 @@
    "income_mult": 1.2,
    "tech": 0.9,
    "buyer_role": "economic_buyer",
-   "base_share": 0.004
+   "base_share": 0.004,
+   "population": "own_account"
   },
   {
    "id": "admin_assistant",
    "title": "Administrative Assistant",
-   "isco": 4,
+   "isco": 3,
    "weight": 2.0,
    "sectors": [
     "all"
@@ -777,7 +906,12 @@
    "income_mult": 0.8,
    "tech": 0.45,
    "buyer_role": "end_user",
-   "base_share": 0.02
+   "base_share": 0.02,
+   "isco08": [
+    "3343",
+    "4110",
+    "4120"
+   ]
   },
   {
    "id": "bpo_agent",
@@ -795,7 +929,10 @@
    "income_mult": 0.75,
    "tech": 0.55,
    "buyer_role": "end_user",
-   "base_share": 0.015
+   "base_share": 0.015,
+   "isco08": [
+    "4222"
+   ]
   },
   {
    "id": "bank_clerk",
@@ -811,7 +948,10 @@
    "income_mult": 0.9,
    "tech": 0.45,
    "buyer_role": "end_user",
-   "base_share": 0.003
+   "base_share": 0.003,
+   "isco08": [
+    "4211"
+   ]
   },
   {
    "id": "data_entry",
@@ -828,7 +968,10 @@
    "income_mult": 0.7,
    "tech": 0.4,
    "buyer_role": "end_user",
-   "base_share": 0.004
+   "base_share": 0.004,
+   "isco08": [
+    "4132"
+   ]
   },
   {
    "id": "retail_worker",
@@ -845,7 +988,11 @@
    "income_mult": 0.65,
    "tech": 0.35,
    "buyer_role": "none",
-   "base_share": 0.03
+   "base_share": 0.03,
+   "isco08": [
+    "5223",
+    "5230"
+   ]
   },
   {
    "id": "restaurant_worker",
@@ -861,12 +1008,17 @@
    "income_mult": 0.6,
    "tech": 0.3,
    "buyer_role": "none",
-   "base_share": 0.03
+   "base_share": 0.03,
+   "isco08": [
+    "5120",
+    "5131",
+    "9412"
+   ]
   },
   {
    "id": "gig_driver",
    "title": "Ride-hailing / Delivery Driver",
-   "isco": 5,
+   "isco": 8,
    "weight": 1.5,
    "sectors": [
     "logistics"
@@ -877,7 +1029,10 @@
    "income_mult": 0.65,
    "tech": 0.55,
    "buyer_role": "none",
-   "base_share": 0.01
+   "base_share": 0.01,
+   "isco08": [
+    "8322"
+   ]
   },
   {
    "id": "caregiver",
@@ -894,7 +1049,11 @@
    "income_mult": 0.6,
    "tech": 0.3,
    "buyer_role": "none",
-   "base_share": 0.015
+   "base_share": 0.015,
+   "isco08": [
+    "5311",
+    "5322"
+   ]
   },
   {
    "id": "security_guard",
@@ -912,7 +1071,10 @@
    "income_mult": 0.75,
    "tech": 0.3,
    "buyer_role": "none",
-   "base_share": 0.008
+   "base_share": 0.008,
+   "isco08": [
+    "5414"
+   ]
   },
   {
    "id": "farmer",
@@ -929,12 +1091,16 @@
    "income_mult": 0.5,
    "tech": 0.25,
    "buyer_role": "economic_buyer",
-   "base_share": 0.004
+   "base_share": 0.004,
+   "isco08": [
+    "61",
+    "63"
+   ]
   },
   {
    "id": "agri_worker",
    "title": "Agricultural / Fishery Worker",
-   "isco": 6,
+   "isco": 9,
    "weight": 3.0,
    "sectors": [
     "agriculture"
@@ -945,7 +1111,10 @@
    "income_mult": 0.4,
    "tech": 0.2,
    "buyer_role": "none",
-   "base_share": 0.006
+   "base_share": 0.006,
+   "isco08": [
+    "92"
+   ]
   },
   {
    "id": "electrician",
@@ -962,7 +1131,11 @@
    "income_mult": 0.9,
    "tech": 0.35,
    "buyer_role": "economic_buyer",
-   "base_share": 0.012
+   "base_share": 0.012,
+   "isco08": [
+    "7411",
+    "7412"
+   ]
   },
   {
    "id": "construction_worker",
@@ -978,7 +1151,17 @@
    "income_mult": 0.7,
    "tech": 0.2,
    "buyer_role": "none",
-   "base_share": 0.015
+   "base_share": 0.015,
+   "isco08": [
+    "7111",
+    "7112",
+    "7113",
+    "7114",
+    "7115",
+    "7119",
+    "9312",
+    "9313"
+   ]
   },
   {
    "id": "tailor",
@@ -995,7 +1178,11 @@
    "income_mult": 0.55,
    "tech": 0.2,
    "buyer_role": "none",
-   "base_share": 0.002
+   "base_share": 0.002,
+   "isco08": [
+    "7531",
+    "7533"
+   ]
   },
   {
    "id": "factory_operator",
@@ -1012,7 +1199,11 @@
    "income_mult": 0.75,
    "tech": 0.3,
    "buyer_role": "none",
-   "base_share": 0.02
+   "base_share": 0.02,
+   "isco08": [
+    "81",
+    "82"
+   ]
   },
   {
    "id": "truck_driver",
@@ -1029,7 +1220,10 @@
    "income_mult": 0.8,
    "tech": 0.3,
    "buyer_role": "none",
-   "base_share": 0.015
+   "base_share": 0.015,
+   "isco08": [
+    "8332"
+   ]
   },
   {
    "id": "cleaner",
@@ -1046,7 +1240,11 @@
    "income_mult": 0.45,
    "tech": 0.15,
    "buyer_role": "none",
-   "base_share": 0.015
+   "base_share": 0.015,
+   "isco08": [
+    "9111",
+    "9112"
+   ]
   },
   {
    "id": "laborer",
@@ -1064,12 +1262,17 @@
    "income_mult": 0.45,
    "tech": 0.15,
    "buyer_role": "none",
-   "base_share": 0.015
+   "base_share": 0.015,
+   "isco08": [
+    "9311",
+    "9321",
+    "9329"
+   ]
   },
   {
    "id": "warehouse_worker",
    "title": "Warehouse / Delivery Worker",
-   "isco": 9,
+   "isco": 4,
    "weight": 1.5,
    "sectors": [
     "logistics",
@@ -1082,7 +1285,11 @@
    "income_mult": 0.6,
    "tech": 0.3,
    "buyer_role": "none",
-   "base_share": 0.012
+   "base_share": 0.012,
+   "isco08": [
+    "4321",
+    "9333"
+   ]
   },
   {
    "id": "student",
@@ -1098,7 +1305,8 @@
    "income_mult": 0.2,
    "tech": 0.85,
    "buyer_role": "none",
-   "adult_share": 0.07
+   "adult_share": 0.07,
+   "population": "students"
   },
   {
    "id": "retiree",
@@ -1114,7 +1322,8 @@
    "income_mult": 0.6,
    "tech": 0.25,
    "buyer_role": "none",
-   "adult_share": 0.0
+   "adult_share": 0.0,
+   "population": "retirees"
   },
   {
    "id": "homemaker",
@@ -1130,7 +1339,8 @@
    "income_mult": 0.3,
    "tech": 0.35,
    "buyer_role": "none",
-   "adult_share": 0.05
+   "adult_share": 0.05,
+   "population": "outside_labour_force"
   },
   {
    "id": "unemployed",
@@ -1146,7 +1356,8 @@
    "income_mult": 0.25,
    "tech": 0.45,
    "buyer_role": "none",
-   "adult_share": 0.0
+   "adult_share": 0.0,
+   "population": "unemployed"
   }
  ],
  "company_types": {

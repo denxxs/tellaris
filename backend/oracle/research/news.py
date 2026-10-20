@@ -291,7 +291,6 @@ def know_chance(p: Persona, countries: list[str], reach: str, audiences: list[st
         base *= 1.3 if p.age < 30 else 0.6 if p.age >= 45 else 1.0
     elif age_skew == "old":
         base *= 1.3 if p.age >= 50 else 0.6 if p.age < 30 else 1.0
-    base *= 0.85 + 0.3 * p.traits.openness
     return max(0.0, min(0.97, base))
 
 

@@ -36,7 +36,8 @@ class Segment(BaseModel):
     age_max: int | None = Field(default=None, ge=15, le=100, description="Oldest age in the group, e.g. 28 for Gen Z")
     gender: Literal["any", "woman", "man"] = Field(default="any", description="Only when the question is about one gender")
     trait: str | None = Field(default=None, description="Any other defining trait, e.g. 'own a dog', 'Taylor Swift fans'")
-    trait_share: float | None = Field(default=None, ge=0, le=1, description="Estimated share of the base population with the trait")
+    trait_share: float | None = Field(default=None, ge=0, le=1, description="Share of the base population with the trait, ONLY if the user states it; else null (Oracle looks it up)")
+    trait_source: str | None = Field(default=None, description="Where trait_share comes from: 'you' or a source link")
     weight: float = Field(default=1.0, ge=0, description="Relative share of agents for this segment")
     is_buyer: bool = Field(default=True, description="True if this segment's behaviour is the outcome being predicted")
 

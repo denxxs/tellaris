@@ -1,93 +1,146 @@
-"""How many real people a simulated group stands for.
+"""How many real people a simulated group stands for, from published statistics.
 
-A job's headcount in a country = employed workforce x the job's baseline share of a
-US-like workforce x (how big its ISCO group is in this country / in the reference)
-x a sector factor (startup density for founders, software spend for tech jobs, the
-size of the IT-services industry for IT-services roles). Non-workers are shares of
-adults. These are order-of-magnitude estimates, labelled as such in the UI.
+- A job with ISCO-08 codes: employed people in each 2-digit group (ILOSTAT), times the 4-digit
+  unit group's share of its 2-digit group (from US occupational data; see build_people.py).
+- Business owners, freelancers, students, retirees, the unemployed and people outside the labour
+  force come from ILOSTAT and World Bank counts (see realdata.population_count).
+- Age and gender filters use the job's real age and gender mix (ILOSTAT), or the country's
+  population by age and sex (World Bank) for people outside jobs.
+- When no source exists (e.g. "startup founders"), the size is unknown and returned as None:
+  Oracle never makes one up.
 """
 
 from __future__ import annotations
 
-import math
 from functools import lru_cache
 
-from ..world.countries import Country, Occupation, countries, occupation_meta, occupations
+from ..world.countries import Occupation, countries, occupations
+from . import realdata
 
-TECH_SECTORS = {"software", "it_services", "finance"}
-DEFAULT_CUSTOM_SHARE = 0.002  # a niche job we know nothing about: 0.2% of the workforce
+UNKNOWN = None
 
 
-def _sector_factor(o: Occupation, c: Country) -> float:
-    if o.id.startswith("founder") or o.id == "vc_investor":
-        return max(0.05, c.startups / 0.95) ** 1.5
-    if o.id.startswith("it_services") or o.id == "bpo_agent":
-        hub = occupation_meta()["it_services_hubs"].get(c.iso3, 0.6)
-        return hub
-    if set(o.sectors) & TECH_SECTORS and o.isco in (1, 2, 3):
-        return max(0.1, c.saas) ** 0.6
-    return 1.0
+def _job_codes(o: Occupation) -> list[str]:
+    return list(getattr(o, "isco08", None) or [])
 
 
 @lru_cache(maxsize=20000)
-def occupation_headcount(iso: str, occupation_id: str) -> float:
-    """People (not millions) doing this job in this country."""
+def occupation_headcount(iso: str, occupation_id: str) -> float | None:
+    """People doing this job in this country, or None when no source exists."""
     c = countries()[iso]
     o = occupations().get(occupation_id)
-    adults = c.adults_m * 1e6
-    workforce = c.workforce_m * 1e6
     if o is None:
-        return workforce * DEFAULT_CUSTOM_SHARE
-    if o.adult_share is not None or o.isco == 0:
-        if o.id == "retiree":
-            return c.population_m * 1e6 * (c.pop65 if c.pop65 is not None else 0.08) * 0.9
-        if o.id == "unemployed":
-            return max(0.0, adults * 0.62 - workforce) * 0.25 + workforce * 0.03
-        return adults * (o.adult_share or 0.05)
-    ref = occupation_meta()["reference_isco"]
-    group_ratio = c.isco_shares().get(o.isco, 0.1) / max(ref[o.isco - 1], 0.005)
-    return workforce * (o.base_share or DEFAULT_CUSTOM_SHARE) * group_ratio * _sector_factor(o, c)
+        return UNKNOWN
+    workforce = c.workforce_m * 1e6
+    kind = getattr(o, "population", None)
+    if kind:
+        n, _ = realdata.population_count(iso, kind)
+        return n
+    codes = _job_codes(o)
+    if not codes:
+        return UNKNOWN
+    by2, _ = realdata.employed_2digit(iso, workforce, c.isco_shares())
+    within = realdata.within_2digit()
+    total = 0.0
+    for code in codes:
+        if len(code) == 2:  # the whole 2-digit group
+            total += by2.get(code, 0.0)
+        elif code in within:
+            total += by2.get(code[:2], 0.0) * within[code]
+        else:
+            return UNKNOWN  # no detailed split for this unit group (yet)
+    return total
 
 
-def age_share(iso: str, lo: int | None, hi: int | None) -> float:
-    """Share of adults (15+) aged lo..hi, from an age curve fitted to the country's median age
-    and share over 65. An approximation, but it gets young and old countries the right way round."""
-    if lo is None and hi is None:
-        return 1.0
+def occupation_source(iso: str, occupation_id: str) -> str:
     c = countries()[iso]
-    lo, hi = max(15, lo or 15), min(100, hi or 100)
-    if hi < lo:
-        return 0.0
-    # Exponential decline in cohort size with age; steeper in young countries.
-    tau = max(18.0, (c.median_age - 10) * 1.6)
-    weights = [math.exp(-(a - 15) / tau) for a in range(15, 101)]
-    total = sum(weights)
-    return sum(weights[a - 15] for a in range(lo, hi + 1)) / total
+    o = occupations().get(occupation_id)
+    if o is None:
+        return "no data"
+    kind = getattr(o, "population", None)
+    if kind:
+        _, src = realdata.population_count(iso, kind)
+        return src
+    _, src = realdata.employed_2digit(iso, c.workforce_m * 1e6, c.isco_shares())
+    return f"{src}; 4-digit split from US occupational data" if realdata.within_2digit() else "no 4-digit split yet"
+
+
+def _age_fraction_job(iso: str, o: Occupation | None, lo: int, hi: int) -> float:
+    """Share of a job's workers aged lo..hi: ILOSTAT age groups by job, spread by the population shape."""
+    major = int(_job_codes(o)[0][0]) if o is not None and _job_codes(o) else None
+    bands = realdata.job_age_band_weights(iso, major)
+    if not bands:
+        return _age_fraction_pop(iso, lo, hi)
+    total = sum(w for _, w in bands) or 1.0
+    got = 0.0
+    for (blo, bhi), w in bands:
+        a, b = max(lo, blo), min(hi, bhi)
+        if a > b:
+            continue
+        inside = realdata.people_aged(iso, a, b) or 0.0
+        whole = realdata.people_aged(iso, blo, bhi) or 1.0
+        got += w * inside / whole
+    return got / total
+
+
+def _age_fraction_pop(iso: str, lo: int, hi: int, base_lo: int = 15, base_hi: int = 99) -> float:
+    whole = realdata.people_aged(iso, base_lo, base_hi)
+    if not whole:
+        return 1.0
+    return (realdata.people_aged(iso, max(lo, base_lo), min(hi, base_hi)) or 0.0) / whole
+
+
+_POP_AGES = {"students": (18, 30), "retirees": (65, 99), "unemployed": (15, 64), "outside_labour_force": (15, 99)}
+
+
+def _filters(iso: str, o: Occupation | None, age_min: int | None, age_max: int | None, gender: str) -> float:
+    lo, hi = age_min or 15, age_max or 99
+    kind = getattr(o, "population", None) if o is not None else None
+    if age_min is None and age_max is None:
+        age_f = 1.0
+    elif kind in _POP_AGES:
+        blo, bhi = _POP_AGES[kind]
+        age_f = _age_fraction_pop(iso, lo, hi, blo, bhi)
+    else:
+        age_f = _age_fraction_job(iso, o, lo, hi)
+    if gender not in ("woman", "man"):
+        return age_f
+    fs = realdata.female_share_job(iso, _job_codes(o)) if o is not None and _job_codes(o) else None
+    if fs is None:
+        fs = realdata.female_share(iso, lo, hi) or 0.5
+    return age_f * (fs if gender == "woman" else 1 - fs)
 
 
 def segment_headcount(
     iso: str, occupation_ids: list[str], custom: bool = False, age_min: int | None = None, age_max: int | None = None, gender: str = "any"
-) -> float:
-    """People in a segment in one country. Empty list = all adults. Age and gender narrow it."""
-    c = countries()[iso]
+) -> float | None:
+    """People in a segment in one country, or None when any part of it has no source."""
+    if custom:
+        return UNKNOWN
     if not occupation_ids:
-        base = c.workforce_m * 1e6 * DEFAULT_CUSTOM_SHARE if custom else c.adults_m * 1e6
-    else:
-        base = sum(occupation_headcount(iso, oid) for oid in occupation_ids)
-    base *= age_share(iso, age_min, age_max)
-    if gender in ("woman", "man"):
-        base *= 0.5
-    return base
+        adults = realdata.people_aged(iso, age_min or 15, age_max or 99, gender if gender in ("woman", "man") else "any")
+        return adults if adults is not None else countries()[iso].adults_m * 1e6
+    total = 0.0
+    for oid in occupation_ids:
+        n = occupation_headcount(iso, oid)
+        if n is None:
+            return UNKNOWN
+        total += n * _filters(iso, occupations().get(oid), age_min, age_max, gender)
+    return total
 
 
-def seg_headcount(iso: str, seg) -> float:
-    """Headcount for a Segment object. A free-text trait narrows it by the model's estimated share."""
+def seg_headcount(iso: str, seg) -> float | None:
+    """Headcount for a Segment object. A free-text trait narrows it only by a share the user gave."""
     base = segment_headcount(iso, seg.occupations, bool(seg.custom_occupation), seg.age_min, seg.age_max, seg.gender)
+    if base is None:
+        return None
     if getattr(seg, "trait", None):
-        base *= seg.trait_share if seg.trait_share is not None else 0.1
+        if seg.trait_share is None:
+            return None
+        base *= seg.trait_share
     return base
 
 
 def seg_is_estimated(seg) -> bool:
-    """True when the headcount rests on a model estimate rather than World Bank / ILO data."""
+    """True when the size isn't fully backed by data (kept for older callers)."""
     return bool(getattr(seg, "trait", None) or getattr(seg, "custom_occupation", None))

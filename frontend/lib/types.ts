@@ -462,9 +462,10 @@ export type Persona = {
   buyer_role: string;
   age: number;
   gender: string;
-  income_usd: number;
+  income_usd: number | null;
   income_band: string;
-  traits: Record<string, number>;
+  traits: Record<string, number | null>;
+  facts?: Record<string, boolean>;
   exposures: Exposure[];
   is_buyer: boolean;
   weight: number;

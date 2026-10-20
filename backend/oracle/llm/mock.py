@@ -62,6 +62,25 @@ KEYWORD_OCCUPATIONS = [
 _COMMON = {"We", "We're", "Our", "Will", "The", "If", "Target", "AI", "B2B", "SaaS", "Is", "Should", "How", "What", "Would", "In", "My", "It", "This", "Outcomes", "Yes", "No", "CFOs", "EU"}
 
 
+
+def _traits(p: dict[str, Any]) -> dict[str, float]:
+    """Offline stand-in leanings: measured traits when present, otherwise fixed per person and
+    nudged by their real Findex facts. Only the demo model uses this."""
+    r = _rng("demo-traits", p["id"])
+    facts = p.get("facts") or {}
+    measured = {k: v for k, v in (p.get("traits") or {}).items() if v is not None}
+    t = {
+        "tech_affinity": _clip(r.uniform(0.25, 0.75) + (0.15 if facts.get("internet_daily") else -0.1 if facts.get("internet_daily") is False else 0)),
+        "skepticism": r.uniform(0.2, 0.8),
+        "risk_appetite": r.uniform(0.2, 0.75),
+        "price_sensitivity": _clip(r.uniform(0.3, 0.7) + (0.2 if facts.get("emergency_hard") else -0.1 if facts.get("emergency_hard") is False else 0)),
+        "conformity": r.uniform(0.25, 0.75),
+        "openness": r.uniform(0.25, 0.8),
+        "budget_authority": 0.9 if p.get("seniority") == "executive" else 0.5 if p.get("seniority") == "senior" else 0.15,
+    }
+    t.update(measured)
+    return t
+
 def _title(prompt: str) -> str:
     """A short title: the product's name if one is given, else the opening words."""
     from ..world.countries import resolve
@@ -159,7 +178,7 @@ def compile_scenario(ctx: dict[str, Any]) -> dict[str, Any]:
             segments = [{"name": name if gender == "any" else f"{name} {'women' if gender == 'woman' else 'men'}", "occupations": [], "weight": 1.0, "is_buyer": True, "age_min": lo, "age_max": hi, "gender": gender}]
             break
     if re.search(r"dog owners?|own a dog", low):
-        segments.append({"name": "Dog owners", "occupations": [], "weight": 1.0, "is_buyer": True, "trait": "owns a dog", "trait_share": 0.33})
+        segments.append({"name": "Dog owners", "occupations": [], "weight": 1.0, "is_buyer": True, "trait": "owns a dog", "trait_share": None})
     if lens in ("opinion", "personal", "forecast"):
         segments = [s for s in segments if not set(s.get("occupations", [])) & {"founder_b2b_saas"}] or segments
     return {
@@ -252,7 +271,7 @@ def enrich_personas(ctx: dict[str, Any]) -> dict[str, Any]:
         src = SOURCES.get(p["sector"], SOURCES["default"])
         years = max(1, p["age"] - 23)
         job = p["occupation"].split(" (")[0].strip()
-        sceptic = p["traits"]["skepticism"] > 0.6
+        sceptic = _traits(p)["skepticism"] > 0.6
         out.append({
             "id": p["id"],
             "name": f"{given} {family}",
@@ -301,14 +320,14 @@ CHANGE = ["A free pilot with our own data", "A case study from a company like mi
 
 
 def _base_probability(p: dict[str, Any], spec: dict[str, Any]) -> float:
-    t = p["traits"]
+    t = _traits(p)
     belief = spec["subject_kind"] in ("event", "policy", "other")
     if belief:
         r = _rng("belief-lean", spec["title"], p["country"], p["segment"])
         x = 0.0 + 0.9 * (t["openness"] - 0.5) - 0.5 * (t["conformity"] - 0.5) + r.uniform(-0.3, 0.3)
         if p["age"] > 55:
             x -= 0.25
-        if p["income_band"] in ("high", "very high"):
+        if str(p.get("income_band") or "").startswith("top"):
             x += 0.1
         return _clip(1 / (1 + math.exp(-x * 2.2)))
     x = -1.1
@@ -319,7 +338,7 @@ def _base_probability(p: dict[str, Any], spec: dict[str, Any]) -> float:
     if spec.get("price"):
         amount = spec["price"]["amount"]
         monthly = amount / 12 if spec["price"]["period"] == "year" else amount
-        burden = monthly * 12 / max(p["income_usd"], 1000)
+        burden = monthly * 12 / max(p.get("income_usd") or 3000, 1000)  # demo stand-in when earnings are unknown
         x -= 2.4 * t["price_sensitivity"] * min(burden * 20, 2.5)
     if spec.get("b2b"):
         x += 1.0 * (t["budget_authority"] - 0.4)
@@ -345,7 +364,7 @@ def react(ctx: dict[str, Any]) -> dict[str, Any]:
     base = _base_probability(p, spec)
     prob = _clip(base + r.gauss(0, 0.08), 0.01, 0.98)
     juster = int(round(prob * 10))
-    t = p["traits"]
+    t = _traits(p)
     belief = spec["subject_kind"] in ("event", "policy", "other")
     if belief:
         attention = r.choice(["consider", "evaluate", "consider"])
@@ -405,7 +424,7 @@ def react(ctx: dict[str, Any]) -> dict[str, Any]:
 def _would_share(p: dict[str, Any], attention: str, run: int) -> bool:
     """Offline stand-in for 'would you bring this up?': interested or very open people do."""
     rs = _rng("share", p["id"], run)
-    return attention in ("evaluate", "consider") and rs.random() < 0.8 or p["traits"]["openness"] > 0.7 and rs.random() < 0.4
+    return attention in ("evaluate", "consider") and rs.random() < 0.8 or _traits(p)["openness"] > 0.7 and rs.random() < 0.4
 
 
 # ---------------------------------------------------------------- committees
@@ -458,7 +477,7 @@ def diffuse_update(ctx: dict[str, Any]) -> dict[str, Any]:
     p, cur, nb, news = ctx["persona"], ctx["p"], ctx["neighbors"], ctx.get("news")
     r = _rng("diffuse", p["id"], cur, len(nb), news)
     target = sum(nb) / len(nb) if nb else cur
-    pull = p["traits"]["conformity"] * 0.6 * (target - cur)
+    pull = _traits(p)["conformity"] * 0.6 * (target - cur)
     news_effect = -0.06 if news and any(w in news.lower() for w in ("regulat", "act", "budget", "ban")) else (0.04 if news else 0)
     new = _clip(cur + pull + news_effect + r.gauss(0, 0.04), 0.01, 0.99)
     changed = abs(new - cur) > 0.05
@@ -592,7 +611,7 @@ POST_NO = [
 def society_turn(ctx: dict[str, Any]) -> dict[str, Any]:
     p, cur, visible, news, rnd = ctx["persona"], ctx["p"], ctx.get("visible") or [], ctx.get("news"), ctx.get("round", 1)
     r = _rng("society", p["id"], rnd, len(visible))
-    t = p["traits"]
+    t = _traits(p)
     peers = [v["p"] for v in visible if v.get("p") is not None]
     target = sum(peers) / len(peers) if peers else cur
     pull = t["conformity"] * 0.6 * (target - cur)
@@ -658,7 +677,7 @@ def interview_answer(ctx: dict[str, Any]) -> dict[str, Any]:
     """Answers that follow the person: keener people pick earlier options, pay more and score higher."""
     p, lean, kind = ctx["persona"], ctx.get("p") or 0.5, ctx.get("kind", "open")
     r = _rng("interview", p["id"], ctx.get("question", ""))
-    t = p["traits"]
+    t = _traits(p)
     out: dict[str, Any] = {"answer": "", "choice": None, "number": None, "scale": None}
     if kind == "choice":
         opts = ctx.get("options") or ["Yes", "No"]
@@ -755,7 +774,7 @@ def reflect(ctx: dict[str, Any]) -> dict[str, Any]:
     ranked = sorted(mems, key=lambda m: -m["importance"])
     picked = [m["n"] for m in ranked if m["kind"] != "said"][: r.choice([0, 1, 2, 2, 3])]
     news = any(m["kind"] == "news" for m in mems if m["n"] in picked)
-    new = _clip(cur + (-0.04 if news else 0.02) * p["traits"]["conformity"] + r.gauss(0, 0.03), 0.01, 0.99)
+    new = _clip(cur + (-0.04 if news else 0.02) * _traits(p)["conformity"] + r.gauss(0, 0.03), 0.01, 0.99)
     moved = new - start
     if abs(moved) < 0.08:
         belief = "I've heard people out, but I'm about where I started."

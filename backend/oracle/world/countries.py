@@ -87,6 +87,8 @@ class Occupation(BaseModel):
     buyer_role: str
     base_share: float | None = None
     adult_share: float | None = None
+    isco08: list[str] = Field(default_factory=list)  # official ISCO-08 unit groups
+    population: str | None = None  # employers | own_account | students | retirees | unemployed | outside_labour_force | unknown
 
 
 def _norm(text: str) -> str:

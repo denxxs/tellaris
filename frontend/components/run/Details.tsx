@@ -15,6 +15,16 @@ const rowsOf = (xs: Results["by_segment"], lab = (s: string) => s) =>
 
 /* ---------------------------------------------------------------- Countries */
 
+const DRIVER_LABEL: Record<string, string> = {
+  internet_daily: "Uses the internet daily",
+  smartphone: "Has a smartphone",
+  account: "Has a bank or mobile-money account",
+  credit_card: "Has a credit card",
+  emergency_hard: "Short of emergency money",
+  news_online: "Reads news online",
+  age: "Older",
+};
+
 export function CountriesTab({ r, live }: { r: Results; live: LiveState }) {
   const { countryName } = useMeta();
   const values = Object.fromEntries(r.by_country.map((c) => [c.key!, c.calibrated]));
@@ -104,7 +114,7 @@ export function GroupsTab({ r }: { r: Results }) {
       </Card>
       <Card className="lg:col-span-2">
         <CardHead title="What predicts a yes">How strongly each personal trait moves with the answer. Right of centre pushes towards yes.</CardHead>
-        <Diverging rows={r.drivers.map((d) => ({ label: titleCase(d.trait), value: d.correlation }))} />
+        <Diverging rows={r.drivers.map((d) => ({ label: DRIVER_LABEL[d.trait] ?? titleCase(d.trait), value: d.correlation }))} />
       </Card>
     </div>
   );

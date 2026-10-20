@@ -50,12 +50,17 @@ def test_gen_z_group_has_the_right_ages(client):
     assert buyers and all(18 <= p["age"] <= 28 for p in buyers)
 
 
-def test_trait_groups_are_estimates(client):
+def test_trait_group_sizes_come_from_a_figure_not_a_guess(client):
     spec = client.post("/api/scenario/preview", json={"prompt": "Would dog owners in the UK pay $15 a month for a dog-walking app?"}).json()["spec"]
     seg = next(s for s in spec["segments"] if s.get("trait"))
+    assert seg["trait_share"] is None  # never guessed
     heads = client.post("/api/scenario/headcount", json={"spec": spec}).json()
     row = next(x for x in heads["segments"] if x["name"] == seg["name"])
-    assert row["estimated"] is True and row["total"] > 0
+    assert row["known"] is False and row["total"] is None and "trait" in row["why_unknown"]
+    # With a figure (the user's, or one found with a source), the size follows real adult counts.
+    seg["trait_share"], seg["trait_source"] = 0.3, "you"
+    row = next(x for x in client.post("/api/scenario/headcount", json={"spec": spec}).json()["segments"] if x["name"] == seg["name"])
+    assert row["known"] and row["total"] > 1_000_000
 
 
 def test_global_run_finds_where_it_works(client):
