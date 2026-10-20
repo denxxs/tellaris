@@ -14,9 +14,11 @@ BATCH = 8
 
 SYSTEM = """You write realistic, specific people for a social simulation.
 For each person you get fixed facts (country, job, age, income, traits). Keep every fact.
-Add: a culturally appropriate full name for their country (avoid the most stereotypical names),
-a 2-3 sentence backstory in third person, 3 current priorities, 2 frustrations, 3 information sources
-they actually use (specific publications, communities, people, apps), and a one-line description of how they talk.
+Add: a culturally appropriate full name for their country that matches their gender (avoid the most stereotypical names),
+a one-line tagline (who they are in a few words, like a social media bio), a 2-3 sentence backstory in third person,
+3 values they live by, 3 current priorities, 2 frustrations, a 1-2 sentence typical day, 2-4 tools, products or services
+they already use for their work or life, their household in a few words, 3 information sources they actually use
+(specific publications, communities, people, apps), and a one-line description of how they talk.
 Make people different from each other. Include ordinary, busy, distracted, sceptical people - not just enthusiasts.
 Skeptical traits must show up as scepticism. Low budget authority means they cannot buy on their own."""
 
@@ -29,6 +31,11 @@ class Enriched(BaseModel):
     frustrations: list[str] = Field(default_factory=list)
     info_sources: list[str] = Field(default_factory=list)
     voice: str = ""
+    tagline: str = ""
+    values: list[str] = Field(default_factory=list)
+    typical_day: str = ""
+    tools_today: list[str] = Field(default_factory=list)
+    household: str = ""
 
 
 class EnrichedBatch(BaseModel):
@@ -84,6 +91,11 @@ async def enrich(
             p.frustrations = [x[:160] for x in e.frustrations[:3]]
             p.info_sources = [x[:80] for x in e.info_sources[:4]]
             p.voice = e.voice.strip()[:200]
+            p.tagline = e.tagline.strip()[:120]
+            p.values = [x[:60] for x in e.values[:3]]
+            p.typical_day = e.typical_day.strip()[:400]
+            p.tools_today = [x[:60] for x in e.tools_today[:4]]
+            p.household = e.household.strip()[:100]
             done += 1
         for p in batch:
             if not p.name:

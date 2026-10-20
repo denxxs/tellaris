@@ -57,6 +57,11 @@ class Persona(BaseModel):
     frustrations: list[str] = Field(default_factory=list)
     info_sources: list[str] = Field(default_factory=list)
     voice: str = ""
+    tagline: str = ""
+    values: list[str] = Field(default_factory=list)
+    typical_day: str = ""
+    tools_today: list[str] = Field(default_factory=list)
+    household: str = ""
 
     def card(self) -> str:
         """Compact description for prompts."""
@@ -80,4 +85,10 @@ class Persona(BaseModel):
             lines.append(f"Frustrations: {'; '.join(self.frustrations)}")
         if self.info_sources:
             lines.append(f"Gets information from: {', '.join(self.info_sources)}")
+        if self.values:
+            lines.append(f"Values: {', '.join(self.values)}")
+        if self.tools_today:
+            lines.append(f"Uses today: {', '.join(self.tools_today)}")
+        if self.household:
+            lines.append(f"Household: {self.household}")
         return "\n".join(lines)

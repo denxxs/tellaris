@@ -298,16 +298,36 @@ class PopulationBuilder:
         country_w = {
             iso: w for iso, w in (spec.target_weights or {t: 1.0 for t in spec.targets}).items() if segs_in(iso)
         }
-        country_alloc = _allocate(n, country_w)
         people: list[Persona] = []
         counter = 0
-        for iso, count in country_alloc.items():
-            seg_alloc = _allocate(count, segs_in(iso))
-            for si, k in seg_alloc.items():
-                seg = segs[int(si)]
+        if self.weighting == "population":
+            # Automatic sizing: every (country, group) cell gets agents in proportion to the
+            # square root of its real headcount. Big groups get more agents, small ones still
+            # get enough to say something, and the weights below put everyone back at true scale.
+            cell_heads = {
+                (iso, i): segment_headcount(iso, s.occupations, custom=bool(s.custom_occupation))
+                for iso in country_w
+                for i, s in enumerate(segs)
+                if not s.countries or iso in s.countries
+            }
+            buyer_cells = {f"{k[0]}|{k[1]}": math.sqrt(max(v, 1.0)) for k, v in cell_heads.items() if segs[k[1]].is_buyer}
+            other_cells = {f"{k[0]}|{k[1]}": math.sqrt(max(v, 1.0)) for k, v in cell_heads.items() if not segs[k[1]].is_buyer}
+            n_other = round(n * spec.general_population_share) if other_cells and buyer_cells else (n if other_cells else 0)
+            alloc = {**_allocate(n - n_other, buyer_cells), **_allocate(n_other, other_cells)}
+            for key, k in alloc.items():
+                iso, si = key.split("|")
                 for _ in range(k):
                     counter += 1
-                    people.append(self._person(f"p{counter:05d}", iso, seg, int(si)))
+                    people.append(self._person(f"p{counter:05d}", iso, segs[int(si)], int(si)))
+        else:
+            country_alloc = _allocate(n, country_w)
+            for iso, count in country_alloc.items():
+                seg_alloc = _allocate(count, segs_in(iso))
+                for si, k in seg_alloc.items():
+                    seg = segs[int(si)]
+                    for _ in range(k):
+                        counter += 1
+                        people.append(self._person(f"p{counter:05d}", iso, seg, int(si)))
 
         # How many real people each agent stands for: the cell's estimated headcount
         # split across the agents sampled into it.

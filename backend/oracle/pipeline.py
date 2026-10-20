@@ -16,13 +16,14 @@ from .population.enrich import enrich
 from .population.models import Persona
 from .population.sampler import PopulationBuilder
 from .report.writer import extract_themes, write_report
-from .research.search import FactSheet, research
+from .files import bundle
+from .research.search import FactSheet, facts_from_files, research
 from .scenario.compiler import compile_scenario, normalize
 from .scenario.models import RunRequest, ScenarioSpec
 from .simulate import committee as committee_mod
 from .simulate.aggregate import Aggregator
 from .simulate.calibrate import Calibration, default_calibration, kind_for
-from .simulate.diffusion import run_diffusion
+from .simulate.society import meeting_items, run_society
 from .simulate.reaction import Reaction, react_all
 from .store import store
 from .world.influence import InfluenceEdge, expand, graph_payload
@@ -36,7 +37,7 @@ STAGES = [
     ("population", "Building the population", 0.18, 0.32),
     ("reactions", "Simulating individual reactions", 0.32, 0.72),
     ("committees", "Running buying committees", 0.72, 0.82),
-    ("diffusion", "Simulating word of mouth", 0.82, 0.91),
+    ("diffusion", "People talk it over", 0.82, 0.91),
     ("report", "Writing the analysis", 0.91, 1.0),
 ]
 STAGE = {s[0]: s for s in STAGES}
@@ -110,26 +111,44 @@ class Runner:
         crowd = roles.crowd or [roles.planner]
         req = self.req
 
-        # 1. Scenario
+        # 1. Scenario (with the user's files, if any)
         await self.stage("scenario", "start")
+        context, file_metas = bundle(req.file_ids)
+        if file_metas:
+            await self.ch.emit("files", file_metas)
+            await self.log(f"Read {len(file_metas)} {'file' if len(file_metas) == 1 else 'files'}: {', '.join(m['name'] for m in file_metas)}")
         if req.spec is not None:
             spec = normalize(req.spec, req.prompt, req.targets or None)
         else:
-            spec = await compile_scenario(req.prompt, roles.planner, req.targets or None)
+            spec = await compile_scenario(req.prompt, roles.planner, req.targets or None, context)
         await store.update_run(self.id, spec=spec.model_dump(), title=spec.title)
         await self.ch.emit("scenario", spec.model_dump())
         await self.stage("scenario", "done")
 
-        # 2. Research
+        # 2. Research: the user's files first, then the web.
         sheet = FactSheet()
-        if self.cfg.research and self.settings.search_provider != "none":
+        web = self.cfg.research and self.settings.search_provider != "none"
+        if web or context:
             await self.stage("research", "start")
-            queries = spec.research_queries or [f"{spec.subject[:120]} market", f"{spec.subject[:80]} competitors pricing"]
-            try:
-                sheet, hits = await research(spec.subject, spec.question, queries, spec.targets, self.settings.search_provider, roles.analyst)
-                await self.log(f"Read {len(hits)} sources, kept {len(sheet.facts)} facts")
-            except Exception as exc:  # noqa: BLE001
-                await self.log(f"Research failed, continuing without it: {exc}", "warn")
+            if context:
+                try:
+                    from_files = await facts_from_files(context, spec.subject, spec.targets, roles.analyst)
+                    sheet.facts.extend(from_files.facts)
+                    sheet.competitors.extend(from_files.competitors)
+                    sheet.price_points.extend(from_files.price_points)
+                    await self.log(f"Took {len(from_files.facts)} facts from your files")
+                except Exception as exc:  # noqa: BLE001
+                    await self.log(f"Couldn't read facts from your files: {exc}", "warn")
+            if web:
+                queries = spec.research_queries or [f"{spec.subject[:120]} market", f"{spec.subject[:80]} competitors pricing"]
+                try:
+                    found, hits = await research(spec.subject, spec.question, queries, spec.targets, self.settings.search_provider, roles.analyst)
+                    sheet.facts.extend(found.facts)
+                    sheet.competitors.extend(found.competitors)
+                    sheet.price_points.extend(found.price_points)
+                    await self.log(f"Read {len(hits)} web sources, kept {len(found.facts)} facts")
+                except Exception as exc:  # noqa: BLE001
+                    await self.log(f"Web research failed, continuing without it: {exc}", "warn")
             if sheet.competitors:
                 spec.competitors = list(dict.fromkeys([*spec.competitors, *sheet.competitors]))[:10]
             await store.update_run(self.id, research=sheet.model_dump(), spec=spec.model_dump())
@@ -187,6 +206,7 @@ class Runner:
         await self.ch.emit("interim", {"headline": results["headline"], "by_country": results["by_country"]})
 
         # 6. Committees
+        comms: list[committee_mod.Committee] = []
         if spec.b2b and "committee" in spec.modes and self.cfg.committees > 0:
             await self.stage("committees", "start")
             comms = committee_mod.form_committees(spec, people, self.cfg.committees, seed=self.cfg.seed)
@@ -205,7 +225,7 @@ class Runner:
         else:
             await self.stage("committees", "skipped")
 
-        # 7. Diffusion
+        # 7. Society: people post, reply and change their minds; meetings join the feed.
         if "diffusion" in spec.modes and self.cfg.diffusion_rounds > 0:
             await self.stage("diffusion", "start")
 
@@ -213,11 +233,19 @@ class Runner:
                 await self.ch.emit("diffusion_round", snap)
                 await self.progress("diffusion", snap["round"] / max(self.cfg.diffusion_rounds, 1))
 
-            results["diffusion"] = await run_diffusion(
+            async def on_items(items: list[dict[str, Any]]) -> None:
+                for it in items:
+                    await self.ch.buffered("feed", it, every=0.3)
+
+            meetings = meeting_items(comms) if comms else []
+            summary, feed = await run_society(
                 people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
-                self.cfg.temperature, seed=self.cfg.seed, on_round=on_round,
+                self.cfg.temperature, seed=self.cfg.seed, initial_items=meetings, on_items=on_items, on_round=on_round,
             )
-            await self.stage("diffusion", "done")
+            await self.ch.flush()
+            await store.save_feed(self.id, feed)
+            results["diffusion"] = summary
+            await self.stage("diffusion", "done", posts=summary.get("society", {}).get("posts", 0))
         else:
             await self.stage("diffusion", "skipped")
 

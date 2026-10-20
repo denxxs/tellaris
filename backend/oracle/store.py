@@ -61,6 +61,15 @@ CREATE TABLE IF NOT EXISTS committees (
   data TEXT NOT NULL,
   PRIMARY KEY (run_id, id)
 );
+CREATE TABLE IF NOT EXISTS feed (
+  run_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  author TEXT,
+  data TEXT NOT NULL,
+  PRIMARY KEY (run_id, id)
+);
+CREATE INDEX IF NOT EXISTS feed_author ON feed(run_id, author);
 CREATE TABLE IF NOT EXISTS chats (
   run_id TEXT NOT NULL,
   persona_id TEXT NOT NULL,
@@ -171,7 +180,7 @@ class Store:
 
     async def delete_run(self, run_id: str) -> None:
         async with self._lock:
-            for table in ("events", "personas", "reactions", "committees", "chats"):
+            for table in ("events", "personas", "reactions", "committees", "chats", "feed"):
                 await self.db.execute(f"DELETE FROM {table} WHERE run_id = ?", (run_id,))
             await self.db.execute("DELETE FROM runs WHERE id = ?", (run_id,))
             await self.db.commit()
@@ -236,6 +245,22 @@ class Store:
 
     async def committees(self, run_id: str) -> list[dict[str, Any]]:
         async with self.db.execute("SELECT data FROM committees WHERE run_id = ? ORDER BY id", (run_id,)) as cur:
+            return [json.loads(r["data"]) for r in await cur.fetchall()]
+
+    # ---------- society feed ----------
+
+    async def save_feed(self, run_id: str, items: list[dict[str, Any]]) -> None:
+        await self._many(
+            "INSERT OR REPLACE INTO feed (run_id, id, seq, author, data) VALUES (?,?,?,?,?)",
+            [(run_id, it["id"], i, it.get("author"), json.dumps(it, default=str)) for i, it in enumerate(items)],
+        )
+
+    async def feed(self, run_id: str, author: str | None = None) -> list[dict[str, Any]]:
+        if author:
+            sql, args = "SELECT data FROM feed WHERE run_id = ? AND author = ? ORDER BY seq", (run_id, author)
+        else:
+            sql, args = "SELECT data FROM feed WHERE run_id = ? ORDER BY seq", (run_id,)
+        async with self.db.execute(sql, args) as cur:
             return [json.loads(r["data"]) for r in await cur.fetchall()]
 
     # ---------- chat ----------

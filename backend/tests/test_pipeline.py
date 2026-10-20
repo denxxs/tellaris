@@ -120,3 +120,42 @@ def test_backtest_runs_and_fits(client):
     cal = client.get("/api/calibration").json()
     assert cal["belief"]["source"] == "backtest"
     client.delete("/api/calibration/belief")
+
+
+def test_files_society_and_profiles(client):
+    import io
+
+    import docx
+
+    d = docx.Document()
+    d.add_paragraph("Ledgerly automates month-end close for finance teams at $49 per seat per month.")
+    d.add_paragraph("Internal target: 400 paying customers by Q4, burn of $90k per month.")
+    d.add_paragraph("Competitors include FloQast and BlackLine, which start around $1,000 per month.")
+    buf = io.BytesIO()
+    d.save(buf)
+    up = client.post("/api/files", files=[("files", ("pitch.docx", buf.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")), ("files", ("bad.exe", b"MZ", "application/octet-stream"))]).json()
+    assert len(up["files"]) == 1 and up["errors"]
+    fid = up["files"][0]["id"]
+    assert "Ledgerly" in up["files"][0]["preview"]
+
+    cfg = {"agents": 80, "runs_per_agent": 1, "committees": 4, "diffusion_rounds": 3, "diffusion_agent_cap": 80, "seed": 3}
+    run_id = client.post("/api/runs", json={"prompt": PROMPT, "config": cfg, "file_ids": [fid]}).json()["id"]
+    run = wait(client, run_id)
+    assert run["status"] == "done", run.get("error")
+    facts = run["research"]["facts"]
+    assert any(f["source_urls"][0].startswith("file:") for f in facts)
+    assert any(not f["public"] for f in facts), "internal numbers must be kept from people"
+
+    feed = client.get(f"/api/runs/{run_id}/feed").json()
+    kinds = {it["kind"] for it in feed}
+    assert {"post", "reply", "meeting"} <= kinds
+    replies = [it for it in feed if it["kind"] == "reply"]
+    ids = {it["id"] for it in feed}
+    assert all(r["parent"] in ids for r in replies)
+    soc = run["results"]["diffusion"]["society"]
+    assert soc["posts"] > 0 and soc["replies"] > 0
+
+    author = next(it["author"] for it in feed if it["kind"] == "reply")
+    prof = client.get(f"/api/runs/{run_id}/personas/{author}").json()
+    assert prof["contacts"] and prof["society"]["mine"]
+    assert prof["persona"]["tagline"] and prof["persona"]["values"]

@@ -8,13 +8,15 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from .. import __version__
+from .. import files as files_mod
+from ..providers import PROVIDERS
 from ..backtest.runner import BacktestRequest, builtin_cases, job_view, start_backtest
 from ..config import PROVIDER_KEY_ENV, env, settings_store
 from ..events import hub
@@ -42,6 +44,7 @@ MODEL_EXAMPLES = {
     "xai": ["xai/grok-3-mini"],
     "together_ai": ["together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"],
     "azure": ["azure/<your-deployment-name>"],
+    "nvidia_nim": ["nvidia_nim/meta/llama-3.3-70b-instruct", "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct", "nvidia_nim/meta/llama-3.1-8b-instruct"],
     "ollama": ["ollama/llama3.1", "ollama/qwen2.5"],
     "mock": ["mock/oracle"],
 }
@@ -103,6 +106,7 @@ class PreviewRequest(BaseModel):
     prompt: str = Field(min_length=10, max_length=20000)
     targets: list[str] = Field(default_factory=list)
     influence_threshold: float = 0.25
+    file_ids: list[str] = Field(default_factory=list)
 
 
 def _forces_as_edges(spec: ScenarioSpec) -> list[InfluenceEdge]:
@@ -122,7 +126,8 @@ async def preview(req: PreviewRequest) -> dict[str, Any]:
     usage = Usage()
     token = current_usage.set(usage)
     try:
-        spec = await compile_scenario(req.prompt, settings_store.get().roles.planner, req.targets or None)
+        context, _ = files_mod.bundle(req.file_ids)
+        spec = await compile_scenario(req.prompt, settings_store.get().roles.planner, req.targets or None, context)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(502, f"Scenario builder failed: {exc}") from exc
     finally:
@@ -270,7 +275,65 @@ async def persona(run_id: str, pid: str) -> dict[str, Any]:
     p = await store.persona(run_id, pid)
     if not p:
         raise HTTPException(404, "Persona not found")
-    return {"persona": p, "reactions": await store.reactions(run_id, pid), "chat": await store.chat(run_id, pid)}
+    run = await store.get_run(run_id) or {}
+    results = run.get("results") or {}
+    net = (results.get("diffusion") or {}).get("network") or {}
+    nodes = {n["id"]: n for n in net.get("nodes", [])}
+    contact_ids = [l["target"] if l["source"] == pid else l["source"] for l in net.get("links", []) if pid in (l["source"], l["target"])]
+    contacts = []
+    for cid in dict.fromkeys(contact_ids):
+        cp = await store.persona(run_id, cid)
+        if cp:
+            contacts.append({
+                "id": cid, "name": cp.get("name"), "country": cp["country"], "occupation": cp["occupation"],
+                "segment": cp["segment"], "p": nodes.get(cid, {}).get("p"),
+            })
+    feed = await store.feed(run_id)
+    mine = [it for it in feed if it.get("author") == pid]
+    parents = {it["parent"] for it in mine if it.get("parent")}
+    context = [it for it in feed if it["id"] in parents]
+    replies_to_me = [it for it in feed if it.get("parent") in {m["id"] for m in mine}]
+    meeting = next((it for it in feed if it.get("kind") == "meeting" and any(m.get("persona_id") == pid for m in it.get("members", []))), None)
+    return {
+        "persona": p,
+        "reactions": await store.reactions(run_id, pid),
+        "chat": await store.chat(run_id, pid),
+        "contacts": contacts,
+        "society": {"mine": mine, "context": context, "replies": replies_to_me, "final_p": nodes.get(pid, {}).get("p")},
+        "meeting": meeting,
+    }
+
+
+@app.get("/api/runs/{run_id}/feed")
+async def feed(run_id: str) -> list[dict[str, Any]]:
+    return await store.feed(run_id)
+
+
+# ------------------------------------------------------------------ files
+
+@app.post("/api/files")
+async def upload_files(files: list[UploadFile] = File(...)) -> dict[str, Any]:
+    saved, errors = [], []
+    for f in files[:10]:
+        data = await f.read()
+        try:
+            saved.append(files_mod.save(f.filename or "file", data))
+        except files_mod.FileError as exc:
+            errors.append(str(exc))
+    return {"files": saved, "errors": errors}
+
+
+@app.get("/api/files/{fid}")
+async def file_meta(fid: str) -> dict[str, Any]:
+    meta = files_mod.get(fid)
+    if not meta:
+        raise HTTPException(404, "File not found")
+    return meta
+
+
+@app.delete("/api/files/{fid}")
+async def delete_file(fid: str) -> dict[str, bool]:
+    return {"ok": files_mod.delete(fid)}
 
 
 class ChatRequest(BaseModel):
@@ -359,7 +422,7 @@ async def export(run_id: str) -> JSONResponse:
 
 @app.get("/api/settings")
 async def get_settings() -> dict[str, Any]:
-    return {**settings_store.public(), "providers": list(PROVIDER_KEY_ENV.keys()), "model_examples": MODEL_EXAMPLES}
+    return {**settings_store.public(), "providers": list(PROVIDER_KEY_ENV.keys()), "model_examples": MODEL_EXAMPLES, "catalog": PROVIDERS}
 
 
 class SettingsPatch(BaseModel):

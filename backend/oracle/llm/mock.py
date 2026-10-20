@@ -235,25 +235,56 @@ def enrich_personas(ctx: dict[str, Any]) -> dict[str, Any]:
     for p in ctx["people"]:
         r = _rng("enrich", p["id"], p["country"])
         c = countries().get(p["country"])
-        given = r.choice(c.names["given"]) if c else "Alex"
+        pool = c.names["given"] if c else ["Alex", "Sam"]
+        # The curated pools alternate men's and women's names, so pick from the matching half.
+        if p["gender"] == "man":
+            pool = pool[0::2] or pool
+        elif p["gender"] == "woman":
+            pool = pool[1::2] or pool
+        given = r.choice(pool)
         family = r.choice(c.names["family"]) if c else "Lee"
         pri = PRIORITIES.get(p["isco"], PRIORITIES[2] if p["isco"] in (2, 3) else PRIORITIES[0])
         src = SOURCES.get(p["sector"], SOURCES["default"])
         years = max(1, p["age"] - 23)
+        job = p["occupation"].split(" (")[0].strip()
+        sceptic = p["traits"]["skepticism"] > 0.6
         out.append({
             "id": p["id"],
             "name": f"{given} {family}",
+            "tagline": r.choice([f"{job} in {p['country_name']}", f"{job}. {p['age']}. {p['country_name']}.", f"{job}, {p['company_type'].replace('_', ' ')}"]),
             "bio": (
-                f"{given} has spent about {min(years, 35)} years working, now as a {p['occupation'].split('(')[0].strip().lower()} "
+                f"{given} has spent about {min(years, 35)} years working, now as a {job.lower()} "
                 f"at a {p['company_type'].replace('_', ' ')} in {p['country_name']}. "
-                + ("Known for questioning every new tool before trying it." if p["traits"]["skepticism"] > 0.6 else "Usually open to trying new things if they save time.")
+                + ("Known for questioning every new tool before trying it." if sceptic else "Usually open to trying new things if they save time.")
             ),
+            "values": r.sample(VALUES, 3),
             "priorities": r.sample(pri, 3),
             "frustrations": r.sample(FRUSTRATIONS, 2),
+            "typical_day": r.choice(DAYS).format(job=job.lower()),
+            "tools_today": r.sample(TOOLS.get(p["sector"], TOOLS["default"]), 3),
+            "household": r.choice(HOUSEHOLDS if p["age"] > 26 else ["Lives with flatmates", "Lives with parents", "Lives alone"]),
             "info_sources": r.sample(src, 3),
             "voice": r.choice(VOICES),
         })
     return {"people": out}
+
+
+VALUES = ["Getting things done", "Family first", "Fairness", "Independence", "Security", "Learning", "Status", "Saving money", "Doing things properly", "Community", "Speed", "Trust"]
+DAYS = [
+    "Starts early with email, then back-to-back meetings; the real {job} work happens after six.",
+    "Commutes an hour each way, spends most of the day in spreadsheets and calls.",
+    "Mornings on the most urgent problem, afternoons firefighting whatever broke.",
+    "Works from home three days a week; blocks time for deep work but rarely keeps it.",
+    "A long day on their feet, catching up on messages in the evening.",
+]
+TOOLS = {
+    "software": ["Slack", "Notion", "Jira", "Google Workspace", "HubSpot", "ChatGPT", "GitHub"],
+    "it_services": ["Microsoft Teams", "Excel", "SAP", "ServiceNow", "Outlook", "Jira", "ChatGPT"],
+    "finance": ["Excel", "QuickBooks", "Bloomberg", "NetSuite", "Tally", "Power BI", "Outlook"],
+    "retail": ["WhatsApp Business", "a POS system", "Instagram", "Excel", "Shopify"],
+    "default": ["WhatsApp", "Excel", "Gmail", "Google Sheets", "a phone banking app", "YouTube"],
+}
+HOUSEHOLDS = ["Married, two children", "Lives with partner", "Single parent of one", "Lives with partner and parents", "Lives alone", "Married, no children"]
 
 
 # ---------------------------------------------------------------- reactions
@@ -519,3 +550,82 @@ HANDLERS = {
     "themes": themes,
     "report": report,
 }
+
+
+# ---------------------------------------------------------------- society
+
+AGREE = [
+    "Same here, {name}. {reason}.",
+    "This. {reason}.",
+    "Agree with {name} - {reason_lc}.",
+    "{name} is right, {reason_lc}.",
+]
+DISAGREE = [
+    "Not so sure, {name}. {objection}.",
+    "Respectfully, no. {objection}.",
+    "{name}, have you tried rolling this out for real? {objection}.",
+    "I'd push back on that. {objection}.",
+]
+POST_YES = [
+    "Been looking at this. {reason}. Might actually try it.",
+    "Unpopular opinion maybe, but this one makes sense for teams like mine. {reason}.",
+    "Tried something similar last year. {reason}. Curious if this is better.",
+]
+POST_NO = [
+    "Every month there's a new tool like this. {objection}.",
+    "Pass for now. {objection}.",
+    "Who is actually buying these? {objection}.",
+]
+
+
+def society_turn(ctx: dict[str, Any]) -> dict[str, Any]:
+    p, cur, visible, news, rnd = ctx["persona"], ctx["p"], ctx.get("visible") or [], ctx.get("news"), ctx.get("round", 1)
+    r = _rng("society", p["id"], rnd, len(visible))
+    t = p["traits"]
+    peers = [v["p"] for v in visible if v.get("p") is not None]
+    target = sum(peers) / len(peers) if peers else cur
+    pull = t["conformity"] * 0.6 * (target - cur)
+    news_effect = (-0.06 if any(w in news.lower() for w in ("regulat", "act", "budget", "ban", "rate")) else 0.04) if news else 0
+    new = _clip(cur + pull + news_effect + r.gauss(0, 0.04), 0.01, 0.99)
+    changed = abs(new - cur) > 0.05
+    activity = 0.12 + 0.3 * t["openness"] + (0.15 if abs(cur - 0.5) > 0.3 else 0) + (0.1 if news else 0)
+    action, reply_to, text = "quiet", None, ""
+    if r.random() < activity:
+        reason = r.choice(REASONS_POS)
+        objection = r.choice(OBJECTIONS)
+        if visible and r.random() < 0.6:
+            # Prefer answering someone you disagree with.
+            others = sorted(visible, key=lambda v: -abs((v.get("p") or 0.5) - new))
+            target_item = others[0] if r.random() < 0.6 else r.choice(visible)
+            first = (target_item.get("author_name") or "").split(" ")[0] or "there"
+            agree = (target_item.get("p") or 0.5) >= 0.5 and new >= 0.5 or (target_item.get("p") or 0.5) < 0.5 and new < 0.5
+            tpl = r.choice(AGREE if agree else DISAGREE)
+            text = tpl.format(name=first, reason=reason, reason_lc=reason[0].lower() + reason[1:], objection=objection)
+            action, reply_to = "reply", target_item["id"]
+        else:
+            text = r.choice(POST_YES if new >= 0.5 else POST_NO).format(reason=reason, objection=objection)
+            action = "post"
+    return {
+        "action": action,
+        "reply_to": reply_to,
+        "text": text,
+        "juster": int(round(new * 10)),
+        "changed": changed,
+        "why": ("People I trust are more positive than I was." if new > cur else "What I'm reading makes me more cautious.") if changed else "Nothing new for me here.",
+    }
+
+
+def file_facts(ctx: dict[str, Any]) -> dict[str, Any]:
+    text = ctx.get("context") or ""
+    names = re.findall(r"=== FILE: (.+?) \(", text) or ["your documents"]
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if 30 < len(s.strip()) < 220 and not s.startswith("===")]
+    keyed = [s for s in sentences if re.search(r"[$€£₹]|\d|price|customer|market|compet|plan", s, re.I)] or sentences
+    facts = []
+    for s in keyed[:8]:
+        internal = bool(re.search(r"internal|confidential|target|roadmap|burn|runway|forecast", s, re.I))
+        facts.append({"statement": s, "relevance": "From your documents", "countries": [], "stance": "neutral", "source_urls": [f"file:{names[0]}"], "public": not internal})
+    return {"facts": facts, "competitors": [], "price_points": []}
+
+
+HANDLERS["society_turn"] = society_turn
+HANDLERS["file_facts"] = file_facts

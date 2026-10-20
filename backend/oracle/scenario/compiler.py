@@ -29,7 +29,9 @@ Rules:
 - forces: outside pressures that change the outcome, especially ones from countries/blocs that are NOT targets (e.g. EU AI Act and GDPR affecting Indian IT firms with EU clients; US interest rates; Chinese competitors). Be concrete.
 - assumed_reach: realistic share of the target audience that will even hear about this within the horizon. New startups usually reach well under 30% of a market.
 - research_queries: 3-6 web searches that would ground the simulation in current facts (competitors, prices, regulations, recent news).
-- Be neutral. Do not assume success."""
+- Be neutral. Do not assume success.
+- Society (word of mouth) is always simulated, so always include "diffusion" in modes.
+- When context files are attached (pitch decks, product docs, pricing pages, research), use them to get the product, price, audience, markets and competitors right. The subject must describe what a member of the public or a buyer would actually see (the offer, the price, the claims), never internal plans, targets or confidential numbers."""
 
 
 def _catalogue() -> str:
@@ -108,11 +110,12 @@ def normalize(spec: ScenarioSpec, prompt: str, overrides: list[str] | None = Non
     return spec
 
 
-async def compile_scenario(prompt: str, model: str, overrides: list[str] | None = None) -> ScenarioSpec:
+async def compile_scenario(prompt: str, model: str, overrides: list[str] | None = None, context: str = "") -> ScenarioSpec:
     user = (
         f"Today is {date.today().isoformat()}.\n\n{_catalogue()}\n\n"
         f"User-selected target countries: {', '.join(overrides) if overrides else 'none - choose'}\n\n"
-        f"USER DESCRIPTION:\n\"\"\"\n{prompt}\n\"\"\""
+        + (f"CONTEXT FILES FROM THE USER:\n{context}\n\n" if context else "")
+        + f"USER DESCRIPTION:\n\"\"\"\n{prompt}\n\"\"\""
     )
     spec = await llm.json(
         task="compile_scenario",
@@ -121,6 +124,9 @@ async def compile_scenario(prompt: str, model: str, overrides: list[str] | None 
         user=user,
         schema=ScenarioSpec,
         temperature=0.3,
-        mock_ctx={"prompt": prompt, "targets": overrides or []},
+        mock_ctx={"prompt": prompt, "context": context[:3000], "targets": overrides or []},
     )
-    return normalize(spec, prompt, overrides)
+    spec = normalize(spec, prompt, overrides)
+    if "diffusion" not in spec.modes:
+        spec.modes.append("diffusion")
+    return spec

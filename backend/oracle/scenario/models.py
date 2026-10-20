@@ -137,3 +137,4 @@ class RunRequest(BaseModel):
     config: RunConfig = Field(default_factory=RunConfig)
     spec: ScenarioSpec | None = Field(default=None, description="Pre-edited scenario (skips the builder)")
     parent_id: str | None = None
+    file_ids: list[str] = Field(default_factory=list, description="Uploaded context files")

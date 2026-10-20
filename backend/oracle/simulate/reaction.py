@@ -77,7 +77,7 @@ Juster scale for the 'juster' field: """ + JUSTER_TEXT
 
 
 def _facts_for(p: Persona, facts: list[Fact]) -> list[Fact]:
-    return [f for f in facts if not f.countries or p.country in f.countries][:8]
+    return [f for f in facts if f.public and (not f.countries or p.country in f.countries)][:8]
 
 
 def build_prompt(p: Persona, spec: ScenarioSpec, facts: list[Fact]) -> str:

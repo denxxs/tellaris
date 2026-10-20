@@ -33,6 +33,7 @@ class Fact(BaseModel):
     countries: list[str] = Field(default_factory=list, description="ISO3 codes it applies to; empty = all")
     stance: str = Field(default="neutral", description="helps | hurts | neutral for the subject")
     source_urls: list[str] = Field(default_factory=list)
+    public: bool = Field(default=True, description="False for internal facts a customer or voter could not know")
 
 
 class FactSheet(BaseModel):
@@ -139,3 +140,23 @@ async def research(
     for f in sheet.facts:
         f.source_urls = [u for u in f.source_urls if u in valid_urls] or f.source_urls[:1]
     return sheet, hits
+
+
+FILES_SYSTEM = """You turn a user's own documents (pitch decks, product docs, pricing pages, research) into facts for a simulation.
+Extract 4-12 concrete facts: what the product does, its price and plans, who it is for, claims it makes, competitors named, market numbers.
+Mark public=false for anything a customer or member of the public could not know (internal targets, costs, roadmaps, confidential figures).
+Use source_urls = ["file:<file name>"] for each fact. Do not invent anything that is not in the documents."""
+
+
+async def facts_from_files(context: str, subject: str, targets: list[str], model: str) -> FactSheet:
+    """Facts from the user's own documents. Internal facts are kept for the analyst only."""
+    if not context:
+        return FactSheet()
+    user = f"Subject: {subject}\nTarget countries: {', '.join(targets)}\n\nDOCUMENTS:\n{context}"
+    sheet = await llm.json(
+        task="file_facts", model=model, system=FILES_SYSTEM, user=user, schema=FactSheet, temperature=0.2,
+        mock_ctx={"context": context[:4000]},
+    )
+    for f in sheet.facts:
+        f.source_urls = [u if u.startswith("file:") else f"file:{u}" for u in f.source_urls] or ["file:your documents"]
+    return sheet

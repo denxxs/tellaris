@@ -45,6 +45,7 @@ PROVIDER_KEY_ENV: dict[str, str] = {
     "together_ai": "TOGETHERAI_API_KEY",
     "xai": "XAI_API_KEY",
     "azure": "AZURE_API_KEY",
+    "nvidia_nim": "NVIDIA_NIM_API_KEY",
     "tavily": "TAVILY_API_KEY",
 }
 
@@ -52,6 +53,7 @@ PROVIDER_KEY_ENV: dict[str, str] = {
 PROVIDER_EXTRA_ENV: dict[str, list[str]] = {
     "azure": ["AZURE_API_BASE", "AZURE_API_VERSION"],
     "ollama": ["OLLAMA_API_BASE"],
+    "nvidia_nim": ["NVIDIA_NIM_API_BASE"],
 }
 
 
