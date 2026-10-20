@@ -494,6 +494,7 @@ class WhatIfRequest(BaseModel):
     label: str = Field(default="What-if", max_length=120)
     changes: dict[str, Any] = Field(default_factory=dict)
     config: RunConfig | None = None
+    config_patch: dict[str, Any] = Field(default_factory=dict, description="Change only these settings of the original run")
 
 
 @app.post("/api/runs/{run_id}/whatif")
@@ -505,6 +506,10 @@ async def whatif(run_id: str, req: WhatIfRequest) -> dict[str, str]:
     spec.title = f"{spec.title} · {req.label}"[:120]
     prev = RunRequest.model_validate(run["request"])
     cfg = req.config or prev.config
+    if req.config_patch:
+        cfg = RunConfig.model_validate({**cfg.model_dump(), **req.config_patch})
+    if cfg.seed is None and (run.get("results") or {}).get("seed") is not None:
+        cfg = cfg.model_copy(update={"seed": run["results"]["seed"]})  # same people, one thing changed
     new_id = await start_run(
         RunRequest(prompt=run["prompt"], targets=spec.targets, config=cfg, spec=spec, parent_id=run_id)
     )

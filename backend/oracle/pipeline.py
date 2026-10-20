@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 import traceback
 import uuid
 from typing import Any
@@ -69,12 +70,27 @@ async def load_calibration(spec: ScenarioSpec) -> Calibration:
     return Calibration(kind=kind, a=a, b=b, source="default")
 
 
+def _society_point(d: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Where a run's conversation ended, for comparing two runs."""
+    if not d or not d.get("rounds"):
+        return None
+    f = d.get("feed") or {}
+    curve = (d.get("bass") or {}).get("curve") or []
+    return {
+        "feed": f.get("style", "word_of_mouth"),
+        "after_talk": d["rounds"][-1]["calibrated"],
+        "outside_share": f.get("outside_share"),
+        "adoption_end": curve[-1]["adoption"] if curve else None,
+    }
+
+
 class Runner:
     def __init__(self, run_id: str, req: RunRequest, ch: RunChannel):
         self.id = run_id
         self.req = req
         self.ch = ch
-        self.cfg = req.config
+        # Every run gets a seed, so a what-if can rebuild the same people and change one thing.
+        self.cfg = req.config if req.config.seed is not None else req.config.model_copy(update={"seed": secrets.randbelow(2**31)})
         self.settings = settings_store.get()
         self.usage = Usage()
 
@@ -272,7 +288,7 @@ class Runner:
             summary, feed = await run_society(
                 people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
                 self.cfg.temperature, seed=self.cfg.seed, initial_items=meetings, on_items=on_items, on_round=on_round,
-                memory=self.cfg.memory, minds_out=minds,
+                memory=self.cfg.memory, minds_out=minds, feed_style=self.cfg.feed_style,
             )
             await self.ch.flush()
             await store.save_feed(self.id, feed)
@@ -298,6 +314,7 @@ class Runner:
         await self.stage("report", "start")
         themes = await extract_themes(agg.raw_lists(), roles.analyst, seed=self.cfg.seed)
         results["themes"] = themes.model_dump()
+        results["seed"] = self.cfg.seed
         if req.parent_id:
             parent = await store.get_run(req.parent_id)
             if parent and parent.get("results"):
@@ -308,6 +325,11 @@ class Runner:
                     "parent_value": ph.get("value"),
                     "delta": round(results["headline"]["value"] - (ph.get("value") or 0), 4),
                 }
+                soc = _society_point(results.get("diffusion"))
+                psoc = _society_point(parent["results"].get("diffusion"))
+                if soc and psoc:
+                    # The feed changes the conversation, not first reactions, so compare where the talk ended too.
+                    results["comparison"]["society"] = {"parent": psoc, "this": soc, "delta": round(soc["after_talk"] - psoc["after_talk"], 4)}
         await store.update_run(self.id, results=results)
         await self.ch.emit("results", results)
         report = await write_report(spec, results, roles.analyst)
