@@ -7,9 +7,9 @@ import { Avatar } from "@/components/people/Avatar";
 import { Card, CardHead, Empty, Pill, Segmented, Select } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
-import { companyLabel, cx, int, pctSmart, shortJob, stanceFill, stanceText, titleCase } from "@/lib/format";
+import { companyLabel, cx, int, pctSmart, shortJob, signedPts, stanceFill, stanceText, titleCase } from "@/lib/format";
 import type { LiveState } from "@/lib/useRunStream";
-import type { FeedItem, Results } from "@/lib/types";
+import type { FeedItem, ReflectionSummary, Results } from "@/lib/types";
 
 type Filter = "all" | "talk" | "shifts" | "news" | "meetings";
 type Order = "time" | "hot";
@@ -305,6 +305,63 @@ export function SocietyFeed({ id, live, r, onSelect, compact }: { id: string; li
   );
 }
 
+/** Where people landed after thinking over what they remembered, and what moved them. */
+function ReflectionCard({ rf, onSelect }: { rf: ReflectionSummary; onSelect: (pid: string) => void }) {
+  const delta = (rf.after ?? 0) - (rf.before ?? 0);
+  const quotes = (rf.examples ?? []).filter((e) => Math.abs(e.to - e.from) >= 0.08).slice(0, 3);
+  return (
+    <Card>
+      <CardHead title="After reflecting">
+        Each person thought over what they remembered. {int(rf.changed_mind ?? 0)} of {int(rf.people)} changed their minds.
+      </CardHead>
+      <div className="flex items-baseline gap-3">
+        <span className="t-kpi">{pctSmart(rf.after)}</span>
+        <span className="text-[13px] text-muted">
+          from {pctSmart(rf.before)} at the end of the talk,{" "}
+          <span className={cx("num", delta > 0.005 ? "text-yes" : delta < -0.005 ? "text-no" : "text-muted")}>{signedPts(delta)}</span>
+        </span>
+      </div>
+      {rf.moved_by && rf.moved_by.length > 0 && (
+        <div className="mt-4">
+          <h3 className="mb-2 text-[13px] font-medium">What moved people</h3>
+          <ul className="flex flex-col gap-1.5">
+            {rf.moved_by.map((m) => (
+              <li key={m.kind} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px] items-center gap-2 text-[13px]">
+                <span className="truncate text-text">{m.label.replace(/^./, (c) => c.toUpperCase())}</span>
+                <span className="h-1.5 rounded-full bg-raised">
+                  <span className="block h-full rounded-full bg-yes" style={{ width: `${m.share * 100}%` }} />
+                </span>
+                <span className="num text-right text-muted">{pctSmart(m.share)}</span>
+              </li>
+            ))}
+          </ul>
+          {!!rf.nothing_moved && <p className="mt-2 text-[12px] text-faint">{int(rf.nothing_moved)} people said nothing they saw moved them.</p>}
+        </div>
+      )}
+      {quotes.length > 0 && (
+        <ul className="mt-4 border-t border-rule pt-3">
+          {quotes.map((e) => (
+            <li key={e.persona_id} className="py-1.5">
+              <button onClick={() => onSelect(e.persona_id)} className="flex w-full items-start gap-2.5 text-left">
+                <Avatar seed={e.persona_id} size={28} ring={stanceFill(e.to)} />
+                <span className="min-w-0 flex-1 text-[13px] leading-[18px]">
+                  <span className="flex justify-between gap-2">
+                    <span className="truncate text-text">{e.name}</span>
+                    <span className="num shrink-0">
+                      {pctSmart(e.from)} to <span className={e.to > e.from ? "text-yes" : "text-no"}>{pctSmart(e.to)}</span>
+                    </span>
+                  </span>
+                  <span className="text-muted">“{e.belief}”</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
 export function SocietyTab({ id, live, r, onSelect }: { id: string; live: LiveState; r: Results; onSelect: (pid: string) => void }) {
   const { countryName } = useMeta();
   const d = r.diffusion;
@@ -346,6 +403,7 @@ export function SocietyTab({ id, live, r, onSelect }: { id: string; live: LiveSt
             />
           </Card>
         )}
+        {d?.reflection && d.reflection.people > 0 && <ReflectionCard rf={d.reflection} onSelect={onSelect} />}
         {d && d.bass.curve.length > 0 && (
           <Card>
             <CardHead title="Adoption over time">A Bass projection fitted to the conversation: how adoption builds month by month.</CardHead>

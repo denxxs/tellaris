@@ -382,6 +382,28 @@ in your own voice, briefly (2-6 sentences). You remember how you reacted earlier
 If asked something your character wouldn't know, say so. Never mention being an AI or a simulation."""
 
 
+def _mind_context(mind: dict[str, Any] | None) -> str:
+    """What the person remembers from the society and how they see it after reflecting."""
+    if not mind:
+        return ""
+    from ..simulate.memory import Memory, describe
+
+    mems = [Memory.model_validate(m) for m in mind.get("memories", [])]
+    top = sorted(sorted(mems, key=lambda m: -m.importance)[:8], key=lambda m: m.n)
+    out = "\n\nWHAT YOU REMEMBER FROM TALKING IT OVER:\n" + "\n".join(f"- round {m.round}, {describe(m)}" for m in top)
+    ref = mind.get("reflection")
+    traj = mind.get("trajectory") or []
+    if ref:
+        out += f"\nAfter thinking it over you said: \"{ref['belief']}\""
+        if traj:
+            out += f" (you started at {traj[0]:.0%} and ended at {ref['p']:.0%})."
+        by_n = {m.n: m for m in mems}
+        moved = [by_n[n] for n in ref.get("influences", []) if n in by_n]
+        if moved:
+            out += " What moved you most: " + "; ".join(describe(m) for m in moved) + "."
+    return out + "\nWhen asked why you think what you think, draw on these memories."
+
+
 @app.post("/api/runs/{run_id}/personas/{pid}/chat")
 async def chat(run_id: str, pid: str, req: ChatRequest) -> dict[str, Any]:
     p = await store.persona(run_id, pid)
@@ -400,6 +422,7 @@ async def chat(run_id: str, pid: str, req: ChatRequest) -> dict[str, Any]:
             f"Your reasons: {'; '.join(earlier['reasons'])}. Your objections: {'; '.join(earlier['objections'])}."
             if earlier else ""
         )
+        + _mind_context(p.get("mind"))
     )
     messages = [{"role": "system", "content": f"{CHAT_SYSTEM}\n\n{context}"}, *history[-20:], {"role": "user", "content": req.message}]
     model = (settings_store.get().roles.crowd or [settings_store.get().roles.planner])[0]

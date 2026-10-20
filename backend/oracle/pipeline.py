@@ -247,12 +247,20 @@ class Runner:
                     await self.ch.buffered("feed", it, every=0.3)
 
             meetings = meeting_items(comms) if comms else []
+            minds: dict[str, dict[str, Any]] = {}
             summary, feed = await run_society(
                 people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
                 self.cfg.temperature, seed=self.cfg.seed, initial_items=meetings, on_items=on_items, on_round=on_round,
+                memory=self.cfg.memory, minds_out=minds,
             )
             await self.ch.flush()
             await store.save_feed(self.id, feed)
+            if minds:
+                # Memories and reflections live on each person's record, read by their profile and chat.
+                await store.save_personas(self.id, [{**p.model_dump(), "mind": minds[p.id]} for p in people if p.id in minds])
+                ref = summary.get("reflection") or {}
+                if ref.get("people"):
+                    await self.log(f"{ref['people']} people reflected on what they saw; {ref['changed_mind']} changed their minds")
             results["diffusion"] = summary
             await self.stage("diffusion", "done", posts=summary.get("society", {}).get("posts", 0))
         else:

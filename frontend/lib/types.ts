@@ -66,6 +66,7 @@ export type RunConfig = {
   diffusion_agent_cap: number;
   influencer_voices: number;
   research: boolean;
+  memory?: boolean;
   influence_threshold: number;
   seed: number | null;
   temperature: number;
@@ -199,6 +200,7 @@ export type Results = {
     rounds: { round: number; stated: number; calibrated: number; by_country: Record<string, number>; changed: number; sharers: number; posts?: number; replies?: number; news: string | null }[];
     examples: { round: number; persona_id: string; name: string; country: string; from: number; to: number; why: string }[];
     social_pull: number;
+    reflection?: ReflectionSummary;
     bass: { m: number; p: number; q: number; curve: { month: number; adoption: number }[] };
     network: { nodes: { id: string; country: string; p: number; name: string }[]; links: { source: string; target: string }[] };
   };
@@ -325,7 +327,32 @@ export type PersonaSummary = PersonaLite & {
 
 export type Exposure = { source: string; source_name: string; channel: string; strength: number; note: string; direction: string; origin: string };
 
+export type MindMemory = {
+  n: number;
+  round: number;
+  kind: "said" | "saw" | "reply" | "news" | "meeting" | "thought";
+  text: string;
+  who: string | null;
+  item: string | null;
+  importance: number;
+};
+export type Mind = {
+  memories: MindMemory[];
+  trajectory: number[];
+  reflection: { belief: string; p: number; influences: number[]; changed_mind: boolean } | null;
+};
+export type ReflectionSummary = {
+  people: number;
+  changed_mind?: number;
+  before?: number;
+  after?: number;
+  moved_by?: { kind: MindMemory["kind"]; label: string; share: number }[];
+  nothing_moved?: number;
+  examples?: { persona_id: string; name: string; country: string; occupation: string; from: number; to: number; belief: string }[];
+};
+
 export type Persona = {
+  mind?: Mind;
   id: string;
   country: string;
   country_name: string;

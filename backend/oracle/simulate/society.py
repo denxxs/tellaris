@@ -22,6 +22,8 @@ from ..population.models import Persona
 from ..scenario.models import ScenarioSpec
 from .calibrate import Calibration, apply_array
 from .diffusion import bass_projection, build_network
+from .memory import Mind, mind_record, reflect_all, seen_importance
+from .memory import summarize as summarize_minds
 from .reaction import JUSTER, Reaction
 
 
@@ -32,6 +34,7 @@ class Turn(BaseModel):
     juster: int = Field(ge=0, le=10, description="Your view now, on the Juster scale")
     changed: bool = Field(description="True if your view moved since last round")
     why: str = Field(default="", description="One short sentence on why your view did or didn't move")
+    takeaway: str = Field(default="", description="One short sentence: what you will remember from this round. Empty if nothing stuck.")
 
     @field_validator("text")
     @classmethod
@@ -78,7 +81,11 @@ async def run_society(
     initial_items: list[dict[str, Any]] | None = None,
     on_items: Callable[[list[dict[str, Any]]], Awaitable[None]] | None = None,
     on_round: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    memory: bool = True,
+    minds_out: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Run the society. With memory on, each person keeps and recalls memories and reflects at the end;
+    their memories and reflection are written into minds_out (person id -> record)."""
     rng = np.random.default_rng(seed)
     first: dict[str, Reaction] = {}
     stated: dict[str, list[float]] = {}
@@ -98,6 +105,19 @@ async def run_society(
     g = build_network(pool, seed=seed)
     weights = np.array([max(by_id[pid].weight, 1e-9) for pid in pids])
     state = {pid: float(np.mean(stated[pid])) for pid in pids}
+    minds: dict[str, Mind] = {}
+    if memory:
+        for pid in pids:
+            m = minds[pid] = Mind()
+            m.trajectory.append(state[pid])
+            m.add(0, "said", first[pid].quote, 0.9)
+        for it in initial_items or []:
+            if it.get("kind") == "meeting":
+                for member in it.get("members", []):
+                    mid = member.get("persona_id")
+                    if mid in minds:
+                        d = it.get("decision") or {}
+                        minds[mid].add(0, "meeting", f"the company chose to {d.get('decision', 'decide')}: {it.get('text', '')}", 0.9, item=it["id"])
 
     feed: list[dict[str, Any]] = list(initial_items or [])
     counter = [len(feed)]
@@ -195,9 +215,21 @@ async def run_society(
                 f"{' (replying)' if it['kind'] == 'reply' else ''}: \"{it['text']}\""
                 for it in visible
             ]
+            mind = minds.get(pid)
+            past = (
+                f"WHAT YOU REMEMBER:\n{mind.lines(rnd)}\n\n" if mind and len(mind.memories) > 1
+                else f"What you said before: \"{first[pid].quote}\"\n\n"
+            )
+            if mind:
+                for it in visible:
+                    kind = "reply" if it["kind"] == "reply" and item_by_id.get(it.get("parent") or "", {}).get("author") == pid else "saw"
+                    imp = 0.85 if kind == "reply" else seen_importance(it.get("p"), state[pid], it["agrees"] + it["disagrees"])
+                    mind.add(rnd, kind, it["text"], imp, who=it["author_name"], item=it["id"])
+                if news:
+                    mind.add(rnd, "news", news, 0.8, item=news_item["id"] if news_item else None)
             user = (
                 f"YOU:\n{p.card()}\n\nTHE TOPIC: {spec.subject}\nThe question for you: {spec.persona_question}\n"
-                f"Your current view: {state[pid]:.0%}. What you said before: \"{first[pid].quote}\"\n\n"
+                f"Your current view: {state[pid]:.0%}.\n" + past
                 + ("YOUR FEED:\n" + "\n".join(lines) + "\n\n" if lines else "")
                 + (f"NEWS: {news}\n\n" if news else "")
                 + "What do you do?"
@@ -214,6 +246,8 @@ async def run_society(
             target = JUSTER.get(t.juster, state[pid])
             p_new = 0.35 * state[pid] + 0.65 * target  # people rarely jump all the way in one round
             new_state[pid] = p_new
+            if mind and t.takeaway.strip():
+                mind.add(rnd, "thought", t.takeaway, 0.7)
             moved = abs(p_new - state[pid]) > 0.08
             async with lock:
                 if moved:
@@ -233,6 +267,8 @@ async def run_society(
 
         await asyncio.gather(*(act(i, pid) for i, pid in enumerate(pids)))
         state.update(new_state)
+        for pid, mind in minds.items():
+            mind.trajectory.append(state[pid])
         tally([it for it in produced if it["kind"] in ("post", "reply")])
         produced.sort(key=lambda it: it["id"])
         feed.extend(produced)
@@ -247,6 +283,23 @@ async def run_society(
         history.append(snapshot(rnd, changed_count, news, posts, replies))
         if on_round:
             await on_round(history[-1])
+
+    # Reflection: each person thinks over what they remember. Kept apart from the rounds, so the
+    # word-of-mouth numbers and the Bass projection mean the same as before.
+    reflection_summary: dict[str, Any] = {"people": 0}
+    if minds:
+        reflections = await reflect_all(by_id, minds, state, spec, models, temperature, JUSTER, rounds + 1)
+        reflection_summary = summarize_minds(
+            minds, reflections, state, {pid: by_id[pid].weight for pid in pids}, lambda v: apply_array(v, cal),
+        )
+        reflection_summary["examples"] = [
+            {"persona_id": pid, "name": by_id[pid].name, "country": by_id[pid].country, "occupation": by_id[pid].occupation,
+             "from": round(minds[pid].trajectory[0], 3), "to": r["p"], "belief": r["belief"]}
+            for pid, r in sorted(reflections.items(), key=lambda kv: -abs(kv[1]["p"] - minds[kv[0]].trajectory[0]))[:8]
+        ]
+        if minds_out is not None:
+            for pid, mind in minds.items():
+                minds_out[pid] = mind_record(mind, reflections.get(pid))
 
     # Bass projection from the observed social pull.
     start, end = history[0]["calibrated"], history[-1]["calibrated"]
@@ -270,6 +323,7 @@ async def run_society(
         "edges": g.number_of_edges(),
         "rounds": history,
         "examples": examples,
+        "reflection": reflection_summary,
         "social_pull": round(end - start, 4),
         "bass": {"m": round(m, 4), "p": round(p_innov, 4), "q": round(q_imit, 4), "curve": bass_projection(m, p_innov, q_imit, spec.horizon_months)},
         "network": {
