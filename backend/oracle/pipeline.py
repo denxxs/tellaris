@@ -1,0 +1,290 @@
+"""Runs a full simulation: scenario -> research -> world -> population ->
+reactions -> committees -> diffusion -> report, streaming progress as it goes."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import traceback
+import uuid
+from typing import Any
+
+from .config import settings_store
+from .events import RunChannel, hub
+from .llm import Usage, current_usage
+from .population.enrich import enrich
+from .population.models import Persona
+from .population.sampler import PopulationBuilder
+from .report.writer import extract_themes, write_report
+from .research.search import FactSheet, research
+from .scenario.compiler import compile_scenario, normalize
+from .scenario.models import RunRequest, ScenarioSpec
+from .simulate import committee as committee_mod
+from .simulate.aggregate import Aggregator
+from .simulate.calibrate import Calibration, default_calibration, kind_for
+from .simulate.diffusion import run_diffusion
+from .simulate.reaction import Reaction, react_all
+from .store import store
+from .world.influence import InfluenceEdge, expand, graph_payload
+
+log = logging.getLogger("oracle.pipeline")
+
+STAGES = [
+    ("scenario", "Understanding the question", 0.0, 0.07),
+    ("research", "Researching the real world", 0.07, 0.14),
+    ("world", "Mapping influence between countries", 0.14, 0.18),
+    ("population", "Building the population", 0.18, 0.32),
+    ("reactions", "Simulating individual reactions", 0.32, 0.72),
+    ("committees", "Running buying committees", 0.72, 0.82),
+    ("diffusion", "Simulating word of mouth", 0.82, 0.91),
+    ("report", "Writing the analysis", 0.91, 1.0),
+]
+STAGE = {s[0]: s for s in STAGES}
+
+tasks: dict[str, asyncio.Task] = {}
+
+
+def lite(p: Persona) -> dict[str, Any]:
+    return {
+        "id": p.id, "name": p.name, "country": p.country, "segment": p.segment, "occupation": p.occupation,
+        "seniority": p.seniority, "voice": p.influencer_voice, "exposures": [e.source for e in p.exposures],
+    }
+
+
+async def load_calibration(subject_kind: str) -> Calibration:
+    kind = kind_for(subject_kind)
+    saved = await store.calibration(kind)
+    if saved:
+        try:
+            return Calibration.model_validate(saved)
+        except Exception:  # noqa: BLE001
+            pass
+    return default_calibration(subject_kind)
+
+
+class Runner:
+    def __init__(self, run_id: str, req: RunRequest, ch: RunChannel):
+        self.id = run_id
+        self.req = req
+        self.ch = ch
+        self.cfg = req.config
+        self.settings = settings_store.get()
+        self.usage = Usage()
+
+    async def stage(self, name: str, status: str, **extra: Any) -> None:
+        key, label, lo, hi = STAGE[name]
+        progress = lo if status == "start" else hi
+        await self.ch.emit("stage", {"stage": key, "label": label, "status": status, "progress": progress, **extra})
+        await store.update_run(self.id, stage=key, progress=progress)
+
+    async def progress(self, name: str, frac: float) -> None:
+        _, _, lo, hi = STAGE[name]
+        await store.update_run(self.id, progress=lo + (hi - lo) * max(0.0, min(1.0, frac)))
+
+    async def log(self, message: str, level: str = "info") -> None:
+        await self.ch.emit("log", {"message": message, "level": level})
+
+    async def run(self) -> None:
+        token = current_usage.set(self.usage)
+        try:
+            await store.update_run(self.id, status="running")
+            await self._run()
+            await store.update_run(self.id, status="done", progress=1.0, usage=self.usage.to_dict())
+            await self.ch.emit("done", {"usage": self.usage.to_dict()})
+        except asyncio.CancelledError:
+            await store.update_run(self.id, status="cancelled", error="Cancelled by user", usage=self.usage.to_dict())
+            await self.ch.emit("error", {"message": "Cancelled"})
+            raise
+        except Exception as exc:  # noqa: BLE001
+            log.exception("run %s failed", self.id)
+            await store.update_run(self.id, status="failed", error=f"{type(exc).__name__}: {exc}", usage=self.usage.to_dict())
+            await self.ch.emit("error", {"message": f"{type(exc).__name__}: {exc}", "trace": traceback.format_exc()[-2000:]})
+        finally:
+            current_usage.reset(token)
+            await self.ch.close()
+            hub.drop(self.id)
+            tasks.pop(self.id, None)
+
+    async def _run(self) -> None:
+        roles = self.settings.roles
+        crowd = roles.crowd or [roles.planner]
+        req = self.req
+
+        # 1. Scenario
+        await self.stage("scenario", "start")
+        if req.spec is not None:
+            spec = normalize(req.spec, req.prompt, req.targets or None)
+        else:
+            spec = await compile_scenario(req.prompt, roles.planner, req.targets or None)
+        await store.update_run(self.id, spec=spec.model_dump(), title=spec.title)
+        await self.ch.emit("scenario", spec.model_dump())
+        await self.stage("scenario", "done")
+
+        # 2. Research
+        sheet = FactSheet()
+        if self.cfg.research and self.settings.search_provider != "none":
+            await self.stage("research", "start")
+            queries = spec.research_queries or [f"{spec.subject[:120]} market", f"{spec.subject[:80]} competitors pricing"]
+            try:
+                sheet, hits = await research(spec.subject, spec.question, queries, spec.targets, self.settings.search_provider, roles.analyst)
+                await self.log(f"Read {len(hits)} sources, kept {len(sheet.facts)} facts")
+            except Exception as exc:  # noqa: BLE001
+                await self.log(f"Research failed, continuing without it: {exc}", "warn")
+            if sheet.competitors:
+                spec.competitors = list(dict.fromkeys([*spec.competitors, *sheet.competitors]))[:10]
+            await store.update_run(self.id, research=sheet.model_dump(), spec=spec.model_dump())
+            await self.ch.emit("research", sheet.model_dump())
+            await self.stage("research", "done")
+        else:
+            await self.stage("research", "skipped")
+
+        # 3. World
+        await self.stage("world", "start")
+        extra = [
+            InfluenceEdge(
+                source=f.origin, target=t, channel=f.channel, strength=f.strength, sectors=f.sectors or ["all"],
+                note=f"{f.name}: {f.description}", origin="scenario",
+            )
+            for f in spec.forces
+            if f.origin and f.origin not in ("global",)
+            for t in (f.affects or spec.targets)
+            if t != f.origin
+        ]
+        influencers = expand(spec.targets, extra, self.cfg.influence_threshold, spec.sectors or None)
+        world = graph_payload(spec.targets, influencers)
+        await store.update_run(self.id, world=world)
+        await self.ch.emit("world", world)
+        await self.stage("world", "done", influencers=len(influencers))
+
+        # 4. Population
+        await self.stage("population", "start")
+        people = await self._population(spec, influencers)
+        await self.stage("population", "done", agents=len(people))
+
+        # 5. Reactions
+        await self.stage("reactions", "start")
+        total = len(people) * self.cfg.runs_per_agent
+        done_count = 0
+        by_id = {p.id: p for p in people}
+
+        async def on_reaction(r: Reaction, p: Persona) -> None:
+            nonlocal done_count
+            done_count += 1
+            await self.ch.buffered("reactions", {"id": p.id, "p": r.p_stated, "choice": r.choice, "attention": r.attention, "quote": r.quote[:220], "model": r.model, "run": r.run})
+            if done_count % 25 == 0:
+                await self.progress("reactions", done_count / max(total, 1))
+
+        reactions = await react_all(people, spec, sheet.facts, crowd, self.cfg.runs_per_agent, self.cfg.temperature, on_reaction)
+        await self.ch.flush()
+        await store.save_reactions(self.id, [r.model_dump() for r in reactions])
+        if not reactions:
+            raise RuntimeError("No agent produced a valid answer. Check the crowd models in Settings.")
+        await self.stage("reactions", "done", samples=len(reactions))
+
+        cal = await load_calibration(spec.subject_kind)
+        agg = Aggregator(people, reactions, spec, cal, seed=self.cfg.seed)
+        results = agg.results()
+        await self.ch.emit("interim", {"headline": results["headline"], "by_country": results["by_country"]})
+
+        # 6. Committees
+        if spec.b2b and "committee" in spec.modes and self.cfg.committees > 0:
+            await self.stage("committees", "start")
+            comms = committee_mod.form_committees(spec, people, self.cfg.committees, seed=self.cfg.seed)
+            finished = 0
+
+            async def on_committee(c: committee_mod.Committee) -> None:
+                nonlocal finished
+                finished += 1
+                await self.ch.emit("committee", {"id": c.id, "country": c.country, "company_type": c.company_type, "decision": c.decision.model_dump() if c.decision else None, "members": c.members})
+                await self.progress("committees", finished / max(len(comms), 1))
+
+            comms = await committee_mod.run_committees(comms, people, spec, sheet.facts, crowd, roles.analyst, self.cfg.committee_rounds, self.cfg.temperature, on_committee)
+            await store.save_committees(self.id, [c.model_dump() for c in comms])
+            results["committees"] = committee_mod.summarize(comms, spec)
+            await self.stage("committees", "done", committees=len(comms))
+        else:
+            await self.stage("committees", "skipped")
+
+        # 7. Diffusion
+        if "diffusion" in spec.modes and self.cfg.diffusion_rounds > 0:
+            await self.stage("diffusion", "start")
+
+            async def on_round(snap: dict[str, Any]) -> None:
+                await self.ch.emit("diffusion_round", snap)
+                await self.progress("diffusion", snap["round"] / max(self.cfg.diffusion_rounds, 1))
+
+            results["diffusion"] = await run_diffusion(
+                people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
+                self.cfg.temperature, seed=self.cfg.seed, on_round=on_round,
+            )
+            await self.stage("diffusion", "done")
+        else:
+            await self.stage("diffusion", "skipped")
+
+        # 8. Themes + report
+        await self.stage("report", "start")
+        themes = await extract_themes(agg.raw_lists(), roles.analyst, seed=self.cfg.seed)
+        results["themes"] = themes.model_dump()
+        if req.parent_id:
+            parent = await store.get_run(req.parent_id)
+            if parent and parent.get("results"):
+                ph = parent["results"]["headline"]
+                results["comparison"] = {
+                    "parent_id": req.parent_id,
+                    "parent_title": parent.get("title"),
+                    "parent_value": ph.get("value"),
+                    "delta": round(results["headline"]["value"] - (ph.get("value") or 0), 4),
+                }
+        await store.update_run(self.id, results=results)
+        await self.ch.emit("results", results)
+        report = await write_report(spec, results, roles.analyst)
+        await store.update_run(self.id, report=report.model_dump())
+        await self.ch.emit("report", report.model_dump())
+        await self.stage("report", "done")
+
+    async def _population(self, spec: ScenarioSpec, influencers) -> list[Persona]:
+        roles = self.settings.roles
+        if self.req.parent_id:
+            parent = await store.get_run(self.req.parent_id)
+            pspec = (parent or {}).get("spec") or {}
+            if pspec and sorted(pspec.get("targets", [])) == sorted(spec.targets) and [s.get("name") for s in pspec.get("segments", [])] == [s.name for s in spec.segments]:
+                rows = await store.personas(self.req.parent_id)
+                if rows:
+                    people = [Persona.model_validate(r) for r in rows]
+                    await store.save_personas(self.id, [p.model_dump() for p in people])
+                    await self.ch.emit("personas", [lite(p) for p in people])
+                    await self.log(f"Reusing the same {len(people)} people as the original run, so the comparison is fair")
+                    return people
+
+        builder = PopulationBuilder(spec, influencers, seed=self.cfg.seed)
+        people = builder.build(self.cfg.agents, self.cfg.influencer_voices)
+        await self.log(f"Sampled {len(people)} people across {len(spec.targets)} countries and {len(spec.segments)} segments")
+        enriched = 0
+
+        async def on_batch(batch: list[Persona]) -> None:
+            nonlocal enriched
+            enriched += len(batch)
+            await self.ch.emit("personas", [lite(p) for p in batch])
+            await self.progress("population", enriched / max(len(people), 1))
+
+        context = f"{spec.title}. {spec.question}"
+        await enrich(people, roles.crowd[0] if roles.crowd else roles.planner, context, on_batch)
+        await store.save_personas(self.id, [p.model_dump() for p in people])
+        return people
+
+
+async def start_run(req: RunRequest) -> str:
+    run_id = uuid.uuid4().hex[:12]
+    await store.create_run(run_id, req.prompt, req.model_dump(), req.parent_id)
+    ch = hub.open(run_id)
+    runner = Runner(run_id, req, ch)
+    tasks[run_id] = asyncio.create_task(runner.run())
+    return run_id
+
+
+async def cancel_run(run_id: str) -> bool:
+    t = tasks.get(run_id)
+    if not t:
+        return False
+    t.cancel()
+    return True

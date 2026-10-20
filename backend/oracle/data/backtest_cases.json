@@ -1,0 +1,77 @@
+{
+  "_meta": {
+    "note": "Resolved cases with published outcomes, expressed as rates (share of a population). Language models may already know these outcomes, so scores on them are optimistic. Add your own cases that happened after your models' training cutoff for an honest test.",
+    "fields": {
+      "actual": "Observed share (0-1) for the first outcome",
+      "kind": "action (people doing something) or belief (votes, opinions)"
+    }
+  },
+  "cases": [
+    {
+      "id": "brexit_2016",
+      "kind": "belief",
+      "as_of": "2016-06-15",
+      "targets": [
+        "GBR"
+      ],
+      "actual": 0.519,
+      "source": "UK Electoral Commission, EU referendum result 2016",
+      "prompt": "It is mid-June 2016. The UK holds a referendum on 23 June on whether to remain in or leave the European Union. Simulate UK adults who will vote. Outcomes: Leave, Remain. What share votes Leave?"
+    },
+    {
+      "id": "scotland_2014",
+      "kind": "belief",
+      "as_of": "2014-09-10",
+      "targets": [
+        "GBR"
+      ],
+      "actual": 0.447,
+      "source": "Scottish independence referendum result 2014",
+      "prompt": "It is September 2014. Scotland votes on 18 September on the question 'Should Scotland be an independent country?'. Simulate adults living in Scotland who will vote. Outcomes: Yes, No. What share votes Yes?"
+    },
+    {
+      "id": "colombia_peace_2016",
+      "kind": "belief",
+      "as_of": "2016-09-25",
+      "targets": [
+        "COL"
+      ],
+      "actual": 0.498,
+      "source": "Registraduría Nacional, plebiscite result 2016",
+      "prompt": "It is late September 2016. Colombia holds a plebiscite on 2 October to approve the peace agreement with the FARC. Simulate Colombian adults who will vote. Outcomes: Yes, No. What share votes Yes?"
+    },
+    {
+      "id": "ireland_8th_2018",
+      "kind": "belief",
+      "as_of": "2018-05-15",
+      "targets": [
+        "IRL"
+      ],
+      "actual": 0.664,
+      "source": "Irish Referendum Commission result 2018",
+      "prompt": "It is mid-May 2018. Ireland votes on 25 May on repealing the Eighth Amendment, which would allow the legislature to regulate abortion. Simulate Irish adults who will vote. Outcomes: Yes, No. What share votes Yes?"
+    },
+    {
+      "id": "aus_ssm_2017",
+      "kind": "belief",
+      "as_of": "2017-09-20",
+      "targets": [
+        "AUS"
+      ],
+      "actual": 0.616,
+      "source": "Australian Bureau of Statistics, marriage law postal survey 2017",
+      "prompt": "It is September 2017. Australia runs a voluntary postal survey: 'Should the law be changed to allow same-sex couples to marry?'. Simulate Australian adults who return the survey. Outcomes: Yes, No. What share answers Yes?"
+    },
+    {
+      "id": "us_chatgpt_2024",
+      "kind": "action",
+      "as_of": "2023-01-15",
+      "targets": [
+        "USA"
+      ],
+      "actual": 0.23,
+      "source": "Pew Research Center, March 2024 (23% of US adults had used ChatGPT)",
+      "prompt": "It is January 2023. OpenAI's ChatGPT, a free AI chatbot, launched two months ago and is getting a lot of attention in tech circles. Simulate US adults. Outcomes: Yes, No. What share of US adults will have used ChatGPT at least once within the next 14 months?"
+    }
+  ]
+}
