@@ -5,6 +5,7 @@ import { use, useEffect, useState } from "react";
 import { PersonaChat } from "@/components/people/Chat";
 import { Avatar } from "@/components/people/Avatar";
 import { MindCard } from "@/components/people/MindCard";
+import { REACH_LABEL, fmtDay } from "@/components/run/NewsTimeline";
 import { Card, CardHead, Chip, ErrorNote, Pill, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
@@ -179,6 +180,24 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                       Each answer, by model: {rs.map((r) => `${pctSmart(r.p_stated)} (${r.model})`).join(", ")}.
                     </p>
                   )}
+                </Card>
+              )}
+
+              {p?.news && p.news.length > 0 && (
+                <Card>
+                  <CardHead title="News they know">Real stories {p.name.split(" ")[0]} has come across, given where they live, their work and age.</CardHead>
+                  <ul>
+                    {p.news.map((n) => (
+                      <li key={n.id} className="border-b border-rule py-2.5 first:pt-0 last:border-0 last:pb-0">
+                        <div className="text-[12px] text-faint">
+                          {fmtDay(n.published)}, {n.source}, {REACH_LABEL[n.reach].toLowerCase()}
+                        </div>
+                        <a href={n.url} target="_blank" rel="noreferrer" className="text-[14px] leading-5 text-text hover:underline">
+                          {n.headline}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
                 </Card>
               )}
 

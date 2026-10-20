@@ -5,7 +5,7 @@ import { Button, Chip, Field, Input, Segmented, Select, Slider, Textarea, Toggle
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { int, pct, people, shortJob, titleCase } from "@/lib/format";
-import type { FeedStyle, Force, LensId, RunConfig, Segment, Spec } from "@/lib/types";
+import type { FeedStyle, Force, LensId, RunConfig, Segment, Spec, WhatIfEvent } from "@/lib/types";
 import { CountryPicker } from "./CountryPicker";
 
 type Props = {
@@ -18,6 +18,36 @@ type Props = {
 const newSegment = (): Segment => ({
   name: "New group", description: "", occupations: [], custom_occupation: null, company_types: [], countries: [], weight: 1, is_buyer: true,
 });
+const newEvent = (horizon: number): WhatIfEvent => ({
+  name: "",
+  description: "",
+  at_month: Math.min(3, horizon),
+  countries: [],
+  reach: "broad",
+  audiences: [],
+  direction: "hurts",
+});
+
+/** When an event can happen, in the units that suit the time frame: months, quarters or years. */
+export function timeOptions(horizon: number, today = new Date()) {
+  const at = (m: number) => {
+    const d = new Date(today);
+    d.setMonth(d.getMonth() + Math.floor(m));
+    return d;
+  };
+  const mon = (d: Date) => d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  if (horizon <= 18) return Array.from({ length: horizon }, (_, i) => ({ value: String(i + 1), label: `Month ${i + 1} (${mon(at(i + 1))})` }));
+  if (horizon <= 48)
+    return Array.from({ length: Math.ceil(horizon / 3) }, (_, i) => {
+      const d = at(i * 3 + 1.5);
+      return { value: String(i * 3 + 1.5), label: `Quarter ${i + 1} (Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()})` };
+    });
+  return Array.from({ length: Math.ceil(horizon / 12) }, (_, i) => ({ value: String(Math.min(i * 12 + 6, horizon)), label: `Year ${i + 1} (${at(i * 12 + 6).getFullYear()})` }));
+}
+
+const nearest = (opts: { value: string }[], m: number) =>
+  opts.reduce((best, o) => (Math.abs(Number(o.value) - m) < Math.abs(Number(best.value) - m) ? o : best), opts[0])?.value ?? "1";
+
 const newForce = (): Force => ({
   name: "New outside factor", origin: "global", affects: [], sectors: ["all"], channel: "regulation", direction: "mixed", strength: 0.5, description: "",
 });
@@ -50,6 +80,9 @@ export function estimateCalls(spec: Spec, c: RunConfig) {
   if (spec.modes.includes("diffusion")) calls += Math.min(c.diffusion_agent_cap, c.agents) * (c.diffusion_rounds + (c.memory === false ? 0 : 1));
   if (c.research) calls += 1;
   if (c.knowledge_graph !== false) calls += 1;
+  if (c.news !== false) calls += 2;
+  // With what-if events, the same people talk it over again with real news only, for comparison.
+  if (spec.events?.length && spec.modes.includes("diffusion")) calls += Math.min(c.diffusion_agent_cap, c.agents) * (c.diffusion_rounds + (c.memory === false ? 0 : 1));
   return calls;
 }
 
@@ -84,6 +117,9 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
   const occTitle = useMemo(() => Object.fromEntries((meta?.occupations ?? []).map((o) => [o.id, shortJob(o.title)])), [meta]);
   const segs = spec.segments;
   const setSeg = (i: number, patch: Partial<Segment>) => set("segments", segs.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const events = spec.events ?? [];
+  const setEvent = (i: number, patch: Partial<WhatIfEvent>) => set("events", events.map((e, j) => (j === i ? { ...e, ...patch } : e)));
+  const whenOptions = timeOptions(spec.horizon_months);
   const setForce = (i: number, patch: Partial<Force>) => set("forces", spec.forces.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   const toggleMode = (m: string, on: boolean) => {
     const modes = new Set(spec.modes);
@@ -332,7 +368,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
         </Button>
       </Section>
 
-      <Section title="Outside factors" aside="Regulation, competitors or economic pressure that people will feel. They are drawn on the map and land as news during word of mouth.">
+      <Section title="Outside factors" aside="Regulation, competitors or economic pressure that people will feel. They are drawn on the map and shape what people feel. Real news is added automatically.">
         {spec.forces.length === 0 && <p className="text-[13px] text-muted">None added. The influence map still applies.</p>}
         {spec.forces.map((f, i) => (
           <div key={i} className="flex flex-col gap-3 border-b border-border pb-5 last:border-0 last:pb-0">
@@ -361,6 +397,81 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
         ))}
         <Button size="sm" className="self-start" onClick={() => set("forces", [...spec.forces, newForce()])}>
           Add factor
+        </Button>
+      </Section>
+
+      <Section
+        title="What-if events"
+        aside="Real news and scheduled events are added automatically. Use this only to test something that hasn't happened, like a rival cutting its price or a new law. It's always shown as an assumption, and Oracle also runs the same people without it so you can see the difference."
+        summary={events.length ? <>{events.length} {events.length === 1 ? "event" : "events"} on the timeline.</> : undefined}
+      >
+        {!spec.modes.includes("diffusion") && <p className="text-[13px] text-muted">Events land while people talk it over. Turn on Society under How to simulate to use them.</p>}
+        {events.length === 0 && <p className="text-[13px] text-muted">None added. The simulation uses the real world only.</p>}
+        {events.map((e, i) => (
+          <div key={i} className="flex flex-col gap-3 border-b border-border pb-5 last:border-0 last:pb-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <Input aria-label="What happens" placeholder="What happens, e.g. Rival cuts its price to $1" value={e.name} onChange={(ev) => setEvent(i, { name: ev.target.value })} className="max-w-md font-medium" />
+              <Button size="sm" variant="ghost" className="ml-auto" onClick={() => set("events", events.filter((_, j) => j !== i))}>
+                Remove
+              </Button>
+            </div>
+            <Textarea aria-label="Details" placeholder="Details people would hear (optional)" rows={2} value={e.description} onChange={(ev) => setEvent(i, { description: ev.target.value })} />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Field label="When">{(id) => <Select id={id} value={nearest(whenOptions, e.at_month)} onChange={(v) => setEvent(i, { at_month: Number(v) })} options={whenOptions} />}</Field>
+              <Field label="Where">
+                {(id) => (
+                  <Select
+                    id={id}
+                    value={e.countries[0] ?? ""}
+                    onChange={(v) => setEvent(i, { countries: v ? [v] : [] })}
+                    options={[{ value: "", label: "Everywhere" }, ...spec.targets.map((c) => ({ value: c, label: countryName(c) }))]}
+                  />
+                )}
+              </Field>
+              <Field label="How widely heard">
+                {(id) => (
+                  <Select
+                    id={id}
+                    value={e.reach}
+                    onChange={(v) => setEvent(i, { reach: v as WhatIfEvent["reach"] })}
+                    options={[
+                      { value: "mass", label: "Everyone hears about it" },
+                      { value: "broad", label: "Widely covered" },
+                      { value: "niche", label: "Only people it concerns" },
+                    ]}
+                  />
+                )}
+              </Field>
+              <Field label="Effect">
+                {(id) => (
+                  <Select
+                    id={id}
+                    value={e.direction}
+                    onChange={(v) => setEvent(i, { direction: v as WhatIfEvent["direction"] })}
+                    options={[
+                      { value: "hurts", label: "Makes a yes less likely" },
+                      { value: "helps", label: "Makes a yes more likely" },
+                      { value: "mixed", label: "Mixed effect" },
+                    ]}
+                  />
+                )}
+              </Field>
+            </div>
+            {e.reach === "niche" && (
+              <Field label="Who follows it closely" hint="Kinds of people who'd hear about it, separated by commas. For example: finance, retail, students.">
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={e.audiences.join(", ")}
+                    onChange={(ev) => setEvent(i, { audiences: ev.target.value.split(",").map((x) => x.trim()).filter(Boolean) })}
+                  />
+                )}
+              </Field>
+            )}
+          </div>
+        ))}
+        <Button size="sm" className="self-start" onClick={() => set("events", [...events, newEvent(spec.horizon_months)])}>
+          Add event
         </Button>
       </Section>
 
@@ -399,6 +510,12 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
             </Field>
           )}
           <Toggle checked={config.research} onChange={(v) => onConfig({ ...config, research: v })} label="Web research" description="Ground people in current facts, prices and competitors." />
+          <Toggle
+            checked={config.news ?? true}
+            onChange={(v) => onConfig({ ...config, news: v })}
+            label="Current news"
+            description="Pulls the latest real news on the topic. Each person only knows the stories they'd plausibly have come across. Two extra model calls."
+          />
           <Toggle
             checked={config.knowledge_graph ?? true}
             onChange={(v) => onConfig({ ...config, knowledge_graph: v })}

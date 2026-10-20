@@ -4,6 +4,7 @@ reactions -> committees -> diffusion -> report, streaming progress as it goes.""
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 import logging
 import secrets
 import traceback
@@ -28,7 +29,9 @@ from .simulate import committee as committee_mod
 from .simulate.aggregate import Aggregator
 from .scenario.lenses import lens_of
 from .simulate.calibrate import DEFAULT_PARAMS, Calibration
+from .simulate import timeline as tl
 from .simulate.society import meeting_items, run_society
+from .research.news import NewsItem, assign, gather_news, known_record, news_lines
 from .simulate.reaction import Reaction, react_all
 from .store import store
 from .world.influence import InfluenceEdge, expand, graph_payload
@@ -37,9 +40,10 @@ log = logging.getLogger("oracle.pipeline")
 
 STAGES = [
     ("scenario", "Understanding the question", 0.0, 0.07),
-    ("research", "Researching the real world", 0.07, 0.12),
-    ("graph", "Mapping the topic", 0.12, 0.14),
-    ("world", "Mapping influence between countries", 0.14, 0.18),
+    ("research", "Researching the real world", 0.07, 0.11),
+    ("news", "Reading the news", 0.11, 0.14),
+    ("graph", "Mapping the topic", 0.14, 0.16),
+    ("world", "Mapping influence between countries", 0.16, 0.18),
     ("population", "Building the population", 0.18, 0.32),
     ("reactions", "Simulating individual reactions", 0.32, 0.72),
     ("committees", "Running buying committees", 0.72, 0.82),
@@ -132,6 +136,7 @@ class Runner:
         roles = self.settings.roles
         crowd = roles.crowd or [roles.planner]
         req = self.req
+        as_of = date.today()
 
         # 1. Scenario (with the user's files, if any)
         await self.stage("scenario", "start")
@@ -186,6 +191,22 @@ class Runner:
         else:
             await self.stage("research", "skipped")
 
+        # 2a. Current affairs: the real news around the question, today.
+        news: list[NewsItem] = []
+        news_status = "off" if not self.cfg.news else "no_search" if self.settings.search_provider == "none" else "none_found"
+        if self.cfg.news and self.settings.search_provider != "none":
+            await self.stage("news", "start")
+            try:
+                news, read = await gather_news(spec, self.settings.search_provider, roles.analyst, as_of)
+                await self.log(f"Read {read} news stories, kept {len(news)} that matter now" if read else "Found no recent news on this; people go on what they already know")
+                await self.ch.emit("news", [n.model_dump() for n in news])
+                await self.stage("news", "done", items=len(news))
+            except Exception as exc:  # noqa: BLE001 - news helps but must never stop a run
+                await self.log(f"Couldn't read the news, continuing without it: {exc}", "warn")
+                await self.stage("news", "skipped")
+        else:
+            await self.stage("news", "skipped")
+
         # 2b. Knowledge graph of the topic.
         graph: dict[str, Any] | None = None
         if self.cfg.knowledge_graph:
@@ -239,7 +260,16 @@ class Runner:
         known_for = None
         if graph and lens_of(spec).id != "b2b":
             known_for = graph_context_for(graph, {p.country: p.country_name for p in people})
-        reactions = await react_all(people, spec, sheet.facts, crowd, self.cfg.runs_per_agent, self.cfg.temperature, on_reaction, known_for=known_for)
+        # Each person knows only the news they'd plausibly have come across.
+        heard = assign(people, news, self.cfg.seed) if news else {}
+        if heard:
+            for p in people:
+                p.news = known_record(heard.get(p.id, []))
+            await store.save_personas(self.id, [p.model_dump() for p in people])
+        reactions = await react_all(
+            people, spec, sheet.facts, crowd, self.cfg.runs_per_agent, self.cfg.temperature, on_reaction, known_for=known_for,
+            news_for=(lambda p: news_lines(heard.get(p.id, []))) if heard else None, today=as_of,
+        )
         await self.ch.flush()
         await store.save_reactions(self.id, [r.model_dump() for r in reactions])
         if not reactions:
@@ -272,6 +302,12 @@ class Runner:
             await self.stage("committees", "skipped")
 
         # 7. Society: people post, reply and change their minds; meetings join the feed.
+        # Rounds are periods of real time; real scheduled events and your what-ifs land in theirs.
+        periods = tl.periods(as_of, spec.horizon_months, self.cfg.diffusion_rounds)
+        events = tl.events_for(spec, news, as_of)
+        for e in events:
+            e["round"] = tl.round_of(e["at_month"], spec.horizon_months, self.cfg.diffusion_rounds)
+        base: dict[str, Any] | None = None
         if "diffusion" in spec.modes and self.cfg.diffusion_rounds > 0:
             await self.stage("diffusion", "start")
 
@@ -288,8 +324,20 @@ class Runner:
             summary, feed = await run_society(
                 people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
                 self.cfg.temperature, seed=self.cfg.seed, initial_items=meetings, on_items=on_items, on_round=on_round,
-                memory=self.cfg.memory, minds_out=minds, feed_style=self.cfg.feed_style,
+                memory=self.cfg.memory, minds_out=minds, feed_style=self.cfg.feed_style, events=events, periods=periods,
             )
+            if any(e["kind"] == "assumed" for e in events):
+                # The same people again with only the real world, so you can see what your what-ifs add.
+                await self.log("Running the base case: the same people with real news only")
+                base_summary, _ = await run_society(
+                    people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
+                    self.cfg.temperature, seed=self.cfg.seed, initial_items=meetings, memory=self.cfg.memory,
+                    feed_style=self.cfg.feed_style, events=[dict(e) for e in events if e["kind"] != "assumed"], periods=periods,
+                )
+                base = {
+                    "opinion": [{"round": r["round"], "value": r["calibrated"]} for r in base_summary["rounds"]],
+                    "adoption": base_summary["bass"]["curve"],
+                }
             await self.ch.flush()
             await store.save_feed(self.id, feed)
             if minds:
@@ -315,6 +363,20 @@ class Runner:
         themes = await extract_themes(agg.raw_lists(), roles.analyst, seed=self.cfg.seed)
         results["themes"] = themes.model_dump()
         results["seed"] = self.cfg.seed
+        results["as_of"] = as_of.isoformat()
+        results["news_status"] = "ok" if news else news_status
+        if news:
+            results["news"] = [n.model_dump() for n in news]
+        results["timeline"] = {
+            "as_of": as_of.isoformat(),
+            "horizon_months": spec.horizon_months,
+            "unit": tl.unit_for(spec.horizon_months),
+            "periods": periods if "diffusion" in results else [],
+            "events": events,
+            "opinion": [{"round": r["round"], "value": r["calibrated"]} for r in results["diffusion"]["rounds"]] if "diffusion" in results else [],
+            "adoption": results["diffusion"]["bass"]["curve"] if "diffusion" in results else [],
+            "base": base,
+        }
         if req.parent_id:
             parent = await store.get_run(req.parent_id)
             if parent and parent.get("results"):
@@ -325,6 +387,10 @@ class Runner:
                     "parent_value": ph.get("value"),
                     "delta": round(results["headline"]["value"] - (ph.get("value") or 0), 4),
                 }
+                old = {n.get("url") for n in parent["results"].get("news") or []}
+                if parent["results"].get("as_of"):
+                    results["comparison"]["parent_as_of"] = parent["results"]["as_of"]
+                    results["comparison"]["new_news"] = [n.id for n in news if n.url not in old]
                 soc = _society_point(results.get("diffusion"))
                 psoc = _society_point(parent["results"].get("diffusion"))
                 if soc and psoc:

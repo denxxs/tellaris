@@ -41,6 +41,18 @@ class Segment(BaseModel):
     is_buyer: bool = Field(default=True, description="True if this segment's behaviour is the outcome being predicted")
 
 
+class TimelineEvent(BaseModel):
+    """A what-if event the user places on the timeline. Always an assumption, never presented as real news."""
+
+    name: str = Field(description="Short name, e.g. 'Rival cuts price to $2'")
+    description: str = ""
+    at_month: float = Field(default=3, ge=0, le=120, description="Months from today when it happens")
+    countries: list[str] = Field(default_factory=list, description="ISO3 codes where it happens; empty = everywhere")
+    reach: Literal["mass", "broad", "niche"] = Field(default="broad", description="How widely people hear about it")
+    audiences: list[str] = Field(default_factory=list, description="Kinds of people who'd follow it closely, e.g. finance")
+    direction: Literal["helps", "hurts", "mixed"] = "mixed"
+
+
 class Force(BaseModel):
     """An outside force acting on the scenario (regulation, competitor move, macro shock...)."""
 
@@ -102,6 +114,10 @@ class ScenarioSpec(BaseModel):
         description="Share of the target audience who would realistically hear about it within the horizon",
     )
     research_queries: list[str] = Field(default_factory=list)
+    events: list[TimelineEvent] = Field(
+        default_factory=list,
+        description="ONLY hypothetical future events the user explicitly asks to test (e.g. 'what if a rival cuts its price in month 3'). Never invent any; usually empty.",
+    )
     key_uncertainties: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
 
@@ -138,6 +154,7 @@ class RunConfig(BaseModel):
     influencer_voices: int = Field(default=12, ge=0, le=200, description="Extra agents from influencer countries")
     research: bool = True
     memory: bool = Field(default=True, description="People in the society remember what they saw and reflect once at the end")
+    news: bool = Field(default=True, description="Ground people in real current affairs; each person knows only the news they'd plausibly have come across")
     knowledge_graph: bool = Field(default=True, description="Map the topic as a knowledge graph and ground each person in the parts that touch them")
     feed_style: Literal["word_of_mouth", "ranked", "viral"] = Field(
         default="word_of_mouth",

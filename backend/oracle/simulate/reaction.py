@@ -7,6 +7,7 @@ so results average over model biases and sampling noise.
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 from collections.abc import Awaitable, Callable
 from typing import Literal
 
@@ -77,8 +78,17 @@ def _facts_for(p: Persona, facts: list[Fact]) -> list[Fact]:
     return [f for f in facts if f.public and (not f.countries or p.country in f.countries)][:8]
 
 
-def build_prompt(p: Persona, spec: ScenarioSpec, facts: list[Fact], known: list[str] | None = None) -> str:
+def build_prompt(
+    p: Persona, spec: ScenarioSpec, facts: list[Fact], known: list[str] | None = None,
+    news: list[str] | None = None, today: date | None = None,
+) -> str:
     lines = ["WHO YOU ARE:", p.card(), ""]
+    if today:
+        lines += [f"TODAY: {today.strftime('%d %B %Y').lstrip('0')}", ""]
+    if news:
+        lines.append("NEWS YOU'VE COME ACROSS RECENTLY:")
+        lines += news
+        lines.append("")
     if p.exposures:
         lines.append("OUTSIDE FORCES IN YOUR WORLD (code: description):")
         for e in p.exposures:
@@ -149,6 +159,8 @@ async def react_all(
     temperature: float,
     on_reaction: Callable[[Reaction, Persona], Awaitable[None]] | None = None,
     known_for: Callable[[Persona], list[str]] | None = None,
+    news_for: Callable[[Persona], list[str]] | None = None,
+    today: date | None = None,
 ) -> list[Reaction]:
     if not models:
         raise ValueError("no crowd models configured")
@@ -157,7 +169,7 @@ async def react_all(
 
     async def one(idx: int, p: Persona, run: int) -> None:
         model = models[(idx + run) % len(models)]
-        user = build_prompt(p, spec, facts, known_for(p) if known_for else None)
+        user = build_prompt(p, spec, facts, known_for(p) if known_for else None, news_for(p) if news_for else None, today)
         try:
             out = await llm.json(
                 task="react",

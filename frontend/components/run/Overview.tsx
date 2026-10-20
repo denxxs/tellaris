@@ -16,6 +16,7 @@ import { SocietyFeed } from "./Society";
 const STAGES = [
   { id: "scenario", label: "Understand the question" },
   { id: "research", label: "Research the real world" },
+  { id: "news", label: "Read the news" },
   { id: "world", label: "Map outside influence" },
   { id: "population", label: "Build the population" },
   { id: "reactions", label: "Each person decides" },
