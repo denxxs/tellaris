@@ -75,7 +75,7 @@ export default function AccuracyPage() {
         </div>
       )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-6">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
         <Card className="lg:col-span-4">
           <CardHead title="Known outcomes" aside={`${picked.length} of ${cases.length} selected`} />
           <ul>

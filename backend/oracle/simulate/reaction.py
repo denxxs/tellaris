@@ -52,7 +52,12 @@ class ReactionOut(BaseModel):
     @field_validator("reasons", "objections", "change_mind", "influences")
     @classmethod
     def _cap(cls, v: list[str]) -> list[str]:
-        return [str(x)[:240] for x in v[:3]]
+        seen: list[str] = []
+        for x in v:
+            t = str(x).strip()[:240]
+            if t and t.lower() not in {s.lower() for s in seen}:
+                seen.append(t)
+        return seen[:3]
 
 
 class Reaction(ReactionOut):

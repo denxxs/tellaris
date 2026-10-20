@@ -1,6 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+/** Width of an element, so charts draw at their real size and text stays legible. */
+function useWidth<T extends HTMLElement>(fallback = 640) {
+  const ref = useRef<T>(null);
+  const [w, setW] = useState(fallback);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(260, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w] as const;
+}
 import { cx, people as fmtPeople, pctSmart } from "@/lib/format";
 
 /* ------------------------------------------------------------------
@@ -121,7 +135,7 @@ export function LineChart({
   yMax?: number;
   reference?: { x: number; label: string };
 }) {
-  const W = 640;
+  const [box, W] = useWidth<HTMLDivElement>();
   const H = height;
   const pad = { l: 40, r: 12, t: reference ? 22 : 10, b: 28 };
   const all = useMemo(() => series.flatMap((s) => s.points), [series]);
@@ -138,13 +152,15 @@ export function LineChart({
   while (ticks.length > 6) ticks.splice(1, 1);
   const sx = (x: number) => pad.l + ((x - x0) / Math.max(1e-9, x1 - x0)) * (W - pad.l - pad.r);
   const sy = (y: number) => H - pad.b - (y / top) * (H - pad.t - pad.b);
-  const xTicks = xs.length <= 7 ? xs : xs.filter((_, i) => i % Math.ceil(xs.length / 6) === 0);
+  const maxTicks = Math.max(3, Math.floor(W / 90));
+  const xTicks = xs.length <= maxTicks ? xs : xs.filter((_, i) => i % Math.ceil(xs.length / maxTicks) === 0);
 
   return (
-    <div>
+    <div ref={box}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="block h-auto w-full"
+        className="block w-full"
+        height={H}
         role="img"
         aria-label={`${series.map((s) => s.label).join(", ")} by ${xLabel}`}
         onMouseLeave={() => setHx(null)}

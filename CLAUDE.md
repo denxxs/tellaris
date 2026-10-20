@@ -16,3 +16,6 @@ Read `docs/vision.md` first. It has the full vision, architecture and plan from 
 - Signature element: the crowd (`components/run/Crowd.tsx`), one square per simulated person, plus the live world map.
 - Check UI with `node .claude/skills/design-taste-frontend/scripts/lint.mjs --app frontend/app frontend/components` and `inspect.mjs --app <url>`.
 - Country data: `backend/scripts/build_world.py` rebuilds `oracle/data/countries.json` for every country from World Bank + ILOSTAT (hand-tuned overrides in `countries_curated.json`). Influence edges: hand-written `influence.json` + rules in `oracle/world/rules.py`. Headcounts: `oracle/population/headcount.py`.
+- Society: `oracle/simulate/society.py` (feed of posts, replies, news, meetings, shifts; stored in the `feed` table). UI in `frontend/components/run/Society.tsx`. Profiles at `/runs/[id]/people/[pid]`; avatars are DiceBear Notionists (CC0), drawn locally.
+- Context files: `oracle/files.py` (PDF, DOCX, PPTX, XLSX, CSV, MD, HTML, TXT) stored in `backend/var/files/`; facts with `public=false` never reach simulated people.
+- Providers: catalogue in `oracle/providers.py` (includes NVIDIA NIM). Roles: planner (orchestrator), analyst (defaults to planner), crowd (list).

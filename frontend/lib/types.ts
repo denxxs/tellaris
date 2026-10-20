@@ -172,9 +172,18 @@ export type Results = {
     role_stance: Record<string, number>;
   };
   diffusion?: {
+    society?: {
+      posts: number;
+      replies: number;
+      shifts: number;
+      news: number;
+      meetings: number;
+      top_voices: { persona_id: string; name: string; country: string; occupation: string; items: number; agrees: number; p: number | null }[];
+      hot_threads: { id: string; author_name: string; text: string; replies: number; agrees: number; disagrees: number }[];
+    };
     agents: number;
     edges: number;
-    rounds: { round: number; stated: number; calibrated: number; by_country: Record<string, number>; changed: number; sharers: number; news: string | null }[];
+    rounds: { round: number; stated: number; calibrated: number; by_country: Record<string, number>; changed: number; sharers: number; posts?: number; replies?: number; news: string | null }[];
     examples: { round: number; persona_id: string; name: string; country: string; from: number; to: number; why: string }[];
     social_pull: number;
     bass: { m: number; p: number; q: number; curve: { month: number; adoption: number }[] };
@@ -261,6 +270,7 @@ export type PersonaLite = {
 };
 
 export type PersonaSummary = PersonaLite & {
+  represents?: number;
   country_name: string;
   age: number;
   company_type: string;
@@ -302,6 +312,11 @@ export type Persona = {
   frustrations: string[];
   info_sources: string[];
   voice: string;
+  tagline: string;
+  values: string[];
+  typical_day: string;
+  tools_today: string[];
+  household: string;
 };
 
 export type Reaction = {
@@ -371,3 +386,57 @@ export type Meta = {
 };
 
 export type StreamEvent = { seq: number; ts: number; type: string; data: unknown };
+
+export type FeedItem = {
+  id: string;
+  round: number;
+  kind: "post" | "reply" | "news" | "meeting" | "shift";
+  text: string;
+  author: string | null;
+  author_name?: string;
+  country?: string;
+  segment?: string;
+  occupation?: string;
+  tagline?: string;
+  p?: number;
+  parent: string | null;
+  agrees: number;
+  disagrees: number;
+  replies?: number;
+  from_p: number | null;
+  to_p: number | null;
+  why?: string | null;
+  title?: string;
+  origin?: string;
+  direction?: string;
+  company_type?: string;
+  company_size?: number;
+  decision?: { decision: "buy" | "pilot" | "defer" | "reject"; probability_of_purchase: number; deal_cycle_months: number; decisive_factor: string; blockers: string[]; conditions: string[]; summary: string };
+  transcript?: { round: number; persona_id: string; name: string; role: string; stance: number; statement: string; conditions: string[]; concerns: string[] }[];
+  members?: { role: string; role_label: string; persona_id: string; name: string; occupation: string; seniority: string }[];
+};
+
+export type UploadedFile = { id: string; name: string; size: number; chars: number; truncated: boolean; preview: string; uploaded_at: number };
+
+export type Contact = { id: string; name: string; country: string; occupation: string; segment: string; p: number | null };
+
+export type Profile = {
+  persona: Persona;
+  reactions: Reaction[];
+  chat: ChatMessage[];
+  contacts: Contact[];
+  society: { mine: FeedItem[]; context: FeedItem[]; replies: FeedItem[]; final_p: number | null };
+  meeting: FeedItem | null;
+};
+
+export type ProviderInfo = {
+  id: string;
+  label: string;
+  key_env: string | null;
+  base_env?: string;
+  base_default?: string;
+  version_env?: string;
+  key_url?: string;
+  models: string[];
+  note?: string;
+};

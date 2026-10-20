@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CountryPicker } from "@/components/composer/CountryPicker";
+import { FileDrop } from "@/components/composer/FileDrop";
 import { ScenarioEditor, estimateCalls } from "@/components/composer/ScenarioEditor";
 import { RunTable } from "@/components/run/RunTable";
-import { Button, Card, CardHead, ErrorNote, Field, PageHead, Segmented, Skeleton, Textarea } from "@/components/ui";
+import { Button, Card, CardHead, ErrorNote, Field, Notice, PageHead, Segmented, Skeleton, Textarea } from "@/components/ui";
 import { WorldMap } from "@/components/world/WorldMap";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { int } from "@/lib/format";
-import type { RunConfig, RunListItem, Spec, World } from "@/lib/types";
+import type { RunConfig, RunListItem, Spec, UploadedFile, World } from "@/lib/types";
 
 const EXAMPLES = [
   {
@@ -48,6 +49,17 @@ const SIZES = [
 ] as const;
 type Size = (typeof SIZES)[number]["value"];
 
+const FLOW = [
+  { title: "Understand", text: "Your words and files become a precise question: who decides, where, at what price, over what time." },
+  { title: "Research", text: "Facts from your files and the web: competitors, prices, rules, news." },
+  { title: "Map influence", text: "Finds the countries and blocs pressing on your markets, like EU rules on Indian IT firms." },
+  { title: "Build people", text: "Real job and income data for each country become people with names, stories and pressures." },
+  { title: "Each person decides", text: "Privately, in their own words, several times across your models." },
+  { title: "Companies meet", text: "For B2B, buying groups argue it out and decide to buy, pilot or pass." },
+  { title: "Society talks", text: "People post, reply and change their minds as news lands." },
+  { title: "Answer", text: "Corrected for say-do gaps, scaled to real headcounts, explained, with changes to test." },
+];
+
 const QUICK_PICKS = ["USA", "IND", "CHN", "GBR", "DEU", "BRA", "JPN", "NGA", "IDN", "MEX"];
 
 export default function NewSimulation() {
@@ -62,6 +74,7 @@ export default function NewSimulation() {
   const [busy, setBusy] = useState<"review" | "run" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<RunListItem[] | null>(null);
+  const [files, setFiles] = useState<UploadedFile[]>([]);
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,7 +99,7 @@ export default function NewSimulation() {
     setError(null);
     setBusy("review");
     try {
-      const r = await api.preview(prompt, targets);
+      const r = await api.preview(prompt, targets, files.map((f) => f.id));
       setSpec(r.spec);
       setWorld(r.world);
       setConfig(baseConfig);
@@ -102,7 +115,13 @@ export default function NewSimulation() {
     setError(null);
     setBusy("run");
     try {
-      const { id } = await api.createRun({ prompt, targets: spec ? spec.targets : targets, config: config ?? baseConfig ?? undefined, spec: spec ?? undefined });
+      const { id } = await api.createRun({
+        prompt,
+        targets: spec ? spec.targets : targets,
+        config: config ?? baseConfig ?? undefined,
+        spec: spec ?? undefined,
+        file_ids: files.map((f) => f.id),
+      });
       router.push(`/runs/${id}`);
     } catch (e) {
       setError((e as Error).message);
@@ -115,10 +134,21 @@ export default function NewSimulation() {
   return (
     <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
       <PageHead title="New simulation">
-        Describe a product, a price, a policy or anything you want to predict. Oracle builds the people it depends on in the countries you choose, and each one decides for themselves.
+        Describe a product, a price, a policy or anything you want to predict, and attach any documents you have. Oracle builds the people it depends on, lets each one decide, lets them talk it over, and tells you what is likely to happen.
       </PageHead>
+      {meta?.mock && (
+        <div className="mb-6">
+          <Notice>
+            Demo mode: simulations run on an offline stand-in model, so you can see how everything works, but the numbers aren&apos;t predictions.{" "}
+            <Link href="/settings" className="font-medium underline">
+              Connect a model
+            </Link>{" "}
+            for real results.
+          </Notice>
+        </div>
+      )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <div className="flex flex-col gap-6 lg:col-span-7">
           <Card>
             <Field label="What do you want to know?" hint="Name the product or idea, the price if there is one, who it is for, where, and the time frame.">
@@ -140,6 +170,11 @@ export default function NewSimulation() {
               )}
             </Field>
             <div className="mt-5">
+              <div className="mb-2 text-[14px] font-medium">Context files</div>
+              <FileDrop files={files} onChange={setFiles} />
+              <p className="mt-1.5 text-[12px] text-faint">Optional. Oracle reads them to get the product, price and audience right. People only see what a customer could see, never internal numbers.</p>
+            </div>
+            <div className="mt-5">
               <Field label="Target countries" hint="Optional. Leave empty and Oracle picks the markets that matter.">
                 {(id) => <CountryPicker id={id} value={spec?.targets ?? targets} onChange={(v) => (spec ? setSpec({ ...spec, targets: v, target_weights: {} }) : setTargets(v))} />}
               </Field>
@@ -160,8 +195,8 @@ export default function NewSimulation() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {!spec && (
-                  <Button size="lg" onClick={review} disabled={!canGo || !!busy} busy={busy === "review"}>
-                    Review setup
+                  <Button size="lg" variant="ghost" onClick={review} disabled={!canGo || !!busy} busy={busy === "review"}>
+                    Adjust setup first
                   </Button>
                 )}
                 <Button size="lg" variant="primary" onClick={run} disabled={!canGo || !!busy} busy={busy === "run"}>
@@ -203,7 +238,8 @@ export default function NewSimulation() {
           )}
         </div>
 
-        <Card className="lg:col-span-5" pad={false}>
+        <div className="flex flex-col gap-6 lg:col-span-5">
+        <Card pad={false}>
           <div className="px-5 pt-5">
             <CardHead title="Who shapes these markets" aside={influencers.length ? `${influencers.length} outside ${influencers.length === 1 ? "influence" : "influences"}` : undefined}>
               {activeTargets.length ? "Arrows show outside countries and blocs that affect your target countries. Thicker means stronger." : "Pick a country to see who shapes it."}
@@ -243,6 +279,23 @@ export default function NewSimulation() {
             )}
           </div>
         </Card>
+        {!spec && (
+          <Card>
+            <CardHead title="What happens when you run it">Fully automatic. You can watch every step live.</CardHead>
+            <ol className="flex flex-col">
+              {FLOW.map((f, i) => (
+                <li key={f.title} className="flex gap-3 border-b border-rule py-2.5 first:pt-0 last:border-0 last:pb-0">
+                  <span className="num grid size-5 shrink-0 place-items-center rounded-full bg-raised text-[11px] font-medium text-muted">{i + 1}</span>
+                  <span>
+                    <span className="block text-[14px] text-text">{f.title}</span>
+                    <span className="block text-[13px] leading-[18px] text-muted">{f.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
+        </div>
       </div>
 
       {spec && config && (

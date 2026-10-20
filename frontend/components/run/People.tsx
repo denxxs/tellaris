@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Avatar } from "@/components/people/Avatar";
 import { Card, Input, Select, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
-import { cx, pctSmart, shortJob, stanceText } from "@/lib/format";
+import { cx, pctSmart, shortJob, stanceFill, stanceText } from "@/lib/format";
 import type { PersonaSummary } from "@/lib/types";
 
 const PAGE = 50;
@@ -63,7 +65,7 @@ export function PeopleTab({ id, onSelect }: { id: string; onSelect: (pid: string
       ) : (
         <>
           <p className="mb-2 text-[13px] text-muted">
-            <span className="num">{filtered.length}</span> of <span className="num">{rows.length}</span> people. Select anyone to see their profile and talk to them.
+            <span className="num">{filtered.length}</span> of <span className="num">{rows.length}</span> people. Select a row for a quick look, or a name for the full profile.
           </p>
           <table className="w-full text-[14px]">
             <thead>
@@ -77,13 +79,18 @@ export function PeopleTab({ id, onSelect }: { id: string; onSelect: (pid: string
               {filtered.slice(0, shown).map((p) => (
                 <tr key={p.id} onClick={() => onSelect(p.id)} className="cursor-pointer border-b border-rule last:border-0 hover:bg-raised">
                   <td className="max-w-0 py-2.5 pr-4 md:w-[38%]">
-                    <button className="block w-full text-left" onClick={() => onSelect(p.id)}>
-                      <span className="block truncate text-text">{p.name}</span>
-                      <span className="block truncate text-[12px] leading-4 text-faint">
-                        {p.age}, {shortJob(p.occupation)}, {countryName(p.country)}
-                        {p.voice ? ", outside voice" : ""}
+                    <span className="flex items-center gap-2.5">
+                      <Avatar seed={p.id} size={32} ring={p.p != null ? stanceFill(p.p) : undefined} />
+                      <span className="min-w-0">
+                        <Link href={`/runs/${id}/people/${p.id}`} onClick={(e) => e.stopPropagation()} className="block truncate text-text hover:underline">
+                          {p.name}
+                        </Link>
+                        <span className="block truncate text-[12px] leading-4 text-faint">
+                          {p.age}, {shortJob(p.occupation)}, {countryName(p.country)}
+                          {p.voice ? ", outside voice" : ""}
+                        </span>
                       </span>
-                    </button>
+                    </span>
                   </td>
                   <td className="hidden max-w-0 py-2.5 pr-4 text-[13px] text-muted md:table-cell">
                     <span className="line-clamp-2">{p.quote ? `“${p.quote}”` : "–"}</span>

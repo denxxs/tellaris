@@ -22,7 +22,7 @@ export function CountriesTab({ r, live }: { r: Results; live: LiveState }) {
   const countries = r.by_country.map((c) => c.key!);
   const peak = Math.max(0.01, ...r.by_country_segment.map((m) => m.value));
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-3">
         <CardHead title="By country" aside="Overall is the tick">
           The bar is the most likely value; the lighter band is the likely range.
@@ -85,7 +85,7 @@ export function CountriesTab({ r, live }: { r: Results; live: LiveState }) {
 
 export function GroupsTab({ r }: { r: Results }) {
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-3">
         <CardHead title="By group" aside="Overall is the tick" />
         <BarRows rows={rowsOf(r.by_segment)} reference={r.headline.value} />
@@ -115,7 +115,7 @@ export function GroupsTab({ r }: { r: Results }) {
 export function InfluenceTab({ r, live }: { r: Results; live: LiveState }) {
   const { countryName } = useMeta();
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-6">
         <CardHead title="Measured effect of outside forces">
           People who feel each force compared with people who don&apos;t. A negative effect means the force makes a yes less likely.
@@ -200,7 +200,7 @@ export function ReasonsTab({ r, onSelect }: { r: Results; onSelect: (pid: string
   const t = r.themes;
   const { countryName } = useMeta();
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-2">
         <CardHead title="Why not" />
         {t?.objections.length ? <ShareRows tone="no" rows={t.objections.map((x) => ({ label: x.theme, share: x.share, example: x.example }))} /> : <p className="text-[13px] text-muted">No objections recorded.</p>}
@@ -252,7 +252,7 @@ export function PricingTab({ r }: { r: Results }) {
   const w = r.wtp!;
   const { countryName } = useMeta();
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-4">
         <CardHead title="How many would pay at each price">The share of people whose maximum price is at or above each point.</CardHead>
         <LineChart
@@ -310,13 +310,13 @@ export function CommitteesTab({ id, r }: { id: string; r: Results }) {
     api.committees(id).then(setList).catch(() => setList([]));
   }, [id]);
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-6">
         <CardHead title="What the companies decided">
           {c.n} buying groups debated it. Average chance a company pays: <span className="num text-text">{pctSmart(c.purchase_probability)}</span>
           {c.median_cycle_months != null && <>, typical deal {c.median_cycle_months} months</>}.
         </CardHead>
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div>
             <h3 className="mb-3 text-[14px] font-medium">Decisions</h3>
             <StackBar parts={(["buy", "pilot", "defer", "reject"] as const).map((k) => ({ label: titleCase(k), value: c.decisions[k] ?? 0, color: DECISION_COLOR[k] }))} />
@@ -371,7 +371,7 @@ export function CommitteesTab({ id, r }: { id: string; r: Results }) {
                 {open === cm.id && (
                   <div className="flex flex-col gap-3 pb-4">
                     {cm.transcript.map((t, i) => (
-                      <div key={i} className="grid gap-1 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-4">
+                      <div key={i} className="grid grid-cols-1 gap-1 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-4">
                         <div className="text-[13px]">
                           <div className="text-text">{t.name}</div>
                           <div className="text-faint">
@@ -403,7 +403,7 @@ export function SpreadTab({ r, horizon }: { r: Results; horizon: number }) {
   const { countryName } = useMeta();
   const countries = Object.keys(d.rounds[0]?.by_country ?? {});
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-3">
         <CardHead title="Views as people talk">
           {d.agents} people connected by {int(d.edges)} ties over {d.rounds.length - 1} rounds. Social effect: <span className={cx("num", d.social_pull >= 0 ? "text-positive" : "text-negative")}>{signedPts(d.social_pull)}</span>.
@@ -428,7 +428,7 @@ export function SpreadTab({ r, horizon }: { r: Results; horizon: number }) {
       {d.examples.length > 0 && (
         <Card className="lg:col-span-6">
           <CardHead title="People who changed their mind" />
-          <ul className="grid gap-x-8 md:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
             {d.examples.slice(0, 10).map((e) => (
               <li key={`${e.persona_id}-${e.round}`} className="border-b border-rule py-2.5">
                 <div className="flex items-baseline justify-between gap-3 text-[14px]">
@@ -458,7 +458,7 @@ export function MethodTab({ live }: { live: LiveState }) {
   const cal = r.headline.calibration;
   const { countryName } = useMeta();
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
       <Card className="lg:col-span-3">
         <CardHead title="How the number is made" />
         <ol className="flex list-decimal flex-col gap-2 pl-5 text-[14px] leading-5 text-muted">
@@ -508,7 +508,7 @@ export function MethodTab({ live }: { live: LiveState }) {
       {live.research && live.research.facts.length > 0 && (
         <Card className="lg:col-span-6">
           <CardHead title="Facts people were given">Found by web search when the run started. Each person only saw the facts that apply to their country.</CardHead>
-          <ul className="grid gap-x-8 md:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
             {live.research.facts.map((f, i) => (
               <li key={i} className="border-b border-rule py-2.5 text-[14px] leading-5">
                 <p className="text-text">{f.statement}</p>
@@ -534,7 +534,7 @@ export function MethodTab({ live }: { live: LiveState }) {
       {spec && (
         <Card className="lg:col-span-6">
           <CardHead title="Scenario" />
-          <dl className="grid gap-x-8 gap-y-4 text-[14px] leading-5 md:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-4 text-[14px] leading-5 md:grid-cols-2">
             <div>
               <dt className="text-[13px] text-muted">Question</dt>
               <dd>{spec.question}</dd>

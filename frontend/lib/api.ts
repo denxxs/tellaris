@@ -1,4 +1,4 @@
-import type { Committee, Meta, Persona, ChatMessage, Reaction, Run, RunConfig, RunListItem, PersonaSummary, Spec, World } from "./types";
+import type { Committee, FeedItem, Meta, Profile, Run, RunConfig, RunListItem, PersonaSummary, ProviderInfo, Spec, UploadedFile, World, ChatMessage } from "./types";
 
 export const API = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
@@ -34,8 +34,22 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   meta: () => req<Meta>("/api/meta"),
-  preview: (prompt: string, targets: string[]) =>
-    req<{ spec: Spec; world: World }>("/api/scenario/preview", { method: "POST", body: JSON.stringify({ prompt, targets }) }),
+  preview: (prompt: string, targets: string[], file_ids: string[] = []) =>
+    req<{ spec: Spec; world: World }>("/api/scenario/preview", { method: "POST", body: JSON.stringify({ prompt, targets, file_ids }) }),
+  upload: async (files: File[]): Promise<{ files: UploadedFile[]; errors: string[] }> => {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    let res: Response;
+    try {
+      res = await fetch(`${API}/api/files`, { method: "POST", body: form });
+    } catch {
+      throw new ApiError(0, `Can't reach the simulation server at ${API}.`);
+    }
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    return res.json();
+  },
+  deleteFile: (id: string) => req<{ ok: boolean }>(`/api/files/${id}`, { method: "DELETE" }),
+  feed: (id: string) => req<FeedItem[]>(`/api/runs/${id}/feed`),
   headcount: (spec: Spec) =>
     req<{ segments: { name: string; total: number; by_country: Record<string, number> }[]; total: number }>("/api/scenario/headcount", {
       method: "POST",
@@ -43,15 +57,14 @@ export const api = {
     }),
   world: (targets: string[], spec?: Spec) =>
     req<World>("/api/world/influence", { method: "POST", body: JSON.stringify({ targets, sectors: spec?.sectors ?? [], spec }) }),
-  createRun: (body: { prompt: string; targets?: string[]; config?: Partial<RunConfig>; spec?: Spec }) =>
+  createRun: (body: { prompt: string; targets?: string[]; config?: Partial<RunConfig>; spec?: Spec; file_ids?: string[] }) =>
     req<{ id: string }>("/api/runs", { method: "POST", body: JSON.stringify(body) }),
   runs: () => req<RunListItem[]>("/api/runs"),
   run: (id: string) => req<Run>(`/api/runs/${id}`),
   deleteRun: (id: string) => req<{ ok: boolean }>(`/api/runs/${id}`, { method: "DELETE" }),
   cancel: (id: string) => req<{ ok: boolean }>(`/api/runs/${id}/cancel`, { method: "POST" }),
   personas: (id: string) => req<PersonaSummary[]>(`/api/runs/${id}/personas`),
-  persona: (id: string, pid: string) =>
-    req<{ persona: Persona; reactions: Reaction[]; chat: ChatMessage[] }>(`/api/runs/${id}/personas/${pid}`),
+  persona: (id: string, pid: string) => req<Profile>(`/api/runs/${id}/personas/${pid}`),
   chat: (id: string, pid: string, message: string) =>
     req<{ reply: string; chat: ChatMessage[] }>(`/api/runs/${id}/personas/${pid}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
   committees: (id: string) => req<Committee[]>(`/api/runs/${id}/committees`),
@@ -83,6 +96,7 @@ export type Settings = {
   request_timeout_s: number;
   providers: string[];
   model_examples: Record<string, string[]>;
+  catalog: ProviderInfo[];
 };
 
 export type BacktestCase = { id: string; kind: "action" | "belief"; as_of: string; targets: string[]; actual: number; prompt: string; source: string };

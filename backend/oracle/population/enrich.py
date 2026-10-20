@@ -104,4 +104,18 @@ async def enrich(
             await on_batch(batch)
 
     await asyncio.gather(*(one(b) for b in batches))
+
+    # Names are unique within a simulation: on a clash, add a middle initial.
+    seen: set[str] = set()
+    letters = "ABCDEFGHJKLMNPRSTVW"
+    for p in people:
+        if p.name in seen:
+            parts = p.name.split(" ")
+            for k in range(len(letters)):
+                letter = letters[(sum(map(ord, p.id)) + k) % len(letters)]
+                candidate = " ".join([parts[0], f"{letter}.", *parts[1:]]) if len(parts) > 1 else f"{p.name} {letter}."
+                if candidate not in seen:
+                    p.name = candidate
+                    break
+        seen.add(p.name)
     return done

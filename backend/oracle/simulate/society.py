@@ -101,6 +101,8 @@ async def run_society(
 
     feed: list[dict[str, Any]] = list(initial_items or [])
     counter = [len(feed)]
+    if on_items and feed:
+        await on_items(list(feed))
 
     def new_id() -> str:
         counter[0] += 1

@@ -84,7 +84,13 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 
 export function Select({ value, onChange, options, id, className, label }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; id?: string; className?: string; label?: string }) {
   return (
-    <select id={id} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={cx(fieldClass, "h-9 border-control pr-8", className)}>
+    <select
+      id={id}
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={cx("rounded-md border border-control bg-surface px-3 text-[14px] text-text transition-colors focus:border-text focus:outline-none", "h-9 pr-8", className ?? "w-full")}
+    >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}

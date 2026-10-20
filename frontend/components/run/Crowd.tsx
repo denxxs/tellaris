@@ -59,7 +59,7 @@ export function Crowd({ order, personas, scores, done, onSelect }: Props) {
     <div className="relative">
       <div className="flex flex-col gap-4">
         {groups.map((g) => (
-          <div key={g.label} className="grid gap-x-6 gap-y-2 md:grid-cols-[200px_minmax(0,1fr)]">
+          <div key={g.label} className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-[200px_minmax(0,1fr)]">
             <div className="min-w-0">
               <div className="truncate text-[14px] text-text">{g.label}</div>
               <div className="truncate text-[12px] leading-4 text-faint">

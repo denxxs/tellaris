@@ -28,22 +28,27 @@ cd frontend && npm run dev              # app on :3000
 
 ## How a run works
 
-1. **Scenario**: a planner model turns your paragraph into a precise question, the groups of people to simulate (tied to specific countries if you say so), outside factors, price and time frame. You can review and edit all of it before running.
-2. **Research**: web search (DuckDuckGo free, or Tavily) for current facts, competitors and prices. People only see facts with sources.
-3. **Influence map**: every country and bloc linked by regulation, outsourcing, capital, trade, technology, remittances and more (hand-written links plus rules covering all countries). Targets pull in their direct and indirect influencers.
-4. **Population**: people are sampled from each country's real labour-market structure (World Bank and ILO data: job mix, income, digital adoption, age) and weighted by the real headcount they stand for, so the answer comes out as a share and as a number of people. Each one feels the outside forces that touch their sector. A model then gives them a name, backstory and point of view.
-5. **Reactions**: every person answers in character, several times across different models, on the Juster probability scale.
-6. **Buying committees** (B2B): champion, budget owner, technical and security reviewers argue it out over rounds, then a deal decision is made.
-7. **Word of mouth**: people talk over a small-world network, news arrives mid-way, views shift. The result drives a Bass adoption projection over your time frame.
-8. **Analysis**: stated intent is corrected for the say/do gap, multiplied by awareness, bootstrapped for a likely range, broken down by country, group, job, seniority and company type, with measured effects of each outside force, pricing curves, objection themes and a written report with testable what-ifs.
+You write a paragraph (and optionally attach a pitch deck, product doc, pricing page or research). Everything else is automatic, and you can watch each step live:
+
+1. **Understand**: the orchestrator turns your words and files into a precise question: who decides, where, at what price, over what time, and which outside factors matter.
+2. **Research**: facts from your files and the web. Internal numbers from your files (targets, burn, roadmaps) are kept from the simulated people; they only see what a customer could.
+3. **Map influence**: the countries and blocs pressing on your markets, for every country in the world.
+4. **Build people**: each country's real job, income and age data become people with a name, face, tagline, story, values, typical day, tools they use today and the outside pressures their work exposes them to. Groups are sized automatically from real headcounts.
+5. **Each person decides**: privately, in their own words, several times across your crowd models.
+6. **Companies meet** (B2B): buying groups argue it out and buy, pilot, defer or reject.
+7. **Society talks**: everyone sees their contacts' posts, then posts, replies or stays quiet, and may change their mind as news lands. Meetings join the same feed.
+8. **Answer**: corrected for the gap between saying and doing, scaled to real headcounts, with a likely range, breakdowns, reasons, and one-click changes to test on the same people.
+
+Then explore: the **Society** feed (replay it round by round), **People** (every person has a full profile with their posts, their circle and a live chat), countries, groups, outside influence, pricing, meetings and the method behind the number.
 
 ## Any model, any provider
 
-All model calls go through [LiteLLM](https://docs.litellm.ai/docs/providers): OpenAI, Anthropic, Gemini, Azure, Mistral, Groq, DeepSeek, OpenRouter, Together, xAI, Ollama and any OpenAI-compatible server. Set three roles on the Models page:
+All model calls go through [LiteLLM](https://docs.litellm.ai/docs/providers): NVIDIA NIM, OpenAI, Anthropic, Gemini, Azure, Mistral, Groq, DeepSeek, OpenRouter, Together, xAI, Ollama and any OpenAI-compatible server. On the Models page pick a provider and model for two roles:
 
-- **Planner**: sets up the scenario (use a strong model)
-- **Crowd**: answers as people, thousands of calls (use fast, cheap models; mix providers to cancel out bias)
-- **Analyst**: research, themes and the report
+- **Orchestrator**: understands your question and files, researches, writes the analysis. A few calls per run, so use your strongest model. (Optionally a separate model for research and the report.)
+- **Crowd**: plays every person: answers, posts, replies, meetings and chats. Thousands of calls per run, so use a fast, inexpensive model. You can mix in more crowd models to cancel out any one model's habits.
+
+For NVIDIA NIM, paste a key from build.nvidia.com, or point the endpoint at your own NIM deployment.
 
 Keys are saved in `backend/var/settings.json` on your machine and never committed.
 

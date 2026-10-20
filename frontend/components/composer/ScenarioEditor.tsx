@@ -25,7 +25,7 @@ const newForce = (): Force => ({
 /** A settings-style row: what it is on the left, the controls in a panel on the right. */
 function Section({ title, children, aside, summary }: { title: string; children: React.ReactNode; aside?: React.ReactNode; summary?: React.ReactNode }) {
   return (
-    <section className="grid gap-4 border-b border-border py-8 first:pt-0 last:border-0 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-10">
+    <section className="grid grid-cols-1 gap-4 border-b border-border py-8 first:pt-0 last:border-0 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-10">
       <div>
         <h2 className="t-section">{title}</h2>
         {aside && <p className="mt-1 text-[14px] leading-5 text-muted">{aside}</p>}
@@ -91,7 +91,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
         <Field label="Asked of each person" hint="About their own choice, never about what society will do.">
           {(id) => <Input id={id} value={spec.persona_question} onChange={(e) => set("persona_question", e.target.value)} />}
         </Field>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Field label="Possible answers" hint="The first one is what the headline measures.">
             {() => (
               <div className="flex flex-wrap gap-1.5">
@@ -109,7 +109,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
 
       <Section title="What people see" aside="Describe it the way a person would first come across it. People only judge what is written here and the facts Oracle finds.">
         <Field label="Description">{(id) => <Textarea id={id} rows={4} value={spec.subject} onChange={(e) => set("subject", e.target.value)} />}</Field>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Field label="Price" hint="Leave empty when there is no price.">
             {(id) => (
               <div className="flex gap-2">
@@ -173,7 +173,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
 
       <Section
         title="Who"
-        aside="Groups of people, their jobs and where they live. A group only counts toward the answer when it is switched on."
+        aside="Groups of people, their jobs and where they live. Oracle sizes each group from real population data, so there's nothing to balance by hand."
         summary={totalHeads > 0 ? <>These groups stand for about <span className="num text-text">{people(totalHeads)}</span> real people.</> : undefined}
       >
         {segs.map((s, i) => (
@@ -234,13 +234,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
                 </select>
               )}
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Toggle checked={s.is_buyer} onChange={(v) => setSeg(i, { is_buyer: v })} label="Counts toward the answer" description={s.is_buyer ? "Their decision is what's predicted." : "Heard for context only."} />
-              <div>
-                <div className="mb-1 text-[13px] text-muted">Share of simulated people</div>
-                <Slider label={`Share of simulated people in ${s.name}`} value={s.weight} min={0.1} max={3} step={0.1} onChange={(v) => setSeg(i, { weight: v })} format={(v) => `${v.toFixed(1)}×`} />
-              </div>
-            </div>
+            <Toggle checked={s.is_buyer} onChange={(v) => setSeg(i, { is_buyer: v })} label="Counts toward the answer" description={s.is_buyer ? "Their decision is what's predicted." : "Heard for context only."} />
           </div>
         ))}
         <Button size="sm" className="self-start" onClick={() => set("segments", [...segs, newSegment()])}>
@@ -259,7 +253,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
               </Button>
             </div>
             <Textarea aria-label="What it does" rows={2} value={f.description} onChange={(e) => setForce(i, { description: e.target.value })} />
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <Select label="Comes from" value={f.origin} onChange={(v) => setForce(i, { origin: v })} options={originOptions} />
               <Select
                 label="Effect"
@@ -281,15 +275,15 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
       </Section>
 
       <Section title="How to simulate" aside="More people and more answers per person narrow the range, at the cost of more model calls." summary={<>About <span className="num text-text">{int(estimateCalls(spec, config))}</span> model calls.</>}>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Toggle checked={spec.modes.includes("committee")} onChange={(v) => toggleMode("committee", v)} label="Buying committees" description="Companies debate the purchase before deciding (B2B)." />
-          <Toggle checked={spec.modes.includes("diffusion")} onChange={(v) => toggleMode("diffusion", v)} label="Word of mouth" description="People talk to their contacts and may change their mind." />
+          <Toggle checked={spec.modes.includes("diffusion")} onChange={(v) => toggleMode("diffusion", v)} label="Society" description="People post, reply to each other and change their minds over several rounds." />
           <Toggle checked={config.research} onChange={(v) => onConfig({ ...config, research: v })} label="Web research" description="Ground people in current facts, prices and competitors." />
           <Field label="Awareness" hint="Share of the audience who would realistically hear about it in the time frame.">
             {(id) => <Slider id={id} value={spec.assumed_reach} min={0.02} max={1} step={0.01} onChange={(v) => set("assumed_reach", v)} format={(v) => pct(v)} />}
           </Field>
         </div>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Field label="People">{(id) => <Slider id={id} value={config.agents} min={20} max={3000} step={10} onChange={(v) => onConfig({ ...config, agents: v })} format={int} />}</Field>
           <Field label="Answers per person" hint="Spread across your crowd models.">
             {(id) => <Slider id={id} value={config.runs_per_agent} min={1} max={6} onChange={(v) => onConfig({ ...config, runs_per_agent: v })} />}
@@ -301,7 +295,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
             <Field label="Buying committees">{(id) => <Slider id={id} value={config.committees} min={2} max={60} onChange={(v) => onConfig({ ...config, committees: v })} />}</Field>
           )}
           {spec.modes.includes("diffusion") && (
-            <Field label="Rounds of conversation">{(id) => <Slider id={id} value={config.diffusion_rounds} min={1} max={6} onChange={(v) => onConfig({ ...config, diffusion_rounds: v })} />}</Field>
+            <Field label="Rounds of conversation" hint="Each round, everyone reads their contacts and may post, reply or move.">{(id) => <Slider id={id} value={config.diffusion_rounds} min={1} max={6} onChange={(v) => onConfig({ ...config, diffusion_rounds: v })} />}</Field>
           )}
         </div>
         <p className="text-[12px] text-faint">

@@ -191,3 +191,12 @@ def test_scenario_force_is_felt_once():
     for p in people:
         notes = [e.note for e in p.exposures]
         assert len(notes) == len(set(notes)), notes
+
+
+async def test_names_are_unique_within_a_run():
+    from oracle.population.enrich import enrich
+    spec = make_spec()
+    people = PopulationBuilder(spec, [], seed=9).build(300)
+    await enrich(people, "mock/oracle", "test")
+    names = [p.name for p in people]
+    assert len(names) == len(set(names))

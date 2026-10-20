@@ -3,7 +3,8 @@
 import { AnimatePresence } from "motion/react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { CommitteesTab, CountriesTab, GroupsTab, InfluenceTab, MethodTab, PricingTab, ReasonsTab, SpreadTab } from "@/components/run/Details";
+import { CommitteesTab, CountriesTab, GroupsTab, InfluenceTab, MethodTab, PricingTab, ReasonsTab } from "@/components/run/Details";
+import { SocietyTab } from "@/components/run/Society";
 import { Overview } from "@/components/run/Overview";
 import { PeopleTab } from "@/components/run/People";
 import { PersonaDrawer } from "@/components/run/PersonaDrawer";
@@ -13,7 +14,7 @@ import { useMeta } from "@/lib/meta";
 import { ago } from "@/lib/format";
 import { useRunStream } from "@/lib/useRunStream";
 
-type TabId = "overview" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "spread" | "people" | "method";
+type TabId = "overview" | "society" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "people" | "method";
 
 const VERDICT: Record<string, { label: string; tone: "yes" | "no" | "neutral" }> = {
   strong: { label: "Strong", tone: "yes" },
@@ -43,11 +44,11 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const tabs = useMemo(() => {
     const t: { id: TabId; label: string }[] = [{ id: "overview", label: "Overview" }];
     if (r) {
-      t.push({ id: "countries", label: "Countries" }, { id: "groups", label: "Groups" }, { id: "influence", label: "Outside influence" }, { id: "reasons", label: "Why and why not" });
+      if (r.diffusion?.rounds?.length) t.push({ id: "society", label: "Society" });
+      t.push({ id: "people", label: "People" }, { id: "countries", label: "Countries" }, { id: "groups", label: "Groups" }, { id: "influence", label: "Outside influence" }, { id: "reasons", label: "Why and why not" });
       if (r.wtp) t.push({ id: "pricing", label: "Pricing" });
       if (r.committees?.n) t.push({ id: "committees", label: "Buying committees" });
-      if (r.diffusion?.rounds?.length) t.push({ id: "spread", label: "Word of mouth" });
-      t.push({ id: "people", label: "People" }, { id: "method", label: "Method" });
+      t.push({ id: "method", label: "Method" });
     }
     return t;
   }, [r]);
@@ -152,14 +153,14 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
         <Tabs tabs={tabs} value={tab} onChange={setTab} />
       </div>
 
-      {tab === "overview" && <Overview id={id} live={live} running={running} onSelect={setPerson} />}
+      {tab === "overview" && <Overview id={id} live={live} running={running} onSelect={setPerson} onTab={(t) => setTab(t as TabId)} />}
+      {r && tab === "society" && <SocietyTab id={id} live={live} r={r} onSelect={setPerson} />}
       {r && tab === "countries" && <CountriesTab r={r} live={live} />}
       {r && tab === "groups" && <GroupsTab r={r} />}
       {r && tab === "influence" && <InfluenceTab r={r} live={live} />}
       {r && tab === "reasons" && <ReasonsTab r={r} onSelect={setPerson} />}
       {r && tab === "pricing" && r.wtp && <PricingTab r={r} />}
       {r && tab === "committees" && r.committees?.n ? <CommitteesTab id={id} r={r} /> : null}
-      {r && tab === "spread" && r.diffusion ? <SpreadTab r={r} horizon={live.spec?.horizon_months ?? 12} /> : null}
       {r && tab === "people" && <PeopleTab id={id} onSelect={setPerson} />}
       {r && tab === "method" && <MethodTab live={live} />}
 

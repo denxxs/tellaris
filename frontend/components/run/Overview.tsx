@@ -11,6 +11,7 @@ import { useMeta } from "@/lib/meta";
 import { cx, int, people, pctSmart, shortJob, stanceText } from "@/lib/format";
 import type { LiveState } from "@/lib/useRunStream";
 import { Crowd } from "./Crowd";
+import { SocietyFeed } from "./Society";
 
 const STAGES = [
   { id: "scenario", label: "Understand the question" },
@@ -58,7 +59,7 @@ function AnswerStrip({ live, running }: { live: LiveState; running: boolean }) {
   ];
 
   return (
-    <Card pad={false} className="grid lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]">
+    <Card pad={false} className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]">
       <div className="border-b border-border p-5 lg:border-b-0 lg:border-r">
         <div className="text-[14px] font-medium text-text">{h ? h.label : "Answer"}</div>
         {h ? (
@@ -147,7 +148,7 @@ function Ticker({ live }: { live: LiveState }) {
   );
 }
 
-export function Overview({ id, live, running, onSelect }: { id: string; live: LiveState; running: boolean; onSelect: (pid: string) => void }) {
+export function Overview({ id, live, running, onSelect, onTab }: { id: string; live: LiveState; running: boolean; onSelect: (pid: string) => void; onTab: (tab: string) => void }) {
   const router = useRouter();
   const agents = useAgents(live);
   const r = live.results;
@@ -172,7 +173,7 @@ export function Overview({ id, live, running, onSelect }: { id: string; live: Li
     <div className="flex flex-col gap-6">
       <AnswerStrip live={live} running={running} />
 
-      <div className="grid items-start gap-6 lg:grid-cols-6">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
         <Card pad={false} className="lg:col-span-4">
           <div className="px-5 pt-5">
             <CardHead title="The world of this simulation" aside={`${int(agents.length - voices)} people${voices ? `, ${voices} outside voices` : ""}`}>
@@ -190,8 +191,8 @@ export function Overview({ id, live, running, onSelect }: { id: string; live: Li
               <CardHead title="Progress" />
               <Progress live={live} />
               <div className="mt-6">
-                <h3 className="mb-2 text-[14px] font-medium">Latest answers</h3>
-                <Ticker live={live} />
+                <h3 className="mb-2 text-[14px] font-medium">{live.feed.length ? "Latest in the conversation" : "Latest answers"}</h3>
+                {live.feed.length ? <SocietyFeed id={id} live={live} r={null} onSelect={onSelect} compact /> : <Ticker live={live} />}
               </div>
             </Card>
           ) : r ? (
@@ -213,6 +214,32 @@ export function Overview({ id, live, running, onSelect }: { id: string; live: Li
         </div>
       </div>
 
+      {r?.diffusion?.society && (
+        <Card>
+          <CardHead
+            title="What people are saying"
+            aside={
+              <button onClick={() => onTab("society")} className="font-medium text-text hover:underline">
+                Open the conversation
+              </button>
+            }
+          >
+            {r.diffusion.society.posts} posts, {r.diffusion.society.replies} replies, {r.diffusion.society.shifts} people changed their mind.
+          </CardHead>
+          <div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
+            {r.diffusion.society.hot_threads.slice(0, 4).map((t) => (
+              <button key={t.id} onClick={() => onTab("society")} className="border-b border-rule py-2.5 text-left">
+                <span className="block text-[13px] text-muted">{t.author_name}</span>
+                <span className="line-clamp-2 block text-[14px] leading-5 text-text">“{t.text}”</span>
+                <span className="mt-0.5 block text-[12px] text-faint">
+                  {t.replies} {t.replies === 1 ? "reply" : "replies"}, {t.agrees} agree, {t.disagrees} disagree
+                </span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card>
         <CardHead title="The crowd" aside={`${int(live.order.length)} people`}>
           Every simulated person as one square, grouped by who they are.
@@ -221,7 +248,7 @@ export function Overview({ id, live, running, onSelect }: { id: string; live: Li
       </Card>
 
       {r && (
-        <div className="grid items-start gap-6 lg:grid-cols-6">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
           <Card className="lg:col-span-3">
             <CardHead title="What to do next">{rep ? undefined : "Writing the analysis…"}</CardHead>
             {rep ? (

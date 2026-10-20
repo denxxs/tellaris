@@ -61,6 +61,13 @@ def build_network(people: list[Persona], k: int = 6, seed: int | None = None) ->
                 q = ids[int(rng.integers(len(ids)))]
                 if q != p.id:
                     g.add_edge(p.id, q)
+    # Nobody is a hermit: everyone knows at least three people, mostly in their own country.
+    for p in people:
+        same = [q.id for q in by_country[p.country] if q.id != p.id] or [i for i in ids if i != p.id]
+        tries = 0
+        while g.degree(p.id) < min(3, len(ids) - 1) and same and tries < 20:
+            g.add_edge(p.id, same[int(rng.integers(len(same)))])
+            tries += 1
     return g
 
 

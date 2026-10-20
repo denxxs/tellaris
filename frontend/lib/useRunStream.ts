@@ -2,7 +2,7 @@
 
 import { useEffect, useReducer, useRef } from "react";
 import { API, api } from "./api";
-import type { FactSheet, PersonaLite, Report, Results, Run, Spec, StreamEvent, Usage, World } from "./types";
+import type { FactSheet, FeedItem, PersonaLite, Report, Results, Run, Spec, StreamEvent, UploadedFile, Usage, World } from "./types";
 
 export type StageState = { stage: string; label: string; status: "pending" | "start" | "done" | "skipped"; progress?: number; detail?: Record<string, unknown> };
 
@@ -21,7 +21,9 @@ export type LiveState = {
   logs: { message: string; level: string; ts: number }[];
   interim: { headline: Results["headline"]; by_country: Results["by_country"] } | null;
   committees: { id: string; country: string; company_type: string; decision: { decision: string; probability_of_purchase: number } | null }[];
-  diffusion: { round: number; calibrated: number; changed: number; news: string | null }[];
+  diffusion: { round: number; calibrated: number; changed: number; news: string | null; posts?: number; replies?: number }[];
+  feed: FeedItem[];
+  files: UploadedFile[];
   results: Results | null;
   report: Report | null;
   usage: Usage | null;
@@ -32,7 +34,7 @@ export type LiveState = {
 
 const initial: LiveState = {
   run: null, spec: null, world: null, research: null, personas: {}, order: [], scores: {}, ticker: [], stages: {}, logs: [],
-  interim: null, committees: [], diffusion: [], results: null, report: null, usage: null, status: "connecting", error: null, progress: 0,
+  interim: null, committees: [], diffusion: [], feed: [], files: [], results: null, report: null, usage: null, status: "connecting", error: null, progress: 0,
 };
 
 type Action = { type: "run"; run: Run } | { type: "events"; events: StreamEvent[] } | { type: "status"; status: LiveState["status"]; error?: string };
@@ -73,6 +75,10 @@ function apply(s: LiveState, e: StreamEvent): LiveState {
       return { ...s, committees: [...s.committees, d] };
     case "diffusion_round":
       return { ...s, diffusion: [...s.diffusion, d] };
+    case "feed":
+      return { ...s, feed: [...s.feed, ...(d as FeedItem[])] };
+    case "files":
+      return { ...s, files: d as UploadedFile[] };
     case "results":
       return { ...s, results: d as Results };
     case "report":
