@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { LineChart } from "@/components/charts";
 import { Avatar } from "@/components/people/Avatar";
+import { FeedReachCard, PostReach } from "@/components/run/FeedReach";
 import { Card, CardHead, Empty, Pill, Segmented, Select } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
@@ -78,6 +79,7 @@ function Post({ it, replies, onSelect }: { it: FeedItem; replies: FeedItem[]; on
           </span>
         )}
       </footer>
+      <PostReach likes={it.likes} reshares={it.reshares} by={it.reshared_by} seen={it.seen} outside={it.seen_outside} onSelect={onSelect} />
       {replies.length > 0 && (
         <div className="mt-3 flex flex-col gap-3 border-l-2 border-border pl-4">
           {replies.map((r) => (
@@ -91,6 +93,7 @@ function Post({ it, replies, onSelect }: { it: FeedItem; replies: FeedItem[]; on
               </div>
               <p className="mt-1.5 text-[14px] leading-5 text-text">{r.text}</p>
               {r.from_p != null && r.to_p != null && <Shift from={r.from_p} to={r.to_p} why={r.why} />}
+              <PostReach likes={r.likes} reshares={r.reshares} by={r.reshared_by} onSelect={onSelect} />
             </div>
           ))}
         </div>
@@ -233,7 +236,8 @@ export function SocietyFeed({ id, live, r, onSelect, compact }: { id: string; li
       if (filter === "shifts") return it.kind === "shift" || it.from_p != null || (repliesOf.get(it.id) ?? []).some((x) => x.from_p != null);
       return true;
     });
-    if (order === "hot") xs = [...xs].sort((a, b) => (repliesOf.get(b.id)?.length ?? 0) * 3 + b.agrees + b.disagrees - ((repliesOf.get(a.id)?.length ?? 0) * 3 + a.agrees + a.disagrees));
+    const heat = (x: FeedItem) => (repliesOf.get(x.id)?.length ?? 0) * 3 + x.agrees + x.disagrees + (x.likes ?? 0) + (x.reshares ?? 0) * 2;
+    if (order === "hot") xs = [...xs].sort((a, b) => heat(b) - heat(a));
     else xs = [...xs].sort((a, b) => a.round - b.round || (a.kind === "news" ? -1 : b.kind === "news" ? 1 : 0));
     return xs;
   }, [tops, filter, order, repliesOf]);
@@ -392,6 +396,7 @@ export function SocietyTab({ id, live, r, onSelect }: { id: string; live: LiveSt
         <SocietyFeed id={id} live={live} r={r} onSelect={onSelect} />
       </Card>
       <div className="flex flex-col gap-6 lg:col-span-2">
+        {d?.feed && <FeedReachCard id={id} f={d.feed} people={d.agents} cmp={r.comparison} onSelect={onSelect} />}
         {d && d.rounds.length > 1 && (
           <Card>
             <CardHead title="Opinion as they talk">How the share leaning yes moved, round by round.</CardHead>

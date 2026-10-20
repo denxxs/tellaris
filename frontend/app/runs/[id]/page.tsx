@@ -102,6 +102,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
             <h1 className="t-title">{title}</h1>
             {verdict && <Pill tone={verdict.tone}>{verdict.label}</Pill>}
             {lensLabel && <Pill>{lensLabel}</Pill>}
+            {r?.diffusion?.feed && r.diffusion.feed.style !== "word_of_mouth" && <Pill>{r.diffusion.feed.style === "viral" ? "Viral feed" : "Ranked feed"}</Pill>}
             {running && (
               <span className="inline-flex items-center gap-1.5 text-[13px] text-muted">
                 <span className="live-dot size-1.5 rounded-full bg-live" aria-hidden />
@@ -129,7 +130,10 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
                 <Link href={`/runs/${live.run.parent_id}`} className="text-text underline-offset-2 hover:underline">
                   the original run
                 </Link>
-                {r?.comparison && <>, {r.comparison.delta >= 0 ? "+" : "−"}{Math.abs(r.comparison.delta * 100).toFixed(1)} points with the same people</>}.
+                {r?.comparison && <>, {r.comparison.delta >= 0 ? "+" : "−"}{Math.abs(r.comparison.delta * 100).toFixed(1)} points with the same people</>}
+                {r?.comparison?.society && r.comparison.society.parent.feed !== r.comparison.society.this.feed && (
+                  <>; after the conversation {r.comparison.society.delta >= 0 ? "+" : "−"}{Math.abs(r.comparison.society.delta * 100).toFixed(1)} points</>
+                )}.
               </>
             )}
           </p>

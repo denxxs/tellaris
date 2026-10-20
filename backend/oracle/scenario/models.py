@@ -139,6 +139,10 @@ class RunConfig(BaseModel):
     research: bool = True
     memory: bool = Field(default=True, description="People in the society remember what they saw and reflect once at the end")
     knowledge_graph: bool = Field(default=True, description="Map the topic as a knowledge graph and ground each person in the parts that touch them")
+    feed_style: Literal["word_of_mouth", "ranked", "viral"] = Field(
+        default="word_of_mouth",
+        description="How people's feeds are chosen: their contacts only (word of mouth), a platform ranking, or viral amplification",
+    )
     influence_threshold: float = Field(default=0.25, ge=0, le=1)
     seed: int | None = None
     temperature: float = Field(default=0.9, ge=0, le=1.5)

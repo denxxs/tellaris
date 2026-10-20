@@ -22,6 +22,7 @@ from ..population.models import Persona
 from ..scenario.models import ScenarioSpec
 from .calibrate import Calibration, apply_array
 from .diffusion import bass_projection, build_network
+from .feed import FeedState, apply_engagement, pick, record_seen, travel_summary
 from .memory import Mind, mind_record, reflect_all, seen_importance
 from .memory import summarize as summarize_minds
 from .reaction import JUSTER, Reaction
@@ -42,6 +43,13 @@ class Turn(BaseModel):
         return v.strip()[:320]
 
 
+class FeedTurn(Turn):
+    """A turn on a platform feed, where people can also like and reshare."""
+
+    like: list[str] = Field(default_factory=list, description="Ids of up to 3 items in your feed you like. Liking is cheap; most people like a thing or two.")
+    reshare: str | None = Field(default=None, description="Id of one item you reshare to your own contacts, only if you really want them to see it. Usually none.")
+
+
 SYSTEM = """You are one specific person scrolling your feed on the network you actually use (LinkedIn, X, WhatsApp groups, Reddit,
 a local forum: whatever fits you). You see what your contacts have been saying about a topic, and maybe some news.
 
@@ -54,11 +62,23 @@ Your traits matter: people who follow their peers move with their circle; scepti
 Then give your current view on the Juster scale: 0 no chance (1%), 1 very slight (10%), 3 some (30%),
 5 fair-good (50%), 7 probable (70%), 9 almost sure (90%), 10 certain (99%)."""
 
+FEED_SYSTEM = SYSTEM.replace(
+    "You see what your contacts have been saying about a topic, and maybe some news.",
+    "The platform picks what you see: your contacts' posts, things they reshared and popular posts from people you don't know.",
+) + """
+You can also like items (cheap: people like what they agree with or find useful) and reshare at most one item to your
+contacts (rarer: only when you want everyone you know to see it). You can do these whether you post, reply or stay quiet."""
+
 
 def _item(**kw: Any) -> dict[str, Any]:
     base = {"agrees": 0, "disagrees": 0, "parent": None, "author": None, "from_p": None, "to_p": None}
     base.update(kw)
     return base
+
+
+def _counts(it: dict[str, Any]) -> str:
+    bits = [f"{n} {w}{'' if n == 1 else 's'}" for n, w in ((it.get("likes", 0), "like"), (it.get("reshares", 0), "reshare"), (it.get("replies", 0), "reply")) if n]
+    return f" ({', '.join(bits)})".replace("replys", "replies") if bits else ""
 
 
 def _author_fields(p: Persona) -> dict[str, Any]:
@@ -83,9 +103,12 @@ async def run_society(
     on_round: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     memory: bool = True,
     minds_out: dict[str, dict[str, Any]] | None = None,
+    feed_style: str = "word_of_mouth",
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Run the society. With memory on, each person keeps and recalls memories and reflects at the end;
-    their memories and reflection are written into minds_out (person id -> record)."""
+    their memories and reflection are written into minds_out (person id -> record).
+    feed_style picks how each person's feed is chosen (see feed.py); word_of_mouth is the original."""
+    platform = feed_style in ("ranked", "viral")
     rng = np.random.default_rng(seed)
     first: dict[str, Reaction] = {}
     stated: dict[str, list[float]] = {}
@@ -181,6 +204,11 @@ async def run_society(
     news_forces = [f for f in spec.forces if f.strength >= 0.4]
     examples: list[dict[str, Any]] = []
     item_by_id = {it["id"]: it for it in feed}
+    fs = FeedState()
+    names = {pid: by_id[pid].name for pid in pids}
+    # A separate generator, so the original word-of-mouth draws are untouched.
+    feed_rng = np.random.default_rng(None if seed is None else [seed, 5]) if platform else None
+    engaged = {"likes": 0, "reshares": 0}
 
     for rnd in range(1, rounds + 1):
         news = None
@@ -194,7 +222,11 @@ async def run_society(
             if on_items:
                 await on_items([news_item])
 
-        recent = [it for it in feed if it["kind"] in ("post", "reply") and it["round"] >= rnd - 2]
+        talk_so_far = [it for it in feed if it["kind"] in ("post", "reply")]
+        shown = {pid: pick(feed_style, pid, rnd, talk_so_far, g, fs, names, feed_rng) for pid in pids}
+        for pid in pids:
+            record_seen(fs, pid, shown[pid], item_by_id, g)
+        actions: list[tuple[str, list[str], str | None]] = []
         new_state: dict[str, float] = {}
         produced: list[dict[str, Any]] = []
         lock = asyncio.Lock()
@@ -203,16 +235,14 @@ async def run_society(
         async def act(i: int, pid: str) -> None:
             nonlocal changed_count
             p = by_id[pid]
-            contacts = set(g.neighbors(pid))
-            visible = [it for it in recent if it["author"] in contacts]
-            visible.sort(key=lambda it: (-it["round"], -(it["agrees"] + it["disagrees"])))
-            visible = visible[:5]
+            visible = shown[pid]
             if not visible and not news:
                 new_state[pid] = state[pid]
                 return
             lines = [
                 f"[{it['id']}] {it['author_name']}, {it['occupation'].split(' (')[0]} in {p.country_name if it['country'] == p.country else it['country']}"
-                f"{' (replying)' if it['kind'] == 'reply' else ''}: \"{it['text']}\""
+                f"{' (replying)' if it['kind'] == 'reply' else ''}{' [' + it['via'] + ']' if it.get('via') else ''}: \"{it['text']}\""
+                + (_counts(it) if platform else "")
                 for it in visible
             ]
             mind = minds.get(pid)
@@ -237,8 +267,9 @@ async def run_society(
             model = models[(i + rnd) % len(models)]
             try:
                 t = await llm.json(
-                    task="society_turn", model=model, system=SYSTEM, user=user, schema=Turn, temperature=temperature,
-                    mock_ctx={"persona": p.model_dump(), "p": state[pid], "visible": visible, "news": news, "spec": spec.model_dump(), "round": rnd},
+                    task="society_turn", model=model, system=FEED_SYSTEM if platform else SYSTEM, user=user,
+                    schema=FeedTurn if platform else Turn, temperature=temperature,
+                    mock_ctx={"persona": p.model_dump(), "p": state[pid], "visible": visible, "news": news, "spec": spec.model_dump(), "round": rnd, "platform": platform},
                 )
             except LLMError:
                 new_state[pid] = state[pid]
@@ -250,6 +281,8 @@ async def run_society(
                 mind.add(rnd, "thought", t.takeaway, 0.7)
             moved = abs(p_new - state[pid]) > 0.08
             async with lock:
+                if isinstance(t, FeedTurn) and (t.like or t.reshare):
+                    actions.append((pid, list(t.like), t.reshare))
                 if moved:
                     changed_count += 1
                     if len(examples) < 40:
@@ -267,6 +300,13 @@ async def run_society(
 
         await asyncio.gather(*(act(i, pid) for i, pid in enumerate(pids)))
         state.update(new_state)
+        # Likes and reshares land after everyone has scrolled, so the order people act in doesn't matter.
+        for pid, likes, reshare in sorted(actions, key=lambda a: a[0]):
+            nl, nr = apply_engagement(fs, pid, names[pid], likes, reshare, {v["id"] for v in shown[pid]}, item_by_id)
+            engaged["likes"] += nl
+            engaged["reshares"] += nr
+            if nr and pid in minds and reshare:
+                minds[pid].add(rnd, "said", f"I reshared: {item_by_id[reshare]['text']}", 0.75, item=reshare)
         for pid, mind in minds.items():
             mind.trajectory.append(state[pid])
         tally([it for it in produced if it["kind"] in ("post", "reply")])
@@ -330,6 +370,7 @@ async def run_society(
             "nodes": [{"id": pid, "country": by_id[pid].country, "p": round(state[pid], 3), "name": by_id[pid].name} for pid in pids],
             "links": [{"source": a, "target": b} for a, b in g.edges()],
         },
+        "feed": travel_summary(feed_style, talk, len(pids)),
         "society": {
             "posts": sum(1 for it in talk if it["kind"] == "post"),
             "replies": sum(1 for it in talk if it["kind"] == "reply"),

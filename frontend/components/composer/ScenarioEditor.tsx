@@ -5,7 +5,7 @@ import { Button, Chip, Field, Input, Segmented, Select, Slider, Textarea, Toggle
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { int, pct, people, shortJob, titleCase } from "@/lib/format";
-import type { Force, LensId, RunConfig, Segment, Spec } from "@/lib/types";
+import type { FeedStyle, Force, LensId, RunConfig, Segment, Spec } from "@/lib/types";
 import { CountryPicker } from "./CountryPicker";
 
 type Props = {
@@ -23,6 +23,12 @@ const newForce = (): Force => ({
 });
 
 /** A settings-style row: what it is on the left, the controls in a panel on the right. */
+const FEED_HINT: Record<FeedStyle, string> = {
+  word_of_mouth: "People only see what their own contacts say. Ideas spread one conversation at a time.",
+  ranked: "A platform picks each feed by freshness, likes, reshares and closeness. People can like and reshare, so popular posts reach friends of friends and strangers.",
+  viral: "The same platform with engagement weighted heavily: a few popular posts reach most people.",
+};
+
 function Section({ title, children, aside, summary }: { title: string; children: React.ReactNode; aside?: React.ReactNode; summary?: React.ReactNode }) {
   return (
     <section className="grid grid-cols-1 gap-4 border-b border-border py-8 first:pt-0 last:border-0 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-10">
@@ -371,6 +377,26 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
               label="Memory and reflection"
               description="People remember what they saw and think it over once at the end. One extra model call per person in the conversation."
             />
+          )}
+          {spec.modes.includes("diffusion") && (
+            <Field label="Feed style" hint={FEED_HINT[config.feed_style ?? "word_of_mouth"]} className="md:col-span-2">
+              {() => (
+                <div className="scroll-thin max-w-full overflow-x-auto">
+                  <div className="w-max">
+                    <Segmented
+                      label="Feed style"
+                      value={config.feed_style ?? "word_of_mouth"}
+                      onChange={(v) => onConfig({ ...config, feed_style: v })}
+                      options={[
+                        { value: "word_of_mouth", label: "Word of mouth" },
+                        { value: "ranked", label: "Ranked feed" },
+                        { value: "viral", label: "Viral" },
+                      ]}
+                    />
+                  </div>
+                </div>
+              )}
+            </Field>
           )}
           <Toggle checked={config.research} onChange={(v) => onConfig({ ...config, research: v })} label="Web research" description="Ground people in current facts, prices and competitors." />
           <Toggle

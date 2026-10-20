@@ -80,8 +80,8 @@ export const api = {
   chat: (id: string, pid: string, message: string) =>
     req<{ reply: string; chat: ChatMessage[] }>(`/api/runs/${id}/personas/${pid}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
   committees: (id: string) => req<Committee[]>(`/api/runs/${id}/committees`),
-  whatif: (id: string, label: string, changes: Record<string, unknown>) =>
-    req<{ id: string }>(`/api/runs/${id}/whatif`, { method: "POST", body: JSON.stringify({ label, changes }) }),
+  whatif: (id: string, label: string, changes: Record<string, unknown>, configPatch?: Record<string, unknown>) =>
+    req<{ id: string }>(`/api/runs/${id}/whatif`, { method: "POST", body: JSON.stringify({ label, changes, config_patch: configPatch ?? {} }) }),
   exportUrl: (id: string) => `${API}/api/runs/${id}/export`,
   settings: () => req<Settings>("/api/settings"),
   saveSettings: (patch: Record<string, unknown>) => req<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(patch) }),

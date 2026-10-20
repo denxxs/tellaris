@@ -8,8 +8,8 @@ Ten features borrowed (as ideas only) from other simulation projects: MiroFish, 
 | 2 | [Memory and reflection](#2-memory-and-reflection) | Generative Agents, AgentSociety | Done |
 | 3 | [Asking a group](#3-asking-a-group) | TinyTroupe, Synthetic Users | Done |
 | 4 | [Knowledge graph](#4-knowledge-graph) for each simulation | MiroFish | Done |
-| 5 | Ranked feed | OASIS | Next |
-| 6 | Timeline of events | AgentSociety, Concordia | Planned |
+| 5 | [Ranked feed](#5-ranked-feed) with likes, reshares and a viral mode | OASIS | Done |
+| 6 | Timeline of events | AgentSociety, Concordia | Next |
 | 7 | Mid-run news | MiroFish | Planned |
 | 8 | Personas from your customer data | Electric Twin, Synthetic Users | Planned |
 | 9 | Shareable reports | Commercial tools | Planned |
@@ -295,3 +295,81 @@ By hand:
 - With the demo model, the map is built from the setup alone (product, groups, places, outside factors and four common ideas), so it's small. Real models produce up to 30 entities with facts.
 - Mentions are matched by name and alias, so a person who describes a competitor without naming it isn't counted.
 - The graph is built once per run, before people react. It doesn't grow from what people say yet.
+
+---
+
+## 5. Ranked feed
+
+### What it does
+
+The society can now run on three kinds of feed. You pick one under **How to simulate → Feed style**:
+- **Word of mouth** (the default, and how it worked before): people see only what their own contacts say.
+- **Ranked feed:** a platform picks what each person sees, by freshness, engagement (likes, reshares, replies) and closeness. People can **like** posts and **reshare** one to their contacts, so a popular post reaches friends of friends and strangers.
+- **Viral:** the same platform with engagement weighted much more heavily. A few popular posts reach almost everyone.
+
+You can test "what if this goes viral instead of spreading by word of mouth?" on the same people, and see how far each post travelled.
+
+### What was done
+
+- **Setup:** a **Feed style** choice under How to simulate, shown when Society is on. The hint under it explains each style. It costs no extra model calls.
+- **Society tab:** a new **How far posts travelled** card:
+  - **Seen per post:** the average number of people each post reached.
+  - **Outside their circle:** the share of views from people the author doesn't know.
+  - **Likes** and **Reshares** (ranked and viral only).
+  - **Furthest-reaching posts:** the top five posts, each with a bar showing reach among the author's contacts (grey) and beyond their circle (blue), plus likes and reshares. Select one to open the author's profile.
+  - **Try another feed:** reruns the same people with only the feed changed.
+  - **Against the original run** (on a rerun): where the conversation ended, outside reach and adoption at the end of the time frame, side by side.
+- **Posts:** each post now shows its likes, who reshared it ("Reshared by Ana and Vikram and 4 more") and "Seen by 40, 33 beyond their circle". **Most discussed** ordering now counts likes and reshares too.
+- **Run header:** a "Ranked feed" or "Viral feed" pill. On a feed rerun, the summary line adds "after the conversation ±x points" next to the usual comparison.
+- **Same people on every what-if:** every run now records the seed it used, and what-ifs reuse it. This applies to all what-ifs, not just feed reruns, so comparisons carry less random noise.
+
+### How it works
+
+1. **Picking each feed** (`backend/oracle/simulate/feed.py`, `pick`). At the start of each round, every person gets a feed of up to 5 posts and replies.
+   - **Word of mouth** keeps the original rule exactly: contacts' posts from the last two rounds, newest first.
+   - **Ranked and viral** score every post from the last three rounds:
+     `score = closeness × freshness^age × (1 + weight × engagement)^power`
+     - **closeness:** a contact's own post 1.0; reshared by a contact 0.8 (0.9 viral); a friend of a friend 0.25 (0.45); a stranger 0.03 (0.25).
+     - **engagement:** likes + 1.5 × replies + 2 × reshares.
+     - **weight and power:** 0.3 and 1 for ranked; 1.0 and 1.6 for viral, so popular posts pull away.
+     - posts already shown to the person drop to 30% of their score, and a small seeded jitter breaks ties.
+2. **Telling people why they see something.** In the prompt, posts that aren't a contact's own carry a tag ("reshared by Ana", "a friend of a friend", "popular outside your circle") and their like, reshare and reply counts.
+3. **Liking and resharing.** On ranked and viral feeds, each turn can also return `like` (up to 3 post ids) and `reshare` (one id). They only count for posts the person was actually shown, at most one like per post per person and one reshare per post per person. They're applied after everyone has acted, so the order people act in doesn't matter. A reshare is also saved to the person's memory.
+4. **Counting reach** (`record_seen`). Every time a post is shown to someone new, `seen` goes up, and `seen_outside` too if that person isn't the author's contact. This is counted in every style, so word of mouth shows reach as well.
+5. **Results:**
+   - `results.diffusion.feed` holds the style, totals, outside share, average and top reach, and the five furthest-travelled posts.
+   - Like, reshare and seen counts live on the feed items themselves. No new table.
+   - On a what-if, `results.comparison.society` holds both runs' after-talk opinion, outside share and end adoption.
+6. **Same people on what-ifs:**
+   - A run with no seed now gets a random one, stored as `results.seed`.
+   - `POST /api/runs/{id}/whatif` accepts `config_patch` (change just these settings) and reuses that seed.
+7. **What the feed changes and what it doesn't.** The feed shapes the conversation: opinion after the talk, the Bass adoption curve and reflection. First reactions, and so the headline answer, come before any talk and don't move. That's why the comparison shows "after the conversation" separately.
+8. **B2B unchanged.** Word of mouth is the default and makes exactly the same draws as before. The like and reshare fields are only asked for on ranked and viral feeds, so the default prompt is word for word the same. The B2B golden test passes.
+
+**Files:** `backend/oracle/simulate/feed.py` (new), `backend/oracle/simulate/society.py` (feed choice, `FeedTurn`, likes and reshares, reach summary), `backend/oracle/scenario/models.py` (`feed_style`), `backend/oracle/pipeline.py` (seed, society comparison), `backend/oracle/api/app.py` (`config_patch`, seed reuse), `backend/oracle/llm/mock.py` (offline likes and reshares), `backend/tests/test_feed.py`, `frontend/components/run/FeedReach.tsx` (new), `frontend/components/run/Society.tsx`, `frontend/components/composer/ScenarioEditor.tsx`, `frontend/app/runs/[id]/page.tsx`, `frontend/lib/types.ts`, `frontend/lib/api.ts`.
+
+### How to test
+
+Automated: `cd backend && python -m pytest tests/test_feed.py tests/test_golden.py`. It checks:
+- word of mouth shows only contacts, even when a stranger's post is very popular;
+- the ranked feed reaches friends of friends, strangers and contacts' reshares, and labels why each is shown;
+- viral puts a popular stranger's post above a contact's, while ranked doesn't;
+- likes and reshares only count on posts the person saw, once each;
+- on the same people, outside reach is 0 for word of mouth, higher for ranked and higher again for viral, and no post has more likes than viewers;
+- a what-if from a run with no seed reuses its seed and gets exactly the same people;
+- B2B results are unchanged.
+
+By hand:
+1. New simulation, e.g. "Would people in India and Brazil pay $3 a month for Penny, an app that tracks spending automatically?" Choose **Adjust setup first**, then How to simulate → **Feed style: Viral**, and run.
+2. The header shows a **Viral feed** pill. Open the **Society** tab: **How far posts travelled** shows most views coming from beyond people's circles, and top posts reaching nearly everyone.
+3. Under the conversation, set **Order: Most discussed**. Posts show likes, "Reshared by …" (select a name to open their profile) and "Seen by …".
+4. In the card, select **Word of mouth** under **Try another feed**. The new run opens. In its Society tab, **Against the original run** compares opinion after the talk, outside reach and adoption. The header line shows "after the conversation ±x points".
+
+With the demo model the numbers show the mechanics only. With real models, people decide for themselves what to like and reshare.
+
+### Known limits
+
+- Feeds hold 5 posts a round. With few posts around, the ranked feed fills the spare places with friends of friends, which raises its outside share. Real feeds do the same.
+- The ranking weights are hand-set, not fitted to any real platform.
+- Likes and reshares only change who sees what. They don't change anyone's view directly; that happens through what people read.
+- Older runs have no reach data, so the card doesn't appear on them.

@@ -68,6 +68,7 @@ export type RunConfig = {
   research: boolean;
   memory?: boolean;
   knowledge_graph?: boolean;
+  feed_style?: FeedStyle;
   influence_threshold: number;
   seed: number | null;
   temperature: number;
@@ -202,13 +203,15 @@ export type Results = {
     examples: { round: number; persona_id: string; name: string; country: string; from: number; to: number; why: string }[];
     social_pull: number;
     reflection?: ReflectionSummary;
+    feed?: FeedReach;
     bass: { m: number; p: number; q: number; curve: { month: number; adoption: number }[] };
     network: { nodes: { id: string; country: string; p: number; name: string }[]; links: { source: string; target: string }[] };
   };
   themes?: { objections: Theme[]; reasons: Theme[]; change_mind: Theme[] };
   splits?: Splits;
   graph?: KGraph;
-  comparison?: { parent_id: string; parent_title: string; parent_value: number; delta: number };
+  seed?: number;
+  comparison?: { parent_id: string; parent_title: string; parent_value: number; delta: number; society?: { parent: SocietyPoint; this: SocietyPoint; delta: number } };
 };
 
 export type KGKind = "product" | "competitor" | "company" | "regulator" | "policy" | "technology" | "customer" | "place" | "event" | "concept";
@@ -479,6 +482,24 @@ export type Meta = {
 
 export type StreamEvent = { seq: number; ts: number; type: string; data: unknown };
 
+export type SocietyPoint = { feed: FeedStyle; after_talk: number; outside_share: number | null; adoption_end: number | null };
+
+export type FeedStyle = "word_of_mouth" | "ranked" | "viral";
+
+export type Travelled = { id: string; author: string; author_name: string; country?: string; text: string; p?: number; seen: number; seen_outside: number; likes: number; reshares: number; replies: number; share: number };
+
+export type FeedReach = {
+  style: FeedStyle;
+  label: string;
+  likes: number;
+  reshares: number;
+  views: number;
+  outside_share: number;
+  avg_reach: number;
+  top_reach: number;
+  travelled: Travelled[];
+};
+
 export type FeedItem = {
   id: string;
   round: number;
@@ -495,6 +516,11 @@ export type FeedItem = {
   agrees: number;
   disagrees: number;
   replies?: number;
+  likes?: number;
+  reshares?: number;
+  reshared_by?: { id: string; name: string }[];
+  seen?: number;
+  seen_outside?: number;
   from_p: number | null;
   to_p: number | null;
   why?: string | null;

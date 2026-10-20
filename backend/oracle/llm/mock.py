@@ -621,7 +621,21 @@ def society_turn(ctx: dict[str, Any]) -> dict[str, Any]:
         else:
             text = r.choice(POST_YES if new >= 0.5 else POST_NO).format(reason=reason, objection=objection)
             action = "post"
+    like: list[str] = []
+    reshare = None
+    if ctx.get("platform"):
+        # Like what you agree with, more readily when it's already popular; reshare rarely.
+        for v in visible:
+            same = ((v.get("p") or 0.5) >= 0.5) == (new >= 0.5)
+            pop = v.get("likes", 0) + 2 * v.get("reshares", 0)
+            if same and r.random() < 0.35 + 0.05 * min(pop, 6) and len(like) < 3:
+                like.append(v["id"])
+        strong = [v for v in visible if v["id"] in like and abs((v.get("p") or 0.5) - 0.5) > 0.2]
+        if strong and r.random() < 0.12 + 0.2 * t["openness"]:
+            reshare = max(strong, key=lambda v: v.get("likes", 0) + 2 * v.get("reshares", 0))["id"]
     return {
+        "like": like,
+        "reshare": reshare,
         "action": action,
         "reply_to": reply_to,
         "text": text,
