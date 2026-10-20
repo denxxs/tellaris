@@ -171,4 +171,6 @@ def test_files_society_and_profiles(client):
     author = next(it["author"] for it in feed if it["kind"] == "reply")
     prof = client.get(f"/api/runs/{run_id}/personas/{author}").json()
     assert prof["contacts"] and prof["society"]["mine"]
-    assert prof["persona"]["tagline"] and prof["persona"]["values"]
+    # A human face, but no invented facts that would steer answers.
+    pr = prof["persona"]
+    assert pr["tagline"] and not pr["values"] and not pr["tools_today"] and not pr["info_sources"] and not pr["priorities"]

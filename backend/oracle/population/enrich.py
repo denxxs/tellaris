@@ -5,37 +5,30 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..llm import LLMError, llm
 from .models import Persona
 
 BATCH = 8
 
-SYSTEM = """You write realistic, specific people for a social simulation.
-For each person you get fixed facts (country, job, age, income, traits). Keep every fact.
-Add: a culturally appropriate full name for their country that matches their gender (avoid the most stereotypical names),
-a one-line tagline (who they are in a few words, like a social media bio), a 2-3 sentence backstory in third person,
-3 values they live by, 3 current priorities, 2 frustrations, a 1-2 sentence typical day, 2-4 tools, products or services
-they already use for their work or life, their household in a few words, 3 information sources they actually use
-(specific publications, communities, people, apps), and a one-line description of how they talk.
-Make people different from each other. Include ordinary, busy, distracted, sceptical people - not just enthusiasts.
-Skeptical traits must show up as scepticism. Low budget authority means they cannot buy on their own."""
+SYSTEM = """You give simulated people a human face, using ONLY the facts you are given (country, age, gender, job,
+company, sector, income, traits and any extra trait).
+For each person write: a culturally appropriate full name for their country and gender (avoid the most stereotypical
+names), a one-line tagline (who they are, like a social media bio), a 1-2 sentence backstory in third person, a
+1-2 sentence typical day, and a one-line description of how they talk.
+Restate the given facts in human words; do NOT add new facts. In particular, never invent which products, apps or
+brands they use, where they get news, their values, opinions, priorities, problems, family or anything about the
+topic being simulated. Those would change how they answer, and Oracle only lets real data do that."""
 
 
 class Enriched(BaseModel):
     id: str
     name: str
     bio: str
-    priorities: list[str] = Field(default_factory=list)
-    frustrations: list[str] = Field(default_factory=list)
-    info_sources: list[str] = Field(default_factory=list)
     voice: str = ""
     tagline: str = ""
-    values: list[str] = Field(default_factory=list)
     typical_day: str = ""
-    tools_today: list[str] = Field(default_factory=list)
-    household: str = ""
 
 
 class EnrichedBatch(BaseModel):
@@ -100,15 +93,9 @@ async def enrich(
                 continue
             p.name = e.name.strip()[:80]
             p.bio = e.bio.strip()[:600]
-            p.priorities = [x[:160] for x in e.priorities[:4]]
-            p.frustrations = [x[:160] for x in e.frustrations[:3]]
-            p.info_sources = [x[:80] for x in e.info_sources[:4]]
             p.voice = e.voice.strip()[:200]
             p.tagline = e.tagline.strip()[:120]
-            p.values = [x[:60] for x in e.values[:3]]
             p.typical_day = e.typical_day.strip()[:400]
-            p.tools_today = [x[:60] for x in e.tools_today[:4]]
-            p.household = e.household.strip()[:100]
             done += 1
         for p in batch:
             if not p.name:

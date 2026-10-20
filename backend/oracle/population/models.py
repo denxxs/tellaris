@@ -79,20 +79,7 @@ class Persona(BaseModel):
             f"tech affinity {t.tech_affinity:.2f}, skepticism {t.skepticism:.2f}, risk appetite {t.risk_appetite:.2f}, "
             f"price sensitivity {t.price_sensitivity:.2f}, follows peers {t.conformity:.2f}, openness {t.openness:.2f}",
         ]
-        if self.bio:
-            lines.append(f"Background: {self.bio}")
-        if self.priorities:
-            lines.append(f"Current priorities: {'; '.join(self.priorities)}")
-        if self.frustrations:
-            lines.append(f"Frustrations: {'; '.join(self.frustrations)}")
-        if self.info_sources:
-            lines.append(f"Gets information from: {', '.join(self.info_sources)}")
-        if self.values:
-            lines.append(f"Values: {', '.join(self.values)}")
-        if self.tools_today:
-            lines.append(f"Uses today: {', '.join(self.tools_today)}")
-        if self.household:
-            lines.append(f"Household: {self.household}")
+        # Only facts from data or from the user reach the prompt; the model-written face (name aside) does not.
         if self.group_trait:
             lines.append(f"Also true about you: {self.group_trait}")
         return "\n".join(lines)

@@ -259,6 +259,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                       <div className="flex flex-wrap gap-1.5">{p.values.map((v) => <Chip key={v}>{v}</Chip>)}</div>
                     </div>
                   )}
+                  <p className="mt-4 text-[12px] leading-4 text-faint">Name and story written by the model from the facts on this page, to give them a human face. They aren&apos;t used in their answers.</p>
                 </Card>
                 <Card>
                   <CardHead title="Work and money" />
@@ -281,15 +282,18 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                       <div className="flex flex-wrap gap-1.5">{p.tools_today.map((t) => <Chip key={t}>{t}</Chip>)}</div>
                     </div>
                   )}
+                  <p className="mt-4 text-[12px] leading-4 text-faint">Job drawn from ILOSTAT employment data for {p.country_name}; income estimated from World Bank income per person and the job.</p>
                 </Card>
-                <Card>
-                  <CardHead title="What's on their mind" />
-                  <dl className="flex flex-col gap-3">
-                    {p.priorities.length > 0 && <Fact label="Priorities right now">{p.priorities.join("; ")}</Fact>}
-                    {p.frustrations.length > 0 && <Fact label="Frustrations">{p.frustrations.join("; ")}</Fact>}
-                    {p.info_sources.length > 0 && <Fact label="Where they get information">{p.info_sources.join(", ")}</Fact>}
-                  </dl>
-                </Card>
+                {(p.priorities.length > 0 || p.frustrations.length > 0 || p.info_sources.length > 0) && (
+                  <Card>
+                    <CardHead title="What's on their mind">Written by the model in an older version of Oracle.</CardHead>
+                    <dl className="flex flex-col gap-3">
+                      {p.priorities.length > 0 && <Fact label="Priorities right now">{p.priorities.join("; ")}</Fact>}
+                      {p.frustrations.length > 0 && <Fact label="Frustrations">{p.frustrations.join("; ")}</Fact>}
+                      {p.info_sources.length > 0 && <Fact label="Where they get information">{p.info_sources.join(", ")}</Fact>}
+                    </dl>
+                  </Card>
+                )}
                 <Card>
                   <CardHead title="How they think">Traits that shape every decision they make, from 0 to 100.</CardHead>
                   <div className="flex flex-col gap-2.5">

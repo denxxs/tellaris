@@ -265,7 +265,7 @@ _WORD = re.compile(r"[a-z]{4,}")
 
 
 def _about(p: Persona) -> str:
-    return " ".join([p.sector, p.occupation, p.segment, p.company_type, p.group_trait or "", " ".join(p.info_sources)]).lower().replace("_", " ")
+    return " ".join([p.sector, p.occupation, p.segment, p.company_type, p.group_trait or ""]).lower().replace("_", " ")
 
 
 def concerns(p: Persona, audiences: list[str]) -> bool:
