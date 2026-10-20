@@ -63,7 +63,8 @@ def test_population_structure_and_exposure():
     core = [p for p in people if p.influencer_voice is None]
     voices = [p for p in people if p.influencer_voice]
     assert len(core) == 300 and len(voices) == 10
-    assert abs(sum(p.weight for p in core) - 1.0) < 1e-6
+    buyers = [p for p in core if p.is_buyer]
+    assert abs(sum(p.weight for p in buyers) - 1.0) < 1e-6
     assert all(p.weight == 0 for p in voices)
     analysts = [p for p in core if p.country == "IND" and p.occupation_id == "it_services_analyst"]
     exposed = [p for p in analysts if any(e.source == "EU" for e in p.exposures)]
@@ -82,7 +83,48 @@ def test_segments_tied_to_countries():
     people = PopulationBuilder(spec, [], seed=4).build(200)
     assert all(p.country == "USA" for p in people if p.segment == "Founders")
     assert all(p.country == "IND" for p in people if p.segment == "IT analysts")
-    assert abs(sum(p.weight for p in people) - 1) < 1e-6
+    buyers = [p for p in people if p.is_buyer]
+    assert abs(sum(p.weight for p in buyers) - 1) < 1e-6
+    # Population weighting: India's IT analysts far outnumber US SaaS founders.
+    founders = sum(p.weight for p in buyers if p.segment == "Founders")
+    analysts = sum(p.weight for p in buyers if p.segment == "IT analysts")
+    assert analysts > founders * 5
+    assert all(p.represents > 0 for p in people)
+
+
+def test_equal_weighting_respects_group_weights():
+    spec = make_spec(segments=[
+        Segment(name="Founders", occupations=["founder_b2b_saas"], countries=["USA"]),
+        Segment(name="IT analysts", occupations=["it_services_analyst"], countries=["India"]),
+    ], target_weights={"USA": 0.5, "IND": 0.5}, general_population_share=0)
+    people = PopulationBuilder(spec, [], seed=4, weighting="equal").build(200)
+    founders = sum(p.weight for p in people if p.segment == "Founders")
+    assert 0.3 < founders < 0.7
+
+
+def test_every_country_is_covered():
+    from oracle.world.countries import countries
+    from oracle.world.influence import expand
+    cs = countries()
+    assert len(cs) >= 200
+    for iso in ["PER", "KAZ", "KEN", "TWN", "ETH", "URY", "FJI", "MNG"]:
+        assert iso in cs, iso
+        assert expand([iso]), f"no influencers for {iso}"
+    assert all(abs(sum(c.isco) - 1) < 0.02 for c in cs.values())
+
+
+def test_headcounts_are_plausible():
+    from oracle.population.headcount import occupation_headcount as h
+    assert 1e6 < h("USA", "software_engineer") < 4e6
+    assert 1e4 < h("USA", "founder_b2b_saas") < 2e5
+    assert h("IND", "it_services_analyst") > h("USA", "it_services_analyst")
+    assert h("IND", "farmer") > 5e7
+
+
+def test_mentions_avoid_false_friends():
+    assert find_mentions("Can you help us decide on pricing?") == []
+    assert find_mentions("Launch in the US and South Africa") == ["USA", "ZAF"]
+    assert "PER" in find_mentions("Selling to farmers in Peru and Bolivia")
 
 
 def test_population_is_seeded():

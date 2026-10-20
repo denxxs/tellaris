@@ -256,7 +256,7 @@ class Runner:
                     await self.log(f"Reusing the same {len(people)} people as the original run, so the comparison is fair")
                     return people
 
-        builder = PopulationBuilder(spec, influencers, seed=self.cfg.seed)
+        builder = PopulationBuilder(spec, influencers, seed=self.cfg.seed, weighting=self.cfg.weighting)
         people = builder.build(self.cfg.agents, self.cfg.influencer_voices)
         await self.log(f"Sampled {len(people)} people across {len(spec.targets)} countries and {len(spec.segments)} segments")
         enriched = 0

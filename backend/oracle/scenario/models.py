@@ -125,6 +125,10 @@ class RunConfig(BaseModel):
     influence_threshold: float = Field(default=0.25, ge=0, le=1)
     seed: int | None = None
     temperature: float = Field(default=0.9, ge=0, le=1.5)
+    weighting: Literal["population", "equal"] = Field(
+        default="population",
+        description="population: each person counts for the real headcount they stand for; equal: every group counts the same",
+    )
 
 
 class RunRequest(BaseModel):

@@ -27,7 +27,7 @@ class InfluenceEdge(BaseModel):
     strength: float
     sectors: list[str]
     note: str
-    origin: str = "map"  # map | scenario
+    origin: str = "map"  # map | rule | scenario
 
 
 class Influencer(BaseModel):
@@ -44,7 +44,16 @@ class Influencer(BaseModel):
 
 @lru_cache
 def base_edges() -> list[InfluenceEdge]:
-    return [InfluenceEdge.model_validate(e) for e in load_json("influence.json")["edges"]]
+    """Hand-written edges, plus rule-generated edges for every country.
+    A hand edge wins over a rule edge with the same source, target and channel."""
+    from .rules import generated_edges
+
+    hand = [InfluenceEdge.model_validate(e) for e in load_json("influence.json")["edges"]]
+    known = {(e.source, e.target, e.channel) for e in hand}
+    cs = countries()
+    valid = set(cs) | set(blocs())
+    rules = [InfluenceEdge.model_validate(e) for e in generated_edges() if (e["source"], e["target"], e["channel"]) not in known]
+    return [e for e in hand + rules if e.source in valid and e.target in valid]
 
 
 @lru_cache
@@ -138,11 +147,23 @@ def expand(
     return result
 
 
+def anchor(code: str) -> list[float] | None:
+    """Where to draw a country or bloc on a map: the capital, or the centre of a bloc's capitals."""
+    cs = countries()
+    if code in cs:
+        return cs[code].anchor
+    if code in blocs():
+        pts = [cs[m].anchor for m in blocs()[code].members if m in cs and cs[m].anchor]
+        if pts:
+            return [round(sum(p[0] for p in pts) / len(pts), 2), round(sum(p[1] for p in pts) / len(pts), 2)]
+    return None
+
+
 def graph_payload(targets: list[str], influencers: list[Influencer]) -> dict[str, Any]:
     """Nodes and links for the frontend map."""
     nodes = []
     for t in targets:
-        nodes.append({"id": t, "name": node_name(t), "role": "target"})
+        nodes.append({"id": t, "name": node_name(t), "role": "target", "anchor": anchor(t)})
     for i in influencers:
         nodes.append(
             {
@@ -153,6 +174,7 @@ def graph_payload(targets: list[str], influencers: list[Influencer]) -> dict[str
                 "strength": i.total_strength,
                 "order": i.order,
                 "members": blocs()[i.code].members if i.code in blocs() else [],
+                "anchor": anchor(i.code),
             }
         )
     links = []

@@ -47,6 +47,7 @@ class Persona(BaseModel):
     exposures: list[Exposure] = Field(default_factory=list)
     is_buyer: bool = True
     weight: float = 1.0
+    represents: float = 0.0  # real people this agent stands for (estimate)
     influencer_voice: str | None = None  # bloc/country code if sampled as an outside voice
 
     # Filled in by enrichment

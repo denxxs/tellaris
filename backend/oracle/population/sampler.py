@@ -16,6 +16,7 @@ import numpy as np
 from ..scenario.models import Force, ScenarioSpec, Segment
 from ..world.countries import Country, Occupation, blocs, company_types, countries, occupations
 from ..world.influence import Influencer
+from .headcount import segment_headcount
 from .models import Exposure, Persona, Traits
 
 SENIORITY = ["junior", "mid", "senior", "executive"]
@@ -72,8 +73,9 @@ def _allocate(total: int, weights: dict[str, float]) -> dict[str, int]:
 
 
 class PopulationBuilder:
-    def __init__(self, spec: ScenarioSpec, influencers: list[Influencer], seed: int | None = None):
+    def __init__(self, spec: ScenarioSpec, influencers: list[Influencer], seed: int | None = None, weighting: str = "population"):
         self.spec = spec
+        self.weighting = weighting
         self.influencers = influencers
         self.rng = np.random.default_rng(seed)
         self.occ = occupations()
@@ -305,15 +307,31 @@ class PopulationBuilder:
                     counter += 1
                     people.append(self._person(f"p{counter:05d}", iso, seg, int(si)))
 
-        # Representation weights: country share x segment share within that country,
-        # spread across the agents in each cell. Sums to 1.
+        # How many real people each agent stands for: the cell's estimated headcount
+        # split across the agents sampled into it.
         cells = Counter((p.country, p.segment_index) for p in people)
-        cw_total = sum(country_w.values()) or 1
+        heads = {
+            key: segment_headcount(key[0], segs[key[1]].occupations, custom=bool(segs[key[1]].custom_occupation))
+            for key in cells
+        }
         for p in people:
-            cw = country_w[p.country] / cw_total
-            local = segs_in(p.country)
-            sw = segs[p.segment_index].weight / (sum(local.values()) or 1)
-            p.weight = round(cw * sw / cells[(p.country, p.segment_index)], 8)
+            p.represents = round(heads[(p.country, p.segment_index)] / cells[(p.country, p.segment_index)], 1)
+
+        if self.weighting == "population":
+            # Weight = real people represented, normalised within buyers and within everyone else.
+            for group in (True, False):
+                members = [p for p in people if p.is_buyer == group]
+                total = sum(p.represents for p in members) or 1
+                for p in members:
+                    p.weight = round(p.represents / total, 10)
+        else:
+            # Equal: country share x segment share within that country. Sums to 1.
+            cw_total = sum(country_w.values()) or 1
+            for p in people:
+                cw = country_w[p.country] / cw_total
+                local = segs_in(p.country)
+                sw = segs[p.segment_index].weight / (sum(local.values()) or 1)
+                p.weight = round(cw * sw / cells[(p.country, p.segment_index)], 8)
 
         people.extend(self._voices(influencer_voices, segs, counter))
         return people

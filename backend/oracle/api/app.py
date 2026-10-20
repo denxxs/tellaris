@@ -27,7 +27,7 @@ from ..scenario.models import RunConfig, RunRequest, ScenarioSpec
 from ..simulate.calibrate import DEFAULT_PARAMS
 from ..store import store
 from ..world.countries import blocs, company_types, countries, occupations
-from ..world.influence import InfluenceEdge, channels, expand, graph_payload
+from ..world.influence import InfluenceEdge, anchor, channels, expand, graph_payload
 
 log = logging.getLogger("oracle.api")
 
@@ -79,10 +79,14 @@ async def meta() -> dict[str, Any]:
         "version": __version__,
         "mock": _uses_mock(),
         "countries": [
-            {"iso3": c.iso3, "name": c.name, "region": c.region, "blocs": c.blocs, "population_m": c.population_m, "gdp_pc_usd": c.gdp_pc_usd}
+            {
+                "iso3": c.iso3, "iso_num": c.iso_num, "name": c.name, "region": c.region, "income": c.income, "blocs": c.blocs,
+                "population_m": c.population_m, "workforce_m": c.workforce_m, "gdp_pc_usd": c.gdp_pc_usd, "anchor": c.anchor,
+                "internet_pct": c.internet_pct, "isco_source": c.isco_source,
+            }
             for c in countries().values()
         ],
-        "blocs": [b.model_dump() for b in blocs().values()],
+        "blocs": [{**b.model_dump(), "anchor": anchor(b.id)} for b in blocs().values()],
         "occupations": [{"id": o.id, "title": o.title, "isco": o.isco, "buyer_role": o.buyer_role} for o in occupations().values()],
         "company_types": company_types(),
         "sectors": SECTORS,

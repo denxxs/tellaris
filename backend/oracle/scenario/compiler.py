@@ -35,7 +35,7 @@ Rules:
 def _catalogue() -> str:
     occ = "\n".join(f"- {o.id}: {o.title}" for o in occupations().values())
     ctypes = ", ".join(company_types().keys())
-    ctry = ", ".join(f"{c.iso3} ({c.name})" for c in countries().values())
+    ctry = "; ".join(f"{c.iso3} {c.name}" for c in countries().values())
     bl = ", ".join(f"{b.id} ({b.name})" for b in blocs().values())
     return (
         f"Occupation catalogue:\n{occ}\n\nCompany types: {ctypes}\n\n"

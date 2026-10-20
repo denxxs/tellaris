@@ -86,8 +86,11 @@ class Aggregator:
             vals = m[idx, pick]
             boots[b] = _wmean(apply_array(vals, self.cal), w[idx]) * self.reach
         lo, hi = np.nanpercentile(boots, [5, 95])
+        heads = float(sum(p.represents for p in people))
         return {
             "n": n,
+            "people": round(heads),
+            "adopters": round(point * heads),
             "stated": round(_wmean(stated, w), 4),
             "calibrated": round(_wmean(cal, w), 4),
             "value": round(point, 4),

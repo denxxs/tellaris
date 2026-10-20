@@ -1,4 +1,4 @@
-"""Country, bloc and occupation reference data."""
+"""Country, bloc and occupation reference data (every country, from World Bank + ILO)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import unicodedata
 from functools import lru_cache
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..config import load_json
 
@@ -26,19 +26,27 @@ ISCO_GROUPS = [
 
 class Country(BaseModel):
     iso3: str
+    iso_num: str | None = None
     name: str
     aliases: list[str]
     region: str
+    income: str = ""
+    capital: str = ""
+    anchor: list[float] | None = None
     blocs: list[str]
-    currency: str
-    languages: list[str]
+    currency: str = ""
+    languages: list[str] = Field(default_factory=list)
     population_m: float
     workforce_m: float
     gdp_pc_usd: float
     internet_pct: float
     english: float
     median_age: float
+    pop65: float | None = None
+    pop014: float | None = None
+    sector_shares: list[float | None] = Field(default_factory=list)
     isco: list[float]
+    isco_source: str = ""
     digital: float
     regulation: float
     saas: float
@@ -46,13 +54,18 @@ class Country(BaseModel):
     price_sensitivity: float
     tech_trust: float
     names: dict[str, list[str]]
+    curated: bool = False
 
     def isco_shares(self) -> dict[int, float]:
         total = sum(self.isco) or 1.0
         return {i + 1: v / total for i, v in enumerate(self.isco)}
 
+    @property
+    def adults_m(self) -> float:
+        return self.population_m * (1 - (self.pop014 if self.pop014 is not None else 0.25))
+
     def summary(self) -> dict[str, Any]:
-        return self.model_dump(exclude={"names", "aliases", "isco"})
+        return self.model_dump(exclude={"names", "aliases"})
 
 
 class Bloc(BaseModel):
@@ -72,6 +85,8 @@ class Occupation(BaseModel):
     income_mult: float
     tech: float
     buyer_role: str
+    base_share: float | None = None
+    adult_share: float | None = None
 
 
 def _norm(text: str) -> str:
@@ -80,15 +95,18 @@ def _norm(text: str) -> str:
 
 
 @lru_cache
+def _world() -> dict[str, Any]:
+    return load_json("countries.json")
+
+
+@lru_cache
 def countries() -> dict[str, Country]:
-    data = load_json("countries.json")
-    return {c["iso3"]: Country.model_validate(c) for c in data["countries"]}
+    return {c["iso3"]: Country.model_validate(c) for c in _world()["countries"]}
 
 
 @lru_cache
 def blocs() -> dict[str, Bloc]:
-    data = load_json("countries.json")
-    return {b["id"]: Bloc.model_validate(b) for b in data["blocs"]}
+    return {b["id"]: Bloc.model_validate(b) for b in _world()["blocs"]}
 
 
 @lru_cache
@@ -98,8 +116,19 @@ def occupations() -> dict[str, Occupation]:
 
 
 @lru_cache
+def occupation_meta() -> dict[str, Any]:
+    d = load_json("occupations.json")
+    return {"reference_isco": d["_meta"]["reference_isco"], "it_services_hubs": d.get("it_services_hubs", {})}
+
+
+@lru_cache
 def company_types() -> dict[str, dict[str, Any]]:
     return load_json("occupations.json")["company_types"]
+
+
+# Words that are also country aliases but usually mean something else in a sentence.
+_AMBIGUOUS = {"us", "chad", "jordan", "georgia", "turkey", "niger", "guinea", "india ink", "china", "japan"}
+_CASE_SENSITIVE_CODES = {"US": "USA", "UK": "GBR", "EU": "EU", "UAE": "ARE", "USA": "USA", "KSA": "SAU", "DRC": "COD"}
 
 
 @lru_cache
@@ -109,12 +138,13 @@ def _alias_index() -> dict[str, str]:
         index[_norm(iso)] = iso
         index[_norm(c.name)] = iso
         for a in c.aliases:
-            index[_norm(a)] = iso
+            n = _norm(a)
+            if n:
+                index.setdefault(n, iso)
     for bid, b in blocs().items():
         index[_norm(bid)] = bid
         index[_norm(b.name)] = bid
-    index["europe"] = "EU"
-    index["european union"] = "EU"
+    index.update({"europe": "EU", "european union": "EU", "the eu": "EU", "gulf": "GCC", "the gulf": "GCC", "southeast asia": "ASEAN"})
     return index
 
 
@@ -122,33 +152,55 @@ def resolve(name: str) -> str | None:
     """Map a country/bloc name, alias or code to its ISO3 / bloc id."""
     if not name:
         return None
-    key = _norm(name)
+    raw = name.strip()
+    if raw.upper() in countries() or raw.upper() in blocs():
+        return raw.upper()
+    key = _norm(raw)
     idx = _alias_index()
     if key in idx:
         return idx[key]
+    if raw.upper() in _CASE_SENSITIVE_CODES:
+        return _CASE_SENSITIVE_CODES[raw.upper()]
     if len(key) == 2:
-        two = {
-            "us": "USA", "uk": "GBR", "gb": "GBR", "in": "IND", "de": "DEU", "fr": "FRA", "cn": "CHN",
-            "jp": "JPN", "br": "BRA", "ca": "CAN", "au": "AUS", "sg": "SGP", "ae": "ARE", "mx": "MEX",
-            "es": "ESP", "it": "ITA", "nl": "NLD", "se": "SWE", "pl": "POL", "ch": "CHE", "kr": "KOR",
-            "id": "IDN", "vn": "VNM", "ph": "PHL", "za": "ZAF", "ng": "NGA", "ke": "KEN", "eg": "EGY",
-            "sa": "SAU", "il": "ISR", "tr": "TUR", "ru": "RUS", "ie": "IRL", "no": "NOR", "ar": "ARG",
-            "cl": "CHL", "co": "COL", "my": "MYS", "pk": "PAK", "bd": "BGD", "eu": "EU",
-        }
-        return two.get(key)
+        import pycountry
+
+        try:
+            c = pycountry.countries.get(alpha_2=key.upper())
+            if c and c.alpha_3 in countries():
+                return c.alpha_3
+        except (KeyError, LookupError):
+            pass
     return None
 
 
 def find_mentions(text: str) -> list[str]:
-    """Countries and blocs mentioned in free text, in order of appearance."""
+    """Countries and blocs mentioned in free text, in order of appearance.
+
+    Longest names match first and claim their words, so "South Africa" never also
+    counts as "Africa", and short codes only count in capitals ("US", not "us")."""
     norm = f" {_norm(text)} "
+    taken = [False] * len(norm)
     hits: list[tuple[int, str]] = []
-    for alias, code in _alias_index().items():
-        if len(alias) < 3 and alias not in {"us", "uk", "eu"}:
+    for alias, code in sorted(_alias_index().items(), key=lambda kv: -len(kv[0])):
+        if len(alias) < 4 or alias in _AMBIGUOUS:
             continue
-        pos = norm.find(f" {alias} ")
-        if pos >= 0:
-            hits.append((pos, code))
+        start = 0
+        needle = f" {alias} "
+        while (pos := norm.find(needle, start)) >= 0:
+            span = range(pos + 1, pos + 1 + len(alias))
+            if not any(taken[i] for i in span):
+                for i in span:
+                    taken[i] = True
+                hits.append((pos, code))
+            start = pos + 1
+    # Short codes and ambiguous names only when written as a proper noun.
+    for m in re.finditer(r"\b(US|USA|UK|EU|UAE|KSA|DRC)\b", text):
+        hits.append((int(m.start() * len(norm) / max(len(text), 1)), _CASE_SENSITIVE_CODES[m.group(1)]))
+    for word in ("China", "Japan", "Jordan", "Chad", "Georgia", "Niger", "Guinea", "Turkey"):
+        for m in re.finditer(rf"\b{word}\b", text):
+            code = _alias_index().get(_norm(word))
+            if code:
+                hits.append((int(m.start() * len(norm) / max(len(text), 1)), code))
     seen: list[str] = []
     for _, code in sorted(hits):
         if code not in seen:
