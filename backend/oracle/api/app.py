@@ -101,7 +101,7 @@ async def meta() -> dict[str, Any]:
         "sectors": SECTORS,
         "channels": channels(),
         "stages": [{"id": s[0], "label": s[1]} for s in STAGES],
-        "lenses": [{"id": x.id, "label": x.label, "description": x.description} for x in LENSES.values()],
+        "lenses": [{"id": x.id, "label": x.label, "description": x.description, "reach": x.reach} for x in LENSES.values()],
         "global": {d: global_sample(d) for d in ("quick", "deep")},
         "model_examples": MODEL_EXAMPLES,
         "defaults": RunConfig().model_dump(),

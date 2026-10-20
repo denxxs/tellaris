@@ -84,8 +84,7 @@ export type Timeline = {
   periods: { round: number; start_month: number; end_month: number; label: string }[];
   events: TimelineEventOut[];
   opinion: { round: number; value: number }[];
-  adoption: { month: number; adoption: number }[];
-  base: { opinion: { round: number; value: number }[]; adoption: { month: number; adoption: number }[] } | null;
+  base: { opinion: { round: number; value: number }[] } | null;
 };
 
 export type Spec = {
@@ -112,7 +111,7 @@ export type Spec = {
   forces: Force[];
   price: { amount: number; currency: string; period: string } | null;
   competitors: string[];
-  assumed_reach: number;
+  assumed_reach: number | null;
   research_queries: string[];
   events?: WhatIfEvent[];
   key_uncertainties: string[];
@@ -162,7 +161,7 @@ export type World = { nodes: WorldNode[]; links: WorldLink[]; channels: Record<s
 export type Summary = {
   n: number;
   people?: number;
-  adopters?: number;
+  adopters?: number | null;
   stated: number;
   calibrated: number;
   value: number;
@@ -205,11 +204,14 @@ export type Results = {
     label: string;
     reach: number;
     if_aware: number;
+    awareness?: number | null;
+    per_point_adopters?: number | null;
+    with_awareness?: { value: number; ci: [number, number] } | null;
     kind: "action" | "belief";
     calibration: { kind: string; a: number; b: number; source: string; n_cases: number };
     samples: number;
     agents_total: number;
-    revenue?: { customers: number; monthly: number; monthly_ci: [number, number]; currency: string; note: string } | null;
+    revenue?: { customers: number | null; monthly: number | null; monthly_ci: [number, number] | null; per_point_monthly: number | null; currency: string; note: string } | null;
     lens?: LensId;
     lens_label?: string;
     leading?: { option: string; share: number; ci: [number, number] } | null;
@@ -267,7 +269,6 @@ export type Results = {
     social_pull: number;
     reflection?: ReflectionSummary;
     feed?: FeedReach;
-    bass: { m: number; p: number; q: number; curve: { month: number; adoption: number }[] };
     network: { nodes: { id: string; country: string; p: number; name: string }[]; links: { source: string; target: string }[] };
   };
   themes?: { objections: Theme[]; reasons: Theme[]; change_mind: Theme[] };
@@ -544,7 +545,7 @@ export type Meta = {
   sectors: string[];
   channels: Record<string, string>;
   stages: { id: string; label: string }[];
-  lenses: { id: LensId; label: string; description: string }[];
+  lenses: { id: LensId; label: string; description: string; reach?: boolean }[];
   global: { quick: string[]; deep: string[] };
   model_examples: Record<string, string[]>;
   defaults: RunConfig;
@@ -552,7 +553,7 @@ export type Meta = {
 
 export type StreamEvent = { seq: number; ts: number; type: string; data: unknown };
 
-export type SocietyPoint = { feed: FeedStyle; after_talk: number; outside_share: number | null; adoption_end: number | null };
+export type SocietyPoint = { feed: FeedStyle; after_talk: number; outside_share: number | null };
 
 export type FeedStyle = "word_of_mouth" | "ranked" | "viral";
 

@@ -398,13 +398,13 @@ export function CommitteesTab({ id, r }: { id: string; r: Results }) {
 
 /* ---------------------------------------------------------------- Word of mouth */
 
-export function SpreadTab({ r, horizon }: { r: Results; horizon: number }) {
+export function SpreadTab({ r }: { r: Results }) {
   const d = r.diffusion!;
   const { countryName } = useMeta();
   const countries = Object.keys(d.rounds[0]?.by_country ?? {});
   return (
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-6">
-      <Card className="lg:col-span-3">
+      <Card className="lg:col-span-6">
         <CardHead title="Views as people talk">
           {d.agents} people connected by {int(d.edges)} ties over {d.rounds.length - 1} rounds. Social effect: <span className={cx("num", d.social_pull >= 0 ? "text-positive" : "text-negative")}>{signedPts(d.social_pull)}</span>.
         </CardHead>
@@ -417,13 +417,6 @@ export function SpreadTab({ r, horizon }: { r: Results; horizon: number }) {
           ]}
         />
         {d.rounds.some((x) => x.news) && <p className="mt-3 text-[13px] text-muted">News that landed: {d.rounds.filter((x) => x.news).map((x) => `round ${x.round}, ${x.news}`).join("; ")}.</p>}
-      </Card>
-      <Card className="lg:col-span-3">
-        <CardHead title="Adoption over time">
-          Projected with a Bass model fitted to the simulation: {pctSmart(d.bass.p)} start on their own each month, social pull {d.bass.q.toFixed(2)}.
-        </CardHead>
-        <LineChart xLabel="month" xFormat={(x) => `Month ${x}`} series={[{ id: "bass", label: "Cumulative adoption", color: "var(--yes)", points: d.bass.curve.map((c) => ({ x: c.month, y: c.adoption })) }]} />
-        <p className="mt-2 text-[12px] text-faint">A projection over {horizon} months, not an observation.</p>
       </Card>
       {d.examples.length > 0 && (
         <Card className="lg:col-span-6">
@@ -463,12 +456,17 @@ export function MethodTab({ live }: { live: LiveState }) {
         <CardHead title="How the number is made" />
         <ol className="flex list-decimal flex-col gap-2 pl-5 text-[14px] leading-5 text-muted">
           <li>
-            {int(r.headline.agents_total)} simulated people gave {int(r.headline.samples)} answers in their own words, on the Juster probability scale, which predicts real behaviour better than yes or no questions.
+            {int(r.headline.agents_total)} simulated people gave {int(r.headline.samples)} answers in their own words, on the Juster probability scale, which predicts real behaviour better than yes or no questions. Each answer is read through Juster&apos;s published probabilities, with no other weighting.
           </li>
           <li>
             Stated intentions are corrected for the gap between saying and doing (factor {cal.a}, shift {cal.b}; {cal.source === "backtest" ? `learned from ${cal.n_cases} past cases` : "defaults until you run the Accuracy checks"}).
           </li>
-          {r.headline.kind === "action" && <li>The result is multiplied by awareness: {pctSmart(r.headline.reach)} of the audience hears about it in the time frame.</li>}
+          {r.headline.kind === "action" &&
+            (r.headline.awareness != null ? (
+              <li>The answer is for people who hear about it. You set awareness at {pctSmart(r.headline.awareness)}, which gives the totals for the whole audience.</li>
+            ) : (
+              <li>The answer is for people who hear about it. Oracle doesn&apos;t guess how many will; totals are given per 1% of the audience who hears, and you can set your own awareness in the setup.</li>
+            ))}
           <li>Each person counts for the number of real people they stand for, estimated from World Bank and ILO data for their country and job.</li>
           <li>The range comes from resampling people and model answers 1,000 times.</li>
         </ol>

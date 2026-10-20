@@ -75,20 +75,32 @@ function AnswerStrip({ live, running }: { live: LiveState; running: boolean }) {
           { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
         ]
       : [
-    {
-      label: h ? h.kind === "action" ? "Among those who hear about it" : "Before correction" : "Leaning yes so far",
-      value: h ? pctSmart(h.kind === "action" ? h.if_aware : h.stated) : raw == null ? "–" : pctSmart(raw),
-      sub: h ? (h.kind === "action" ? `${pctSmart(h.reach)} expected to hear about it` : "What people said") : "Raw, before any correction",
-    },
+    h?.with_awareness && h.awareness != null
+      ? { label: "Whole audience", value: pctSmart(h.with_awareness.value), sub: `If ${pctSmart(h.awareness)} hear about it, your estimate` }
+      : {
+          label: h ? "Before correction" : "Leaning yes so far",
+          value: h ? pctSmart(h.stated) : raw == null ? "–" : pctSmart(raw),
+          sub: h ? "What people said, before the say/do correction" : "Raw, before any correction",
+        },
     { label: "People represented", value: h?.people ? people(h.people) : "–", sub: h?.people ? "Estimated real headcount" : "Known when people are built" },
-    {
-      label: h?.kind === "belief" ? (first.toLowerCase() === "yes" ? "Expected to say yes" : `Expected to say “${first}”`) : "Expected to say yes",
-      value: h?.adopters != null ? people(h.adopters) : "–",
-      sub: h?.adopters != null ? "Answer × people represented" : "Known at the end",
-    },
-    h?.revenue
-      ? { label: "Implied monthly revenue", value: money(h.revenue.monthly, h.revenue.currency), sub: `${money(h.revenue.monthly_ci[0], h.revenue.currency)} to ${money(h.revenue.monthly_ci[1], h.revenue.currency)} at list price` }
-      : { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
+    h?.adopters != null
+      ? {
+          label: h.kind === "belief" ? (first.toLowerCase() === "yes" ? "Expected to say yes" : `Expected to say “${first}”`) : "Expected customers",
+          value: people(h.adopters),
+          sub: h.awareness != null ? `If ${pctSmart(h.awareness)} hear about it` : "Answer × people represented",
+        }
+      : h?.per_point_adopters != null
+        ? { label: "Per 1% who hear about it", value: people(h.per_point_adopters), sub: "people would do it" }
+        : { label: "Expected to say yes", value: "–", sub: "Known at the end" },
+    h?.revenue && h.revenue.monthly != null
+      ? {
+          label: "Implied monthly revenue",
+          value: money(h.revenue.monthly, h.revenue.currency),
+          sub: h.revenue.monthly_ci ? `${money(h.revenue.monthly_ci[0], h.revenue.currency)} to ${money(h.revenue.monthly_ci[1], h.revenue.currency)} at list price` : "At list price",
+        }
+      : h?.revenue && h.revenue.per_point_monthly != null
+        ? { label: "Revenue per 1% who hear", value: money(h.revenue.per_point_monthly, h.revenue.currency), sub: "a month, at list price" }
+        : { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
   ];
 
   return (
@@ -133,7 +145,7 @@ function AnswerStrip({ live, running }: { live: LiveState; running: boolean }) {
               Likely between <span className="num text-text">{pctSmart(h.ci[0])}</span> and <span className="num text-text">{pctSmart(h.ci[1])}</span>
             </div>
             <div className="mt-2">
-              <RangeTrack value={h.value} ci={h.ci} aware={h.kind === "action" ? h.if_aware : undefined} />
+              <RangeTrack value={h.value} ci={h.ci} />
             </div>
           </>
         ) : (

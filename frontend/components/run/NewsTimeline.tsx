@@ -79,9 +79,7 @@ function TimelineChart({ t, sel, onSel }: { t: Timeline; sel: string | null; onS
   const end = (r: number) => (r === 0 ? 0 : t.periods.find((p) => p.round === r)?.end_month ?? 0);
   const opinion = t.opinion.map((o) => ({ m: end(o.round), v: o.value }));
   const base = t.base?.opinion.map((o) => ({ m: end(o.round), v: o.value })) ?? [];
-  const adoption = t.adoption.map((a) => ({ m: a.month, v: a.adoption }));
-  const baseAdoption = t.base?.adoption.map((a) => ({ m: a.month, v: a.adoption })) ?? [];
-  const maxV = Math.max(0.1, ...opinion.map((p) => p.v), ...base.map((p) => p.v), ...adoption.map((p) => p.v), ...baseAdoption.map((p) => p.v));
+  const maxV = Math.max(0.1, ...opinion.map((p) => p.v), ...base.map((p) => p.v));
   const top = Math.min(1, Math.ceil((maxV * 1.15) / 0.05) * 0.05);
   const x = (m: number) => pad.l + (m / horizon) * iw;
   const y = (v: number) => pad.t + ih - (v / top) * ih;
@@ -101,9 +99,7 @@ function TimelineChart({ t, sel, onSel }: { t: Timeline; sel: string | null; onS
   };
   const hv = hover && {
     op: at(opinion, hover.m),
-    ad: at(adoption, hover.m),
     bop: at(base, hover.m),
-    bad: at(baseAdoption, hover.m),
   };
 
   return (
@@ -113,7 +109,7 @@ function TimelineChart({ t, sel, onSel }: { t: Timeline; sel: string | null; onS
         height={H}
         className="block w-full touch-pan-y"
         role="img"
-        aria-label="Opinion and adoption over the time frame, with events marked"
+        aria-label="Share leaning yes over the time frame, with events marked"
         onPointerMove={(ev) => {
           const r = (ev.currentTarget as SVGSVGElement).getBoundingClientRect();
           const px = ev.clientX - r.left;
@@ -140,9 +136,7 @@ function TimelineChart({ t, sel, onSel }: { t: Timeline; sel: string | null; onS
             <line x1={x(e.at_month)} x2={x(e.at_month)} y1={pad.t - 14} y2={pad.t + ih} stroke="var(--flow)" strokeOpacity={sel === e.id ? 0.9 : 0.35} strokeDasharray={e.kind === "assumed" ? "3 3" : undefined} />
           </g>
         ))}
-        {baseAdoption.length > 1 && <path d={path(baseAdoption)} fill="none" stroke="var(--text)" strokeOpacity={0.45} strokeWidth={1.5} strokeDasharray="4 4" />}
         {base.length > 1 && <path d={path(base)} fill="none" stroke="var(--yes)" strokeOpacity={0.6} strokeWidth={1.5} strokeDasharray="4 4" />}
-        {adoption.length > 1 && <path d={path(adoption)} fill="none" stroke="var(--text)" strokeOpacity={0.8} strokeWidth={2} />}
         {opinion.length > 1 && (
           <>
             <path d={path(opinion)} fill="none" stroke="var(--yes)" strokeWidth={2} />
@@ -186,16 +180,7 @@ function TimelineChart({ t, sel, onSel }: { t: Timeline; sel: string | null; onS
               </span>
             </div>
           )}
-          {hv.ad && (
-            <div className="flex justify-between gap-3">
-              <span className="text-muted">Adopted</span>
-              <span className="num">
-                {pctSmart(hv.ad.v)}
-                {hv.bad && <span className="text-faint"> / {pctSmart(hv.bad.v)}</span>}
-              </span>
-            </div>
-          )}
-          {(hv.bop || hv.bad) && <div className="mt-1 text-faint">Second figure: without your what-ifs</div>}
+          {hv.bop && <div className="mt-1 text-faint">Second figure: without your what-ifs</div>}
         </div>
       )}
     </div>
@@ -211,8 +196,7 @@ function Legend({ base, assumed, scheduled }: { base: boolean; assumed: boolean;
   return (
     <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
       <span className="inline-flex items-center gap-1.5">{line("var(--yes)")} Leaning yes</span>
-      <span className="inline-flex items-center gap-1.5">{line("var(--text)", false, 0.8)} Adopted (projection)</span>
-      {base && <span className="inline-flex items-center gap-1.5">{line("var(--text)", true, 0.5)} Without your what-ifs</span>}
+      {base && <span className="inline-flex items-center gap-1.5">{line("var(--yes)", true, 0.6)} Without your what-ifs</span>}
       {scheduled && (
         <span className="inline-flex items-center gap-1.5">
           <EventMark e={{ kind: "scheduled" }} /> Real, scheduled

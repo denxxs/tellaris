@@ -68,10 +68,10 @@ function Post({ it, replies, onSelect }: { it: FeedItem; replies: FeedItem[]; on
       {it.from_p != null && it.to_p != null && <Shift from={it.from_p} to={it.to_p} why={it.why} />}
       <footer className="mt-2 flex gap-4 text-[12px] text-muted">
         <span>
-          <span className="num text-text">{it.agrees}</span> of their contacts agree
+          <span className="num text-text">{it.agrees}</span> agreed
         </span>
         <span>
-          <span className="num text-text">{it.disagrees}</span> disagree
+          <span className="num text-text">{it.disagrees}</span> disagreed
         </span>
         {replies.length > 0 && (
           <span>
@@ -409,18 +409,6 @@ export function SocietyTab({ id, live, r, onSelect }: { id: string; live: LiveSt
           </Card>
         )}
         {d?.reflection && d.reflection.people > 0 && <ReflectionCard rf={d.reflection} onSelect={onSelect} />}
-        {d && d.bass.curve.length > 0 && (
-          <Card>
-            <CardHead title="Adoption over time">A Bass projection fitted to the conversation: how adoption builds month by month.</CardHead>
-            <LineChart
-              height={180}
-              xLabel="month"
-              xFormat={(x) => `M${x}`}
-              series={[{ id: "bass", label: "Cumulative adoption", color: "var(--yes)", points: d.bass.curve.map((c) => ({ x: c.month, y: c.adoption })) }]}
-            />
-            <p className="mt-1 text-[12px] text-faint">A projection, not an observation.</p>
-          </Card>
-        )}
         {soc && soc.top_voices.length > 0 && (
           <Card>
             <CardHead title="Loudest voices">Who posted most and drew the most agreement.</CardHead>

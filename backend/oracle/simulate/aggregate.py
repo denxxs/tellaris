@@ -49,7 +49,12 @@ class Aggregator:
         self.focus = buyers or self.core
         self.lens = lens_of(spec)
         self.action = self.lens.say_do
-        self.reach = spec.assumed_reach if self.lens.reach else 1.0
+        # The headline is what people answered. Awareness (how many will even hear of it) is only
+        # applied when the user gave it; Oracle never guesses it.
+        self.reach = 1.0
+        self.awareness = spec.assumed_reach if self.lens.reach and spec.assumed_reach is not None else None
+        # Turns a share into people: everyone for opinion questions, the aware for adoption questions.
+        self.aw = 1.0 if not self.lens.reach else self.awareness
         self.max_runs = max((len(v) for v in self.by_person.values()), default=1)
 
     # ---------- per-person numbers ----------
@@ -95,7 +100,7 @@ class Aggregator:
         return {
             "n": n,
             "people": round(heads),
-            "adopters": round(point * heads),
+            "adopters": round(point * heads * self.aw) if self.aw is not None else None,
             "stated": round(_wmean(stated, w), 4),
             "calibrated": round(_wmean(cal, w), 4),
             "value": round(point, 4),
@@ -437,22 +442,27 @@ class Aggregator:
         first = self.spec.outcomes[0].strip().lower()
         verb = "say yes" if first in ("yes", "y", "true", "agree") else first
         label = (
-            f"Realistic share who {verb} within {self.spec.horizon_months} months"
+            f"Share who would {verb} once they hear about it"
             if self.action and self.spec.outcome_type != "numeric"
             else f"Probability: {self.spec.outcomes[0]}"
         )
+        heads = float(head.get("people") or 0)
+        # Without a given awareness, scale is stated per 1% of the audience who hears about it.
+        per_point = round(head["value"] * heads / 100) if self.lens.reach and head.get("value") is not None else None
         revenue = None
         price = self.spec.price
-        if price and self.lens.revenue and head.get("adopters") is not None:
+        if price and self.lens.revenue and head.get("value") is not None:
             per_month = {"month": 1.0, "per-seat-month": 1.0, "year": 1 / 12, "usage": 1.0}.get(price.period)
             if per_month is not None:
-                customers = head["adopters"]
+                unit = price.amount * per_month
+                aw = self.aw
                 revenue = {
-                    "customers": customers,
-                    "monthly": round(customers * price.amount * per_month, 2),
-                    "monthly_ci": [round(x * head.get("people", 0) * price.amount * per_month, 2) for x in head["ci"]],
+                    "customers": head.get("adopters"),
+                    "monthly": round(head["adopters"] * unit, 2) if head.get("adopters") is not None else None,
+                    "monthly_ci": [round(x * heads * aw * unit, 2) for x in head["ci"]] if aw is not None else None,
+                    "per_point_monthly": round(head["value"] * heads / 100 * unit, 2) if self.lens.reach else None,
                     "currency": price.currency,
-                    "note": "Adopters times the list price, one seat each, at full ramp by the end of the time frame.",
+                    "note": "Customers times the list price, one seat each.",
                 }
         leading = None
         dist = self.outcome_distribution()
@@ -474,6 +484,12 @@ class Aggregator:
                 "label": label,
                 "reach": self.reach,
                 "if_aware": head.get("calibrated"),
+                "awareness": self.awareness,
+                "per_point_adopters": per_point,
+                "with_awareness": (
+                    {"value": round(head["value"] * self.awareness, 4), "ci": [round(x * self.awareness, 4) for x in head["ci"]]}
+                    if self.awareness is not None and head.get("value") is not None else None
+                ),
                 "kind": "action" if self.action else "belief",
                 "lens": self.lens.id,
                 "lens_label": self.lens.label,

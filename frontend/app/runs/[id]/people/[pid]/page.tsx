@@ -53,7 +53,7 @@ function SaidItem({ it, parent }: { it: FeedItem; parent?: FeedItem }) {
       )}
       <p className={cx("text-[15px] leading-[22px]", parent && "border-l-2 border-border pl-3")}>{it.text}</p>
       <div className="mt-1 text-[12px] text-faint">
-        {it.kind === "reply" ? "Replied" : "Posted"} {it.round === 0 ? "in their first reaction" : `in round ${it.round}`}. {it.agrees} of their contacts agreed, {it.disagrees} disagreed
+        {it.kind === "reply" ? "Replied" : "Posted"} {it.round === 0 ? "in their first reaction" : `in round ${it.round}`}. {it.agrees} people who saw it agreed, {it.disagrees} disagreed
         {it.from_p != null && it.to_p != null && (
           <>
             . Moved from {pctSmart(it.from_p)} to <span className={stanceText(it.to_p)}>{pctSmart(it.to_p)}</span>

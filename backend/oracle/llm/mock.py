@@ -193,7 +193,7 @@ def compile_scenario(ctx: dict[str, Any]) -> dict[str, Any]:
         "forces": forces,
         "price": price,
         "competitors": [],
-        "assumed_reach": 0.9 if belief else (0.35 if b2b else 0.45),
+        "assumed_reach": None,
         "research_queries": [f"{_title(prompt)} competitors", f"{_title(prompt)} market size"],
         "key_uncertainties": ["How many buyers hear about it", "Price versus existing tools"],
         "assumptions": ["Offline mock scenario - connect a real model for real analysis"],
@@ -409,7 +409,14 @@ def react(ctx: dict[str, Any]) -> dict[str, Any]:
         "attention": attention, "juster": juster, "likelihood": round(prob, 3), "choice": choice, "option_probs": option_probs,
         "estimate": estimate, "willingness_to_pay": wtp, "reasons": reasons, "objections": objections,
         "change_mind": r.sample(CHANGE, 2), "influences": influences, "quote": quote, "confidence": round(r.uniform(0.4, 0.85), 2),
+        "share_it": _would_share(p, attention, run),
     }
+
+
+def _would_share(p: dict[str, Any], attention: str, run: int) -> bool:
+    """Offline stand-in for 'would you bring this up?': interested or very open people do."""
+    rs = _rng("share", p["id"], run)
+    return attention in ("evaluate", "consider") and rs.random() < 0.8 or p["traits"]["openness"] > 0.7 and rs.random() < 0.4
 
 
 # ---------------------------------------------------------------- committees
@@ -515,7 +522,6 @@ def report(ctx: dict[str, Any]) -> dict[str, Any]:
         amt = spec["price"]["amount"]
         levers.append({"label": f"Cut price to {amt * 0.6:g}", "description": "Test a 40% lower entry price", "changes": {"price_amount": round(amt * 0.6, 2)}})
     levers.append({"label": "Add EU data residency + SOC 2", "description": "Remove the compliance objection", "changes": {"subject_append": "It is SOC 2 Type II certified and offers EU data residency with a standard DPA."}})
-    levers.append({"label": "Double awareness", "description": "Stronger distribution", "changes": {"assumed_reach": min(1.0, spec.get("assumed_reach", 0.4) * 2)}})
     return {
         "headline": f"{h['label']}: about {_p(v)} (likely {_p(h['ci'][0])} to {_p(h['ci'][1])}).",
         "verdict": verdict,
@@ -637,7 +643,13 @@ def society_turn(ctx: dict[str, Any]) -> dict[str, Any]:
         strong = [v for v in visible if v["id"] in like and abs((v.get("p") or 0.5) - 0.5) > 0.2]
         if strong and r.random() < 0.12 + 0.2 * t["openness"]:
             reshare = max(strong, key=lambda v: v.get("likes", 0) + 2 * v.get("reshares", 0))["id"]
+    # Agree with what's on your side, disagree with the other side (own generator: other draws unchanged).
+    ra = _rng("react-items", p["id"], rnd)
+    agree = [v["id"] for v in visible if ((v.get("p") or 0.5) >= 0.5) == (new >= 0.5) and ra.random() < 0.5]
+    disagree = [v["id"] for v in visible if ((v.get("p") or 0.5) >= 0.5) != (new >= 0.5) and ra.random() < 0.4]
     return {
+        "agree": agree,
+        "disagree": disagree,
         "like": like,
         "reshare": reshare,
         "action": action,

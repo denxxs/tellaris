@@ -140,7 +140,6 @@ function Versus({ cmp }: { cmp: NonNullable<Results["comparison"]> }) {
   const rows: [string, number | null, number | null, boolean][] = [
     ["Leaning yes after the talk", s.parent.after_talk, s.this.after_talk, true],
     ["Views from beyond people's circles", s.parent.outside_share, s.this.outside_share, false],
-    ["Adoption at the end of the time frame", s.parent.adoption_end, s.this.adoption_end, true],
   ];
   return (
     <div className="mt-5 rounded-md bg-raised p-3">

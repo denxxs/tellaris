@@ -45,6 +45,8 @@ export function timeOptions(horizon: number, today = new Date()) {
   return Array.from({ length: Math.ceil(horizon / 12) }, (_, i) => ({ value: String(Math.min(i * 12 + 6, horizon)), label: `Year ${i + 1} (${at(i * 12 + 6).getFullYear()})` }));
 }
 
+const pctSmartLocal = (v: number) => (v < 0.1 ? `${(v * 100).toFixed(1)}%` : `${Math.round(v * 100)}%`);
+
 const nearest = (opts: { value: string }[], m: number) =>
   opts.reduce((best, o) => (Math.abs(Number(o.value) - m) < Math.abs(Number(best.value) - m) ? o : best), opts[0])?.value ?? "1";
 
@@ -522,9 +524,23 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
             label="Knowledge graph"
             description="Map who and what the question involves, and tell each person the parts that touch them. One extra model call."
           />
-          <Field label="Awareness" hint="Share of the audience who would realistically hear about it in the time frame.">
-            {(id) => <Slider id={id} value={spec.assumed_reach} min={0.02} max={1} step={0.01} onChange={(v) => set("assumed_reach", v)} format={(v) => pct(v)} />}
-          </Field>
+          {meta?.lenses.find((l) => l.id === spec.lens)?.reach !== false && (
+            <div className="flex flex-col gap-2">
+              <Toggle
+                checked={spec.assumed_reach != null}
+                onChange={(v) => set("assumed_reach", v ? 0.05 : null)}
+                label="I know how many will hear about it"
+                description={
+                  spec.assumed_reach != null
+                    ? "Your own estimate of the share of the audience who hears about it in the time frame. Used for totals like customers and revenue."
+                    : "Off: Oracle doesn't guess this. The answer is for people who hear about it, and totals are shown per 1% who hear."
+                }
+              />
+              {spec.assumed_reach != null && (
+                <Slider label="Share who hears about it" value={spec.assumed_reach} min={0.001} max={1} step={0.001} onChange={(v) => set("assumed_reach", v)} format={(v) => pctSmartLocal(v)} />
+              )}
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Field label="People">{(id) => <Slider id={id} value={config.agents} min={20} max={3000} step={10} onChange={(v) => onConfig({ ...config, agents: v })} format={int} />}</Field>

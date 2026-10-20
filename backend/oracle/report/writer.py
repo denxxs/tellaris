@@ -69,7 +69,7 @@ class Lever(BaseModel):
         default_factory=dict,
         description=(
             "Scenario edits to test it. Allowed keys: price_amount (number), subject_append (text added to the "
-            "subject description), assumed_reach (0-1), add_force (object with name, origin, direction, strength, description)"
+            "subject description), add_force (object with name, origin, direction, strength, description)"
         ),
     )
 

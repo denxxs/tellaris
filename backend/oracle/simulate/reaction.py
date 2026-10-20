@@ -50,6 +50,7 @@ class ReactionOut(BaseModel):
     )
     quote: str = Field(description="1-2 sentences, how you'd actually say it")
     confidence: float = Field(ge=0, le=1, default=0.6)
+    share_it: bool = Field(default=False, description="Would you post about this or bring it up with people you know, right away?")
 
     @field_validator("reasons", "objections", "change_mind", "influences")
     @classmethod
@@ -126,15 +127,10 @@ def build_prompt(
     return "\n".join(lines)
 
 
-def stated_probability(r: ReactionOut, offer: bool = True) -> float:
-    """Blend the Juster answer with the stated probability. For offers, someone who would
-    ignore or only skim it can't also be very likely to take it up."""
-    p = 0.6 * JUSTER.get(r.juster, 0.5) + 0.4 * r.likelihood
-    if offer and r.attention == "ignore":
-        p = min(p, 0.08)
-    elif offer and r.attention == "skim":
-        p = min(p, 0.35)
-    return round(max(0.0, min(1.0, p)), 4)
+def stated_probability(r: ReactionOut, offer: bool = True) -> float:  # noqa: ARG001 - kept for callers
+    """The person's answer on the Juster scale, read through Juster's published probabilities.
+    No blending or caps: the number is what the person said."""
+    return round(JUSTER.get(r.juster, 0.5), 4)
 
 
 def _normalize(r: ReactionOut, spec: ScenarioSpec) -> ReactionOut:

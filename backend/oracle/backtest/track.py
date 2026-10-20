@@ -51,6 +51,9 @@ def freeze(run: dict[str, Any], req: TrackRequest) -> dict[str, Any]:
     if req.resolves_on <= _today():
         raise PredictionError("Pick a date in the future, when the real answer will be known.")
     outcomes = spec.get("outcomes") or ["Yes"]
+    # With a given awareness, the prediction is for the whole audience; otherwise for those who hear of it.
+    wa = head.get("with_awareness")
+    predicted, ci, reach = (wa["value"], wa["ci"], head["awareness"]) if wa else (head["value"], head.get("ci"), 1.0)
     return {
         "id": uuid.uuid4().hex[:12],
         "run_id": run["id"],
@@ -60,15 +63,15 @@ def freeze(run: dict[str, Any], req: TrackRequest) -> dict[str, Any]:
         "note": req.note.strip(),
         "title": spec.get("title") or run.get("title") or "",
         "question": spec.get("question") or "",
-        "measure": head.get("label") or f"Share choosing {outcomes[0]}",
+        "measure": (f"Share of the whole audience, if {round(head['awareness'] * 100, 1):g}% hear about it" if wa else head.get("label")) or f"Share choosing {outcomes[0]}",
         "outcome": outcomes[0],
         "targets": spec.get("targets") or [],
         "lens": head.get("lens"),
         "kind": head.get("kind") or "belief",
-        "predicted": head["value"],
-        "ci": head.get("ci"),
+        "predicted": predicted,
+        "ci": ci,
         "stated": head.get("stated"),
-        "reach": head.get("reach") or 1.0,
+        "reach": reach,
         "calibration": head.get("calibration"),
         "status": "open",
         "actual": None,

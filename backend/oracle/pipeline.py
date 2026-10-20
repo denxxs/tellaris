@@ -79,12 +79,10 @@ def _society_point(d: dict[str, Any] | None) -> dict[str, Any] | None:
     if not d or not d.get("rounds"):
         return None
     f = d.get("feed") or {}
-    curve = (d.get("bass") or {}).get("curve") or []
     return {
         "feed": f.get("style", "word_of_mouth"),
         "after_talk": d["rounds"][-1]["calibrated"],
         "outside_share": f.get("outside_share"),
-        "adoption_end": curve[-1]["adoption"] if curve else None,
     }
 
 
@@ -336,7 +334,6 @@ class Runner:
                 )
                 base = {
                     "opinion": [{"round": r["round"], "value": r["calibrated"]} for r in base_summary["rounds"]],
-                    "adoption": base_summary["bass"]["curve"],
                 }
             await self.ch.flush()
             await store.save_feed(self.id, feed)
@@ -374,7 +371,6 @@ class Runner:
             "periods": periods if "diffusion" in results else [],
             "events": events,
             "opinion": [{"round": r["round"], "value": r["calibrated"]} for r in results["diffusion"]["rounds"]] if "diffusion" in results else [],
-            "adoption": results["diffusion"]["bass"]["curve"] if "diffusion" in results else [],
             "base": base,
         }
         if req.parent_id:

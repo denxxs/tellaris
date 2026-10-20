@@ -1,8 +1,8 @@
 """The society: people post, reply, argue and change their minds on a feed.
 
 Each person is connected to a handful of contacts (mostly same country and
-similar work). Round 0 seeds the feed with the takes of people who cared enough
-to say something. In each later round every person reads their contacts' recent
+similar work). Round 0 holds the first takes of the people who said they would
+bring it up. In each later round every person reads their contacts' recent
 posts (and any news), then posts, replies or stays quiet, and updates their view.
 Company buying meetings appear in the same feed. The rounds also drive the Bass
 projection of adoption over the full time frame.
@@ -22,7 +22,7 @@ from ..population.models import Persona
 from ..research.news import draw, know_chance
 from ..scenario.models import ScenarioSpec
 from .calibrate import Calibration, apply_array
-from .diffusion import bass_projection, build_network
+from .diffusion import build_network
 from .feed import FeedState, apply_engagement, pick, record_seen, travel_summary
 from .memory import Mind, mind_record, reflect_all, seen_importance
 from .memory import summarize as summarize_minds
@@ -37,6 +37,8 @@ class Turn(BaseModel):
     changed: bool = Field(description="True if your view moved since last round")
     why: str = Field(default="", description="One short sentence on why your view did or didn't move")
     takeaway: str = Field(default="", description="One short sentence: what you will remember from this round. Empty if nothing stuck.")
+    agree: list[str] = Field(default_factory=list, description="Ids of items in your feed you agree with")
+    disagree: list[str] = Field(default_factory=list, description="Ids of items in your feed you disagree with")
 
     @field_validator("text")
     @classmethod
@@ -179,30 +181,9 @@ async def run_society(
             "period": period_label.get(rnd),
         }
 
-    def tally(items: list[dict[str, Any]]) -> None:
-        """Contacts on the same side agree; on the other side disagree."""
-        for it in items:
-            a = it.get("author")
-            if a not in by_id:
-                continue
-            side = state[a] >= 0.5
-            for n in g.neighbors(a):
-                if (state[n] >= 0.5) == side:
-                    it["agrees"] += 1
-                else:
-                    it["disagrees"] += 1
-
-    # Round 0: people who cared enough to say something.
-    seeds = []
-    for pid in pids:
-        r = first[pid]
-        p = by_id[pid]
-        if r.attention in ("evaluate", "consider") or (p.traits.openness > 0.7 and rng.random() < 0.4):
-            seeds.append(pid)
-    rng.shuffle(seeds)
-    seeds = seeds[: max(3, int(len(pids) * 0.35))]
+    # Round 0: the first takes of the people who said they would bring it up.
+    seeds = [pid for pid in pids if getattr(first[pid], "share_it", False)]
     round0 = [_item(id=new_id(), round=0, kind="post", text=first[pid].quote, p=round(state[pid], 3), **_author_fields(by_id[pid])) for pid in seeds]
-    tally(round0)
     feed.extend(round0)
     history = [snapshot(0, posts=len(round0))]
     if on_items:
@@ -217,6 +198,7 @@ async def run_society(
     # A separate generator, so the original word-of-mouth draws are untouched.
     feed_rng = np.random.default_rng(None if seed is None else [seed, 5]) if platform else None
     engaged = {"likes": 0, "reshares": 0}
+    judged: set[tuple[str, str]] = set()
 
     for rnd in range(1, rounds + 1):
         # Events landing in this period, and who hears each one.
@@ -248,6 +230,7 @@ async def run_society(
         for pid in pids:
             record_seen(fs, pid, shown[pid], item_by_id, g)
         actions: list[tuple[str, list[str], str | None]] = []
+        reacts: list[tuple[str, list[str], list[str]]] = []
         new_state: dict[str, float] = {}
         produced: list[dict[str, Any]] = []
         lock = asyncio.Lock()
@@ -301,8 +284,7 @@ async def run_society(
             except LLMError:
                 new_state[pid] = state[pid]
                 return
-            target = JUSTER.get(t.juster, state[pid])
-            p_new = 0.35 * state[pid] + 0.65 * target  # people rarely jump all the way in one round
+            p_new = JUSTER.get(t.juster, state[pid])  # their view is what they answer
             new_state[pid] = p_new
             if mind and t.takeaway.strip():
                 mind.add(rnd, "thought", t.takeaway, 0.7)
@@ -310,6 +292,8 @@ async def run_society(
             async with lock:
                 if isinstance(t, FeedTurn) and (t.like or t.reshare):
                     actions.append((pid, list(t.like), t.reshare))
+                if t.agree or t.disagree:
+                    reacts.append((pid, list(t.agree), list(t.disagree)))
                 if moved:
                     changed_count += 1
                     if len(examples) < 40:
@@ -327,6 +311,17 @@ async def run_society(
 
         await asyncio.gather(*(act(i, pid) for i, pid in enumerate(pids)))
         state.update(new_state)
+        # Agreement is what people who saw an item said about it, once per person and item.
+        for pid, ag, dis in sorted(reacts, key=lambda a: a[0]):
+            seen_ids = {v["id"] for v in shown[pid]}
+            for iid in dict.fromkeys(ag):
+                if iid in seen_ids and iid in item_by_id and (pid, iid) not in judged:
+                    judged.add((pid, iid))
+                    item_by_id[iid]["agrees"] += 1
+            for iid in dict.fromkeys(dis):
+                if iid in seen_ids and iid in item_by_id and (pid, iid) not in judged:
+                    judged.add((pid, iid))
+                    item_by_id[iid]["disagrees"] += 1
         # Likes and reshares land after everyone has scrolled, so the order people act in doesn't matter.
         for pid, likes, reshare in sorted(actions, key=lambda a: a[0]):
             nl, nr = apply_engagement(fs, pid, names[pid], likes, reshare, {v["id"] for v in shown[pid]}, item_by_id)
@@ -336,7 +331,6 @@ async def run_society(
                 minds[pid].add(rnd, "said", f"I reshared: {item_by_id[reshare]['text']}", 0.75, item=reshare)
         for pid, mind in minds.items():
             mind.trajectory.append(state[pid])
-        tally([it for it in produced if it["kind"] in ("post", "reply")])
         produced.sort(key=lambda it: it["id"])
         feed.extend(produced)
         for it in produced:
@@ -368,14 +362,7 @@ async def run_society(
             for pid, mind in minds.items():
                 minds_out[pid] = mind_record(mind, reflections.get(pid))
 
-    # Bass projection from the observed social pull.
     start, end = history[0]["calibrated"], history[-1]["calibrated"]
-    m = max(0.0, min(1.0, end * spec.assumed_reach))
-    enthusiasts = sum(weights[i] for i, pid in enumerate(pids) if state[pid] >= 0.7 and by_id[pid].traits.risk_appetite >= 0.6) / weights.sum()
-    p_innov = float(np.clip(0.005 + 0.08 * enthusiasts, 0.003, 0.06))
-    pull = (end - start) / max(start, 0.02)
-    active = sum(h["sharers"] for h in history[1:]) / max(len(pids) * max(rounds, 1), 1)
-    q_imit = float(np.clip(0.15 + 0.6 * active + 0.8 * pull, 0.05, 0.7))
 
     talk = [it for it in feed if it["kind"] in ("post", "reply")]
     voices: dict[str, dict[str, Any]] = {}
@@ -392,7 +379,6 @@ async def run_society(
         "examples": examples,
         "reflection": reflection_summary,
         "social_pull": round(end - start, 4),
-        "bass": {"m": round(m, 4), "p": round(p_innov, 4), "q": round(q_imit, 4), "curve": bass_projection(m, p_innov, q_imit, spec.horizon_months)},
         "network": {
             "nodes": [{"id": pid, "country": by_id[pid].country, "p": round(state[pid], 3), "name": by_id[pid].name} for pid in pids],
             "links": [{"source": a, "target": b} for a, b in g.edges()],

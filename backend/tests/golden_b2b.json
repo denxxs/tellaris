@@ -1,29 +1,29 @@
 {
  "headline": {
-  "stated": 0.1045,
-  "calibrated": 0.0823,
-  "value": 0.0288,
+  "stated": 0.106,
+  "calibrated": 0.0833,
+  "value": 0.0833,
   "ci": [
-   0.0243,
-   0.033
+   0.0699,
+   0.0957
   ],
-  "reach": 0.35,
+  "reach": 1.0,
   "n": 120,
   "people": 5704679,
-  "adopters": 164369
+  "adopters": null
  },
  "by_country": {
-  "IND": 0.0156,
-  "USA": 0.0555
+  "IND": 0.0457,
+  "USA": 0.1597
  },
  "by_segment": {
-  "IT services staff": 0.0162,
-  "Finance leaders": 0.0547,
-  "Financial analysts": 0.0144,
-  "Startup founders": 0.0858
+  "IT services staff": 0.0468,
+  "Finance leaders": 0.1574,
+  "Financial analysts": 0.0429,
+  "Startup founders": 0.2435
  },
  "committees": 0.027,
- "society_final": 0.0927,
+ "society_final": 0.0906,
  "spec": {
   "b2b": true,
   "modes": [
@@ -31,7 +31,7 @@
    "committee",
    "diffusion"
   ],
-  "assumed_reach": 0.35,
+  "assumed_reach": null,
   "price": {
    "amount": 49.0,
    "currency": "USD",

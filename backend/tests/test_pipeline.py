@@ -67,8 +67,10 @@ def test_full_run_and_whatif(client):
     assert len(res["diffusion"]["rounds"]) == 3
     assert res["wtp"]["curve"]
     assert run["report"]["headline"]
+    # Nobody said how many will hear about it, so Oracle doesn't guess a total: it states scale per 1% who hear.
     rev = h["revenue"]
-    assert rev and rev["customers"] == h["adopters"] and rev["monthly"] == round(h["adopters"] * 49, 2)
+    assert h["awareness"] is None and h["adopters"] is None and rev["monthly"] is None
+    assert h["per_point_adopters"] > 0 and rev["per_point_monthly"] == round(h["value"] * h["people"] / 100 * 49, 2)
     assert "say yes" in h["label"] or "adopt" in h["label"]
 
     events = client.get(f"/api/runs/{run_id}/events").text
@@ -88,6 +90,14 @@ def test_full_run_and_whatif(client):
     crun = wait(client, child)
     assert crun["status"] == "done", crun.get("error")
     assert crun["spec"]["price"]["amount"] == 19
+
+    # When the user gives awareness, totals appear and the headline itself is unchanged by it.
+    spec = {**run["spec"], "assumed_reach": 0.05}
+    arun = wait(client, client.post("/api/runs", json={"prompt": PROMPT, "config": cfg, "spec": spec}).json()["id"])
+    ah = arun["results"]["headline"]
+    assert ah["awareness"] == 0.05 and ah["value"] == h["value"]
+    assert ah["with_awareness"]["value"] == round(h["value"] * 0.05, 4)
+    assert abs(ah["adopters"] - h["value"] * h["people"] * 0.05) < h["people"] * 0.0001 and ah["revenue"]["monthly"] == round(ah["adopters"] * 49, 2)
     assert crun["results"]["comparison"]["parent_id"] == run_id
     child_people = {p["id"] for p in client.get(f"/api/runs/{child}/personas").json()}
     assert child_people == {p["id"] for p in people}

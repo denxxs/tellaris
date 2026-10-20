@@ -107,11 +107,12 @@ class ScenarioSpec(BaseModel):
     forces: list[Force] = Field(default_factory=list)
     price: Price | None = None
     competitors: list[str] = Field(default_factory=list)
-    assumed_reach: float = Field(
-        default=0.6,
+    assumed_reach: float | None = Field(
+        default=None,
         ge=0,
         le=1,
-        description="Share of the target audience who would realistically hear about it within the horizon",
+        description="Share of the audience who will hear about it within the time frame, ONLY if the user states it "
+        "(e.g. 'we expect 5% to hear about it'). Never guess it: leave null when the user didn't say.",
     )
     research_queries: list[str] = Field(default_factory=list)
     events: list[TimelineEvent] = Field(
