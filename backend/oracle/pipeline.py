@@ -18,11 +18,13 @@ from .population.sampler import PopulationBuilder
 from .report.writer import extract_themes, write_report
 from .files import bundle
 from .research.search import FactSheet, facts_from_files, research
+from .scenario.clarify import apply_answers
 from .scenario.compiler import compile_scenario, normalize
 from .scenario.models import RunRequest, ScenarioSpec
 from .simulate import committee as committee_mod
 from .simulate.aggregate import Aggregator
-from .simulate.calibrate import Calibration, default_calibration, kind_for
+from .scenario.lenses import lens_of
+from .simulate.calibrate import DEFAULT_PARAMS, Calibration
 from .simulate.society import meeting_items, run_society
 from .simulate.reaction import Reaction, react_all
 from .store import store
@@ -52,15 +54,16 @@ def lite(p: Persona) -> dict[str, Any]:
     }
 
 
-async def load_calibration(subject_kind: str) -> Calibration:
-    kind = kind_for(subject_kind)
+async def load_calibration(spec: ScenarioSpec) -> Calibration:
+    kind = lens_of(spec).calibration_kind
     saved = await store.calibration(kind)
     if saved:
         try:
             return Calibration.model_validate(saved)
         except Exception:  # noqa: BLE001
             pass
-    return default_calibration(subject_kind)
+    a, b = DEFAULT_PARAMS[kind]
+    return Calibration(kind=kind, a=a, b=b, source="default")
 
 
 class Runner:
@@ -117,10 +120,17 @@ class Runner:
         if file_metas:
             await self.ch.emit("files", file_metas)
             await self.log(f"Read {len(file_metas)} {'file' if len(file_metas) == 1 else 'files'}: {', '.join(m['name'] for m in file_metas)}")
+        prompt = apply_answers(req.prompt, req.clarifications)
         if req.spec is not None:
-            spec = normalize(req.spec, req.prompt, req.targets or None)
+            spec = req.spec
+            if req.lens:
+                spec.lens = req.lens
+            spec = normalize(spec, prompt, req.targets or None, req.global_depth)
         else:
-            spec = await compile_scenario(req.prompt, roles.planner, req.targets or None, context)
+            spec = await compile_scenario(
+                prompt, roles.planner, req.targets or None, context,
+                lens=req.lens, scope=req.scope, global_depth=req.global_depth,
+            )
         await store.update_run(self.id, spec=spec.model_dump(), title=spec.title)
         await self.ch.emit("scenario", spec.model_dump())
         await self.stage("scenario", "done")
@@ -184,7 +194,6 @@ class Runner:
         await self.stage("reactions", "start")
         total = len(people) * self.cfg.runs_per_agent
         done_count = 0
-        by_id = {p.id: p for p in people}
 
         async def on_reaction(r: Reaction, p: Persona) -> None:
             nonlocal done_count
@@ -200,14 +209,14 @@ class Runner:
             raise RuntimeError("No agent produced a valid answer. Check the crowd models in Settings.")
         await self.stage("reactions", "done", samples=len(reactions))
 
-        cal = await load_calibration(spec.subject_kind)
+        cal = await load_calibration(spec)
         agg = Aggregator(people, reactions, spec, cal, seed=self.cfg.seed)
         results = agg.results()
         await self.ch.emit("interim", {"headline": results["headline"], "by_country": results["by_country"]})
 
         # 6. Committees
         comms: list[committee_mod.Committee] = []
-        if spec.b2b and "committee" in spec.modes and self.cfg.committees > 0:
+        if lens_of(spec).committees and "committee" in spec.modes and self.cfg.committees > 0:
             await self.stage("committees", "start")
             comms = committee_mod.form_committees(spec, people, self.cfg.committees, seed=self.cfg.seed)
             finished = 0

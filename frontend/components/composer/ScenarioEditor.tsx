@@ -5,7 +5,7 @@ import { Button, Chip, Field, Input, Segmented, Select, Slider, Textarea, Toggle
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { int, pct, people, shortJob, titleCase } from "@/lib/format";
-import type { Force, RunConfig, Segment, Spec } from "@/lib/types";
+import type { Force, LensId, RunConfig, Segment, Spec } from "@/lib/types";
 import { CountryPicker } from "./CountryPicker";
 
 type Props = {
@@ -50,13 +50,17 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
   const { meta, countryName } = useMeta();
   const set = <K extends keyof Spec>(k: K, v: Spec[K]) => onSpec({ ...spec, [k]: v });
   const [heads, setHeads] = useState<Record<string, number>>({});
+  const [estimated, setEstimated] = useState<Record<string, boolean>>({});
 
   // How many real people each group stands for (debounced).
   useEffect(() => {
     const t = setTimeout(() => {
       api
         .headcount(spec)
-        .then((r) => setHeads(Object.fromEntries(r.segments.map((s) => [s.name, s.total]))))
+        .then((r) => {
+          setHeads(Object.fromEntries(r.segments.map((s) => [s.name, s.total])));
+          setEstimated(Object.fromEntries(r.segments.map((s) => [s.name, !!s.estimated])));
+        })
         .catch(() => {});
     }, 300);
     return () => clearTimeout(t);
@@ -82,10 +86,35 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
     onSpec({ ...spec, modes: [...modes], b2b: m === "committee" ? on : spec.b2b });
   };
   const totalHeads = Object.values(heads).reduce((a, b) => a + b, 0);
+  const lens = meta?.lenses.find((l) => l.id === spec.lens);
+  const setLens = (id: LensId) => {
+    // Buying committees belong to the business lens only.
+    const modes = new Set(spec.modes.filter((m) => m !== "committee"));
+    if (id === "b2b") modes.add("committee");
+    onSpec({ ...spec, lens: id, b2b: id === "b2b", modes: [...modes] });
+  };
+  const global = spec.scope === "global";
+  const ageNum = (v: string) => (v === "" ? null : Math.max(0, Math.min(100, Math.round(Number(v)))));
 
   return (
     <div>
       <Section title="The question" aside="What Oracle predicts, and what each simulated person is asked about their own behaviour.">
+        {meta && (
+          <Field label="Reading this as" hint={lens?.description ?? "How people are asked, and how answers turn into the headline."}>
+            {() => (
+              <div className="scroll-thin max-w-full overflow-x-auto">
+                <div className="w-max">
+                  <Segmented
+                    label="Lens"
+                    value={(spec.lens ?? "consumer") as LensId}
+                    onChange={setLens}
+                    options={meta.lenses.map((l) => ({ value: l.id, label: l.label }))}
+                  />
+                </div>
+              </div>
+            )}
+          </Field>
+        )}
         <Field label="Title">{(id) => <Input id={id} value={spec.title} onChange={(e) => set("title", e.target.value)} />}</Field>
         <Field label="What we're predicting">{(id) => <Input id={id} value={spec.question} onChange={(e) => set("question", e.target.value)} />}</Field>
         <Field label="Asked of each person" hint="About their own choice, never about what society will do.">
@@ -153,8 +182,22 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
       <Section
         title="Where"
         aside="Target countries. The countries and blocs that influence them are found automatically and shown on the map."
-        summary={spec.targets.length ? `${spec.targets.length} ${spec.targets.length === 1 ? "country" : "countries"} selected.` : "Pick at least one country."}
+        summary={
+          global
+            ? `A global sample of ${spec.targets.length} countries, chosen to cover most of the world's adults.`
+            : spec.targets.length
+              ? `${spec.targets.length} ${spec.targets.length === 1 ? "country" : "countries"} selected.`
+              : "Pick at least one country."
+        }
       >
+        {global && (
+          <Toggle
+            checked
+            onChange={(v) => !v && onSpec({ ...spec, scope: "countries" })}
+            label="Whole world"
+            description="Results are split by country, region and demographic so you can see where it works and where it doesn't. Turn off to edit the countries freely."
+          />
+        )}
         <Field label="Target countries">{(id) => <CountryPicker id={id} value={spec.targets} onChange={(v) => onSpec({ ...spec, targets: v, target_weights: {} })} />}</Field>
         <Field label="How groups add up" hint={config.weighting === "population" ? "Each person counts for the real number of people they stand for. Large groups weigh more, as they do in the real world." : "Each group counts the same, whatever its real size. Useful for comparing groups."}>
           {() => (
@@ -180,7 +223,10 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
           <div key={i} className="flex flex-col gap-3 border-b border-border pb-5 last:border-0 last:pb-0">
             <div className="flex flex-wrap items-center gap-3">
               <Input aria-label="Group name" value={s.name} onChange={(e) => setSeg(i, { name: e.target.value })} className="max-w-xs font-medium" />
-              <span className="num text-[13px] text-muted">{heads[s.name] != null ? `${people(heads[s.name])} people` : ""}</span>
+              <span className="num text-[13px] text-muted">
+                {heads[s.name] != null ? `${estimated[s.name] ? "About " : ""}${people(heads[s.name])} people` : ""}
+                {estimated[s.name] && <span className="ml-1.5 text-faint">estimated from the trait share</span>}
+              </span>
               <Button size="sm" variant="ghost" className="ml-auto" onClick={() => set("segments", segs.filter((_, j) => j !== i))} disabled={segs.length <= 1}>
                 Remove
               </Button>
@@ -234,6 +280,43 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
                 </select>
               )}
             </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[auto_auto_minmax(0,1fr)]">
+              <div className="flex items-center gap-2 text-[13px] text-muted">
+                Aged
+                <Input aria-label={`Youngest in ${s.name}`} type="number" min={15} max={100} placeholder="15" value={s.age_min ?? ""} onChange={(e) => setSeg(i, { age_min: ageNum(e.target.value) })} className="w-16" />
+                to
+                <Input aria-label={`Oldest in ${s.name}`} type="number" min={15} max={100} placeholder="any" value={s.age_max ?? ""} onChange={(e) => setSeg(i, { age_max: ageNum(e.target.value) })} className="w-16" />
+              </div>
+              <Select
+                label={`Gender of ${s.name}`}
+                value={s.gender ?? "any"}
+                onChange={(v) => setSeg(i, { gender: v as Segment["gender"] })}
+                options={[
+                  { value: "any", label: "Any gender" },
+                  { value: "woman", label: "Women" },
+                  { value: "man", label: "Men" },
+                ]}
+              />
+              <div className="flex min-w-0 items-center gap-2">
+                <Input aria-label={`Trait shared by ${s.name}`} placeholder="Shared trait, e.g. owns a dog" value={s.trait ?? ""} onChange={(e) => setSeg(i, { trait: e.target.value || null })} className="min-w-0" />
+                {s.trait && (
+                  <div className="flex shrink-0 items-center gap-1 text-[13px] text-muted">
+                    <Input
+                      aria-label={`Share of people with ${s.trait}`}
+                      type="number"
+                      min={0.1}
+                      max={100}
+                      step="any"
+                      value={s.trait_share != null ? +(s.trait_share * 100).toFixed(1) : ""}
+                      placeholder="?"
+                      onChange={(e) => setSeg(i, { trait_share: e.target.value === "" ? null : Math.max(0.001, Math.min(1, Number(e.target.value) / 100)) })}
+                      className="w-16"
+                    />
+                    % of adults
+                  </div>
+                )}
+              </div>
+            </div>
             <Toggle checked={s.is_buyer} onChange={(v) => setSeg(i, { is_buyer: v })} label="Counts toward the answer" description={s.is_buyer ? "Their decision is what's predicted." : "Heard for context only."} />
           </div>
         ))}
@@ -276,7 +359,9 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
 
       <Section title="How to simulate" aside="More people and more answers per person narrow the range, at the cost of more model calls." summary={<>About <span className="num text-text">{int(estimateCalls(spec, config))}</span> model calls.</>}>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <Toggle checked={spec.modes.includes("committee")} onChange={(v) => toggleMode("committee", v)} label="Buying committees" description="Companies debate the purchase before deciding (B2B)." />
+          {spec.lens === "b2b" && (
+            <Toggle checked={spec.modes.includes("committee")} onChange={(v) => toggleMode("committee", v)} label="Buying committees" description="Companies debate the purchase before deciding." />
+          )}
           <Toggle checked={spec.modes.includes("diffusion")} onChange={(v) => toggleMode("diffusion", v)} label="Society" description="People post, reply to each other and change their minds over several rounds." />
           <Toggle checked={config.research} onChange={(v) => onConfig({ ...config, research: v })} label="Web research" description="Ground people in current facts, prices and competitors." />
           <Field label="Awareness" hint="Share of the audience who would realistically hear about it in the time frame.">

@@ -19,6 +19,7 @@ import logging
 import random
 import re
 import time
+import weakref
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
@@ -81,16 +82,17 @@ class Usage:
 
 current_usage: contextvars.ContextVar[Usage | None] = contextvars.ContextVar("current_usage", default=None)
 
-_semaphores: dict[int, asyncio.Semaphore] = {}
+# One limiter per event loop (and size). Keyed weakly by the loop itself, so a new loop
+# can never inherit a limiter from a dead one that happened to share its address.
+_semaphores: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[int, asyncio.Semaphore]]" = weakref.WeakKeyDictionary()
 
 
 def _semaphore() -> asyncio.Semaphore:
     size = max(1, settings_store.get().max_concurrency)
-    loop_id = id(asyncio.get_running_loop())
-    key = hash((size, loop_id))
-    if key not in _semaphores:
-        _semaphores[key] = asyncio.Semaphore(size)
-    return _semaphores[key]
+    per_loop = _semaphores.setdefault(asyncio.get_running_loop(), {})
+    if size not in per_loop:
+        per_loop[size] = asyncio.Semaphore(size)
+    return per_loop[size]
 
 
 def _strip_titles(schema: Any) -> Any:

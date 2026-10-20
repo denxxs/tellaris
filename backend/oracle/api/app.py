@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +17,8 @@ from sse_starlette.sse import EventSourceResponse
 from .. import __version__
 from .. import files as files_mod
 from ..providers import PROVIDERS
+from ..scenario.lenses import LENSES
+from ..world.countries import global_sample
 from ..backtest.runner import BacktestRequest, builtin_cases, job_view, start_backtest
 from ..config import PROVIDER_KEY_ENV, env, settings_store
 from ..events import hub
@@ -96,6 +98,8 @@ async def meta() -> dict[str, Any]:
         "sectors": SECTORS,
         "channels": channels(),
         "stages": [{"id": s[0], "label": s[1]} for s in STAGES],
+        "lenses": [{"id": x.id, "label": x.label, "description": x.description} for x in LENSES.values()],
+        "global": {d: global_sample(d) for d in ("quick", "deep")},
         "model_examples": MODEL_EXAMPLES,
         "defaults": RunConfig().model_dump(),
     }
@@ -108,6 +112,31 @@ class PreviewRequest(BaseModel):
     targets: list[str] = Field(default_factory=list)
     influence_threshold: float = 0.25
     file_ids: list[str] = Field(default_factory=list)
+    lens: str | None = None
+    scope: str | None = None
+    global_depth: str = "quick"
+    clarifications: list[dict[str, str]] = Field(default_factory=list)
+
+
+class ClarifyRequest(BaseModel):
+    prompt: str = Field(min_length=10, max_length=20000)
+    targets: list[str] = Field(default_factory=list)
+    file_ids: list[str] = Field(default_factory=list)
+    scope: Literal["countries", "global"] | None = None
+
+
+@app.post("/api/scenario/clarify")
+async def clarify_endpoint(req: ClarifyRequest) -> dict[str, Any]:
+    """Lens, scope and any questions worth asking before a run."""
+    from ..scenario.clarify import clarify
+
+    context, _ = files_mod.bundle(req.file_ids, budget=12000)
+    try:
+        c = await clarify(req.prompt, req.targets, context, settings_store.get().roles.planner, scope=req.scope)
+    except Exception as exc:  # noqa: BLE001 - never block a run on this step
+        log.warning("clarify failed: %s", exc)
+        return {"reading": "", "lens": None, "lens_reason": "", "scope": "countries", "questions": [], "error": str(exc)[:300]}
+    return c.model_dump()
 
 
 def _forces_as_edges(spec: ScenarioSpec) -> list[InfluenceEdge]:
@@ -127,8 +156,13 @@ async def preview(req: PreviewRequest) -> dict[str, Any]:
     usage = Usage()
     token = current_usage.set(usage)
     try:
+        from ..scenario.clarify import apply_answers
+
         context, _ = files_mod.bundle(req.file_ids)
-        spec = await compile_scenario(req.prompt, settings_store.get().roles.planner, req.targets or None, context)
+        spec = await compile_scenario(
+            apply_answers(req.prompt, req.clarifications), settings_store.get().roles.planner, req.targets or None, context,
+            lens=req.lens, scope=req.scope, global_depth=req.global_depth,
+        )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(502, f"Scenario builder failed: {exc}") from exc
     finally:
@@ -144,14 +178,14 @@ class HeadcountRequest(BaseModel):
 @app.post("/api/scenario/headcount")
 async def headcount(req: HeadcountRequest) -> dict[str, Any]:
     """Estimated real people behind each group, per country."""
-    from ..population.headcount import segment_headcount
+    from ..population.headcount import seg_headcount, seg_is_estimated
 
     spec = req.spec
     out = []
     for seg in spec.segments:
         where = [c for c in (seg.countries or spec.targets) if c in countries()]
-        per = {c: round(segment_headcount(c, seg.occupations, custom=bool(seg.custom_occupation))) for c in where}
-        out.append({"name": seg.name, "total": sum(per.values()), "by_country": per})
+        per = {c: round(seg_headcount(c, seg)) for c in where}
+        out.append({"name": seg.name, "total": sum(per.values()), "by_country": per, "estimated": seg_is_estimated(seg)})
     return {"segments": out, "total": sum(s["total"] for s in out)}
 
 
@@ -280,7 +314,7 @@ async def persona(run_id: str, pid: str) -> dict[str, Any]:
     results = run.get("results") or {}
     net = (results.get("diffusion") or {}).get("network") or {}
     nodes = {n["id"]: n for n in net.get("nodes", [])}
-    contact_ids = [l["target"] if l["source"] == pid else l["source"] for l in net.get("links", []) if pid in (l["source"], l["target"])]
+    contact_ids = [e["target"] if e["source"] == pid else e["source"] for e in net.get("links", []) if pid in (e["source"], e["target"])]
     contacts = []
     for cid in dict.fromkeys(contact_ids):
         cp = await store.persona(run_id, cid)

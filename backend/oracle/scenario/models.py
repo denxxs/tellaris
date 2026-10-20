@@ -6,7 +6,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-SubjectKind = Literal["product", "feature", "pricing", "campaign", "policy", "event", "market", "company", "other"]
+SubjectKind = Literal[
+    "product", "feature", "pricing", "campaign", "company", "market",  # people deciding to buy or do something
+    "personal", "habit",  # people deciding something about their own life
+    "policy", "event", "opinion", "preference", "hypothetical", "culture", "other",  # what people think or would choose
+]
 OutcomeType = Literal["binary", "categorical", "numeric"]
 Mode = Literal["reaction", "committee", "diffusion"]
 
@@ -28,6 +32,11 @@ class Segment(BaseModel):
         default_factory=list,
         description="ISO3 codes where this segment exists (e.g. IT-services analysts only in IND). Empty = all targets.",
     )
+    age_min: int | None = Field(default=None, ge=15, le=95, description="Youngest age in the group, e.g. 18 for Gen Z adults")
+    age_max: int | None = Field(default=None, ge=15, le=100, description="Oldest age in the group, e.g. 28 for Gen Z")
+    gender: Literal["any", "woman", "man"] = Field(default="any", description="Only when the question is about one gender")
+    trait: str | None = Field(default=None, description="Any other defining trait, e.g. 'own a dog', 'Taylor Swift fans'")
+    trait_share: float | None = Field(default=None, ge=0, le=1, description="Estimated share of the base population with the trait")
     weight: float = Field(default=1.0, ge=0, description="Relative share of agents for this segment")
     is_buyer: bool = Field(default=True, description="True if this segment's behaviour is the outcome being predicted")
 
@@ -52,6 +61,12 @@ class Price(BaseModel):
 
 
 class ScenarioSpec(BaseModel):
+    lens: Literal["b2b", "consumer", "personal", "opinion", "forecast"] | None = Field(
+        default=None,
+        description="How to treat the question: b2b (companies buying), consumer (people buying or using something), "
+        "personal (choices about one's own life), opinion (what people think or prefer), forecast (votes, events, results)",
+    )
+    scope: Literal["countries", "global"] = Field(default="countries", description="global when the question is about the whole world")
     title: str = Field(description="Short title, max ~8 words")
     question: str = Field(description="The precise question being predicted")
     subject_kind: SubjectKind = "product"
@@ -138,3 +153,7 @@ class RunRequest(BaseModel):
     spec: ScenarioSpec | None = Field(default=None, description="Pre-edited scenario (skips the builder)")
     parent_id: str | None = None
     file_ids: list[str] = Field(default_factory=list, description="Uploaded context files")
+    lens: Literal["b2b", "consumer", "personal", "opinion", "forecast"] | None = Field(default=None, description="Override the detected lens")
+    scope: Literal["countries", "global"] | None = Field(default=None, description="Override: simulate the whole world")
+    global_depth: Literal["quick", "deep"] = "quick"
+    clarifications: list[dict[str, str]] = Field(default_factory=list, description="Answers to Oracle's clarifying questions")

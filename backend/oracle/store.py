@@ -97,6 +97,8 @@ class Store:
         self._lock = asyncio.Lock()
 
     async def open(self) -> None:
+        # A fresh lock for the event loop that opens the store; asyncio locks bind to one loop.
+        self._lock = asyncio.Lock()
         if self._db is None:
             self._db = await aiosqlite.connect(self.path)
             self._db.row_factory = aiosqlite.Row

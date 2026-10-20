@@ -1,4 +1,11 @@
+export type LensId = "b2b" | "consumer" | "personal" | "opinion" | "forecast";
+
 export type Segment = {
+  age_min?: number | null;
+  age_max?: number | null;
+  gender?: "any" | "woman" | "man";
+  trait?: string | null;
+  trait_share?: number | null;
   name: string;
   description: string;
   occupations: string[];
@@ -21,6 +28,8 @@ export type Force = {
 };
 
 export type Spec = {
+  lens?: LensId | null;
+  scope?: "countries" | "global";
   title: string;
   question: string;
   subject_kind: string;
@@ -135,6 +144,9 @@ export type Results = {
     samples: number;
     agents_total: number;
     revenue?: { customers: number; monthly: number; monthly_ci: [number, number]; currency: string; note: string } | null;
+    lens?: LensId;
+    lens_label?: string;
+    leading?: { option: string; share: number; ci: [number, number] } | null;
   };
   outcomes: { option: string; share: number }[] | { unit: string | null; median: number; p10: number; p90: number; mean: number } | null;
   attention: Record<string, number>;
@@ -191,7 +203,35 @@ export type Results = {
     network: { nodes: { id: string; country: string; p: number; name: string }[]; links: { source: string; target: string }[] };
   };
   themes?: { objections: Theme[]; reasons: Theme[]; change_mind: Theme[] };
+  splits?: Splits;
   comparison?: { parent_id: string; parent_title: string; parent_value: number; delta: number };
+};
+
+export type SplitCell = { label: string; dims: string[]; n: number; value: number; ci: [number, number]; people?: number; vs_overall?: number };
+export type Splits = {
+  dimensions: Record<string, { label: string; rows: { key: string; label: string; n: number; value: number; ci: [number, number]; people?: number }[]; hidden: number }>;
+  hot: SplitCell[];
+  cold: SplitCell[];
+  overall?: number;
+  min_n?: number;
+};
+
+export type ClarifyQuestion = {
+  id: string;
+  question: string;
+  why: string;
+  kind: "single" | "multi" | "boolean" | "number" | "short" | "long";
+  options: string[];
+  default: string;
+  unit?: string | null;
+};
+export type Clarification = {
+  reading: string;
+  lens: LensId | null;
+  lens_reason: string;
+  scope: "countries" | "global";
+  questions: ClarifyQuestion[];
+  error?: string;
 };
 
 export type Report = {
@@ -382,6 +422,8 @@ export type Meta = {
   sectors: string[];
   channels: Record<string, string>;
   stages: { id: string; label: string }[];
+  lenses: { id: LensId; label: string; description: string }[];
+  global: { quick: string[]; deep: string[] };
   model_examples: Record<string, string[]>;
   defaults: RunConfig;
 };

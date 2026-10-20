@@ -16,7 +16,7 @@ import numpy as np
 from ..scenario.models import Force, ScenarioSpec, Segment
 from ..world.countries import Country, Occupation, blocs, company_types, countries, occupations
 from ..world.influence import Influencer
-from .headcount import segment_headcount
+from .headcount import seg_headcount
 from .models import Exposure, Persona, Traits
 
 SENIORITY = ["junior", "mid", "senior", "executive"]
@@ -119,6 +119,15 @@ class PopulationBuilder:
             for m in members:
                 pool.append((_Occ.of(m), gw * m.weight / total_w))
         return pool
+
+    @staticmethod
+    def _age_ok(o: _Occ, seg: Segment) -> bool:
+        lo, hi = seg.age_min or 15, seg.age_max or 100
+        if o.id == "retiree":
+            return hi >= 58
+        if o.id == "student":
+            return lo <= 30
+        return True
 
     def _pick(self, pool: list[tuple[_Occ, float]]) -> _Occ:
         w = np.array([max(p[1], 1e-9) for p in pool])
@@ -253,11 +262,19 @@ class PopulationBuilder:
 
     def _person(self, idx: str, iso: str, seg: Segment, seg_index: int, *, voice: str | None = None) -> Persona:
         c = countries()[iso]
-        o = self._pick(self._segment_pool(seg, c))
+        pool = [(o, w) for o, w in self._segment_pool(seg, c) if self._age_ok(o, seg)] or self._segment_pool(seg, c)
+        o = self._pick(pool)
         seniority = self._seniority(o)
         ctype, size = self._company(o, seg)
         sector = self._sector(o)
         age = self._age(o, seniority)
+        if seg.age_min is not None or seg.age_max is not None:
+            lo, hi = seg.age_min or 15, max(seg.age_min or 15, seg.age_max or 95)
+            if not lo <= age <= hi:
+                age = int(self.rng.integers(lo, hi + 1))
+                # Keep seniority believable for the age we landed on.
+                if age < 26 and seniority in ("senior", "executive") and o.id not in OWNER_OCCUPATIONS:
+                    seniority = "junior"
         income = c.gdp_pc_usd * o.income_mult * SENIORITY_INCOME[seniority] * float(self.rng.lognormal(0, 0.35))
         if o.id in NON_WORKERS:
             income = c.gdp_pc_usd * o.income_mult * float(self.rng.lognormal(0, 0.4))
@@ -272,9 +289,10 @@ class PopulationBuilder:
             id=idx, country=iso, country_name=c.name, segment=seg.name, segment_index=seg_index,
             occupation_id=o.id, occupation=o.title, isco=o.isco, sector=sector, company_type=ctype,
             company_size=size, seniority=seniority, buyer_role=o.buyer_role, age=age,
-            gender=str(self.rng.choice(["woman", "man", "non-binary person"], p=[0.475, 0.51, 0.015])),
+            gender=seg.gender if seg.gender in ("woman", "man") else str(self.rng.choice(["woman", "man", "non-binary person"], p=[0.475, 0.51, 0.015])),
             income_usd=int(round(income, -2)), income_band=band, traits=traits, exposures=exposures,
             is_buyer=seg.is_buyer if voice is None else False, influencer_voice=voice,
+            group_trait=seg.trait if voice is None else None,
         )
 
     def build(self, n: int, influencer_voices: int = 0) -> list[Persona]:
@@ -305,7 +323,7 @@ class PopulationBuilder:
             # square root of its real headcount. Big groups get more agents, small ones still
             # get enough to say something, and the weights below put everyone back at true scale.
             cell_heads = {
-                (iso, i): segment_headcount(iso, s.occupations, custom=bool(s.custom_occupation))
+                (iso, i): seg_headcount(iso, s)
                 for iso in country_w
                 for i, s in enumerate(segs)
                 if not s.countries or iso in s.countries
@@ -333,7 +351,7 @@ class PopulationBuilder:
         # split across the agents sampled into it.
         cells = Counter((p.country, p.segment_index) for p in people)
         heads = {
-            key: segment_headcount(key[0], segs[key[1]].occupations, custom=bool(segs[key[1]].custom_occupation))
+            key: seg_headcount(key[0], segs[key[1]])
             for key in cells
         }
         for p in people:

@@ -9,6 +9,7 @@ adults. These are order-of-magnitude estimates, labelled as such in the UI.
 
 from __future__ import annotations
 
+import math
 from functools import lru_cache
 
 from ..world.countries import Country, Occupation, countries, occupation_meta, occupations
@@ -48,11 +49,45 @@ def occupation_headcount(iso: str, occupation_id: str) -> float:
     return workforce * (o.base_share or DEFAULT_CUSTOM_SHARE) * group_ratio * _sector_factor(o, c)
 
 
-def segment_headcount(iso: str, occupation_ids: list[str], custom: bool = False) -> float:
-    """People in a segment in one country. Empty list = all adults."""
+def age_share(iso: str, lo: int | None, hi: int | None) -> float:
+    """Share of adults (15+) aged lo..hi, from an age curve fitted to the country's median age
+    and share over 65. An approximation, but it gets young and old countries the right way round."""
+    if lo is None and hi is None:
+        return 1.0
+    c = countries()[iso]
+    lo, hi = max(15, lo or 15), min(100, hi or 100)
+    if hi < lo:
+        return 0.0
+    # Exponential decline in cohort size with age; steeper in young countries.
+    tau = max(18.0, (c.median_age - 10) * 1.6)
+    weights = [math.exp(-(a - 15) / tau) for a in range(15, 101)]
+    total = sum(weights)
+    return sum(weights[a - 15] for a in range(lo, hi + 1)) / total
+
+
+def segment_headcount(
+    iso: str, occupation_ids: list[str], custom: bool = False, age_min: int | None = None, age_max: int | None = None, gender: str = "any"
+) -> float:
+    """People in a segment in one country. Empty list = all adults. Age and gender narrow it."""
     c = countries()[iso]
     if not occupation_ids:
-        if custom:
-            return c.workforce_m * 1e6 * DEFAULT_CUSTOM_SHARE
-        return c.adults_m * 1e6
-    return sum(occupation_headcount(iso, oid) for oid in occupation_ids)
+        base = c.workforce_m * 1e6 * DEFAULT_CUSTOM_SHARE if custom else c.adults_m * 1e6
+    else:
+        base = sum(occupation_headcount(iso, oid) for oid in occupation_ids)
+    base *= age_share(iso, age_min, age_max)
+    if gender in ("woman", "man"):
+        base *= 0.5
+    return base
+
+
+def seg_headcount(iso: str, seg) -> float:
+    """Headcount for a Segment object. A free-text trait narrows it by the model's estimated share."""
+    base = segment_headcount(iso, seg.occupations, bool(seg.custom_occupation), seg.age_min, seg.age_max, seg.gender)
+    if getattr(seg, "trait", None):
+        base *= seg.trait_share if seg.trait_share is not None else 0.1
+    return base
+
+
+def seg_is_estimated(seg) -> bool:
+    """True when the headcount rests on a model estimate rather than World Bank / ILO data."""
+    return bool(getattr(seg, "trait", None) or getattr(seg, "custom_occupation", None))

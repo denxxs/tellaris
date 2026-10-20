@@ -5,16 +5,17 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { CommitteesTab, CountriesTab, GroupsTab, InfluenceTab, MethodTab, PricingTab, ReasonsTab } from "@/components/run/Details";
 import { SocietyTab } from "@/components/run/Society";
+import { WhereItWorks } from "@/components/run/WhereItWorks";
 import { Overview } from "@/components/run/Overview";
 import { PeopleTab } from "@/components/run/People";
 import { PersonaDrawer } from "@/components/run/PersonaDrawer";
-import { Button, ErrorNote, Notice, Pill, Tabs } from "@/components/ui";
+import { Button, ErrorNote, Notice, Pill, Select, Tabs } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { ago } from "@/lib/format";
 import { useRunStream } from "@/lib/useRunStream";
 
-type TabId = "overview" | "society" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "people" | "method";
+type TabId = "overview" | "society" | "where" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "people" | "method";
 
 const VERDICT: Record<string, { label: string; tone: "yes" | "no" | "neutral" }> = {
   strong: { label: "Strong", tone: "yes" },
@@ -44,6 +45,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const tabs = useMemo(() => {
     const t: { id: TabId; label: string }[] = [{ id: "overview", label: "Overview" }];
     if (r) {
+      if (r.splits && Object.keys(r.splits.dimensions).length) t.push({ id: "where", label: "Where it works" });
       if (r.diffusion?.rounds?.length) t.push({ id: "society", label: "Society" });
       t.push({ id: "people", label: "People" }, { id: "countries", label: "Countries" }, { id: "groups", label: "Groups" }, { id: "influence", label: "Outside influence" }, { id: "reasons", label: "Why and why not" });
       if (r.wtp) t.push({ id: "pricing", label: "Pricing" });
@@ -56,6 +58,27 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const targets = live.spec?.targets ?? [];
   const usedMock = Object.keys(live.usage?.by_model ?? {}).some((m) => m.startsWith("mock/")) || (meta?.mock && running);
   const verdict = live.report ? VERDICT[live.report.verdict] : null;
+  const lensId = r?.headline.lens ?? live.spec?.lens ?? null;
+  const lensLabel = r?.headline.lens_label ?? meta?.lenses.find((l) => l.id === lensId)?.label;
+  const first = live.spec?.outcomes?.[0] ?? "yes";
+  const measure = r?.headline.leading
+    ? `Share choosing “${first}”`
+    : r?.headline.kind === "action"
+      ? "Realistic share who say yes"
+      : first.toLowerCase() === "yes"
+        ? "Share who say yes"
+        : `Share who say “${first}”`;
+  const [relensing, setRelensing] = useState(false);
+  const relens = async (l: string) => {
+    const label = meta?.lenses.find((x) => x.id === l)?.label ?? l;
+    setRelensing(true);
+    try {
+      const res = await api.whatif(id, `As ${label.toLowerCase()}`, { lens: l });
+      window.location.href = `/runs/${res.id}`;
+    } catch {
+      setRelensing(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
@@ -72,6 +95,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="t-title">{title}</h1>
             {verdict && <Pill tone={verdict.tone}>{verdict.label}</Pill>}
+            {lensLabel && <Pill>{lensLabel}</Pill>}
             {running && (
               <span className="inline-flex items-center gap-1.5 text-[13px] text-muted">
                 <span className="live-dot size-1.5 rounded-full bg-live" aria-hidden />
@@ -105,6 +129,15 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {!running && live.status === "done" && lensId && meta && (
+            <Select
+              label="Run again with a different lens"
+              value=""
+              onChange={(v) => v && relens(v)}
+              className="w-auto"
+              options={[{ value: "", label: relensing ? "Starting…" : "Try another lens" }, ...meta.lenses.filter((l) => l.id !== lensId).map((l) => ({ value: l.id, label: `As ${l.label.toLowerCase()}` }))]}
+            />
+          )}
           {running ? (
             <Button
               busy={stopping}
@@ -155,6 +188,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
 
       {tab === "overview" && <Overview id={id} live={live} running={running} onSelect={setPerson} onTab={(t) => setTab(t as TabId)} />}
       {r && tab === "society" && <SocietyTab id={id} live={live} r={r} onSelect={setPerson} />}
+      {r && tab === "where" && r.splits && <WhereItWorks r={r} live={live} measure={measure} />}
       {r && tab === "countries" && <CountriesTab r={r} live={live} />}
       {r && tab === "groups" && <GroupsTab r={r} />}
       {r && tab === "influence" && <InfluenceTab r={r} live={live} />}

@@ -221,3 +221,36 @@ def expand_codes(codes: list[str]) -> list[str]:
 
 def country_blocs(iso: str) -> list[str]:
     return [bid for bid, b in blocs().items() if iso in b.members]
+
+
+def global_sample(depth: str = "quick") -> list[str]:
+    """Countries for a whole-world run: every region represented, then the largest by adults
+    until most of the world's adults are covered. quick = 16 countries, deep = 32."""
+    cs = sorted(countries().values(), key=lambda c: -c.adults_m)
+    limit = 32 if depth == "deep" else 20
+    per_region = 3 if depth == "deep" else 1
+    eu_west = set(blocs()["EU"].members) | {"GBR", "CHE", "NOR"} if "EU" in blocs() else {"GBR"}
+
+    def area(c: Country) -> str:
+        # The World Bank puts Western Europe and Central Asia in one region; treat them apart.
+        if c.region.startswith("Europe"):
+            return "Western Europe" if c.iso3 in eu_west else "Eastern Europe and Central Asia"
+        return c.region
+
+    big = [c for c in cs if c.adults_m >= 3]  # regional representatives must be sizeable
+    picked: list[str] = []
+    for region in sorted({area(c) for c in big}):
+        picked += [c.iso3 for c in big if area(c) == region][:per_region]
+    for c in cs:
+        if len(picked) >= limit:
+            break
+        if c.iso3 not in picked:
+            picked.append(c.iso3)
+    return picked[:limit] if len(picked) > limit else picked
+
+
+def world_coverage(isos: list[str]) -> float:
+    """Share of the world's adults living in these countries."""
+    cs = countries()
+    total = sum(c.adults_m for c in cs.values()) or 1
+    return sum(cs[i].adults_m for i in isos if i in cs) / total

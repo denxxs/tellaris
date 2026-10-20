@@ -16,7 +16,7 @@ import math
 import numpy as np
 from pydantic import BaseModel
 
-ACTION_KINDS = {"product", "feature", "pricing", "campaign", "company", "market"}
+ACTION_KINDS = {"product", "feature", "pricing", "campaign", "company", "market", "personal", "habit"}
 
 DEFAULT_PARAMS = {
     # (a, b) for logit(p') = a * logit(p) + b

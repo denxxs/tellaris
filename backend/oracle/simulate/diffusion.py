@@ -166,7 +166,7 @@ async def run_diffusion(
             user = (
                 f"YOU:\n{p.card()}\n\nTHE SUBJECT: {spec.subject}\nQuestion: {spec.persona_question}\n"
                 f"Your current view: {state[pid]['p']:.0%} likely. You said: \"{state[pid]['quote']}\"\n\n"
-                + (f"WHAT YOUR CONTACTS SAY:\n" + "\n".join(lines) + "\n\n" if lines else "")
+                + ("WHAT YOUR CONTACTS SAY:\n" + "\n".join(lines) + "\n\n" if lines else "")
                 + (f"NEWS THIS WEEK: {news}\n\n" if news else "")
                 + "Has your view changed?"
             )

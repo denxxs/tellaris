@@ -29,6 +29,9 @@ def apply_lever(spec: ScenarioSpec, changes: dict[str, Any]) -> ScenarioSpec:
         s.forces = [*s.forces, Force.model_validate(f)]
     if changes.get("remove_force"):
         s.forces = [f for f in s.forces if f.name != changes["remove_force"]]
+    if changes.get("lens") in ("b2b", "consumer", "personal", "opinion", "forecast"):
+        s.lens = changes["lens"]
+        s.b2b = s.lens == "b2b"
     if changes.get("competitors") is not None:
         s.competitors = list(changes["competitors"])
     return ScenarioSpec.model_validate(s.model_dump())
