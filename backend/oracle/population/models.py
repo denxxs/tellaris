@@ -49,6 +49,7 @@ class Persona(BaseModel):
     weight: float = 1.0
     represents: float = 0.0  # real people this agent stands for (estimate)
     influencer_voice: str | None = None  # bloc/country code if sampled as an outside voice
+    group_trait: str | None = None  # a defining trait from their group, e.g. "owns a dog"
 
     # Filled in by enrichment
     name: str = ""
@@ -91,4 +92,6 @@ class Persona(BaseModel):
             lines.append(f"Uses today: {', '.join(self.tools_today)}")
         if self.household:
             lines.append(f"Household: {self.household}")
+        if self.group_trait:
+            lines.append(f"Also true about you: {self.group_trait}")
         return "\n".join(lines)

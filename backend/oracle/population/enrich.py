@@ -49,6 +49,7 @@ def _brief(p: Persona) -> str:
         f"{p.company_type} ~{p.company_size} staff | sector {p.sector} | ${p.income_usd:,}/yr ({p.income_band}) | "
         f"tech {t.tech_affinity:.2f} skeptic {t.skepticism:.2f} risk {t.risk_appetite:.2f} "
         f"price-sens {t.price_sensitivity:.2f} authority {t.budget_authority:.2f}"
+        + (f" | also: {p.group_trait}" if p.group_trait else "")
     )
 
 

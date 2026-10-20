@@ -16,6 +16,7 @@ from ..llm import LLMError, llm
 from ..population.models import Persona
 from ..research.search import Fact
 from ..scenario.models import ScenarioSpec
+from ..scenario.lenses import lens_of
 
 # Juster scale: verbal probability anchors that predict real purchases better
 # than "would you buy?" questions.
@@ -67,18 +68,9 @@ class Reaction(ReactionOut):
     p_stated: float
 
 
-SYSTEM = """You are role-playing ONE specific real person in a world simulation used to forecast real outcomes.
-Stay fully in character. Decide as this person would actually BEHAVE, not how they would like to look.
-
-Realism rules (critical):
-- Most people ignore most new products, campaigns and announcements. Busy, sceptical or price-sensitive people say no often.
-- Your traits are real constraints: high scepticism means you need proof; high price sensitivity means price dominates; low tech affinity means friction; low budget authority means you can only suggest, and the answer is about whether it actually happens for you.
-- Compare against what you use today (including doing nothing, spreadsheets, or an existing vendor). Switching has a cost.
-- Outside forces listed for you are real pressures in your work. Weigh them only if they matter to this decision.
-- Use only the facts given and your own life. Don't invent statistics.
-- Be honest and specific in your own voice. No marketing language.
-
-Juster scale for the 'juster' field: """ + JUSTER_TEXT
+def system_for(spec: ScenarioSpec) -> str:
+    """The person's instructions for this question's lens."""
+    return lens_of(spec).system_prompt(JUSTER_TEXT)
 
 
 def _facts_for(p: Persona, facts: list[Fact]) -> list[Fact]:
@@ -121,12 +113,13 @@ def build_prompt(p: Persona, spec: ScenarioSpec, facts: list[Fact]) -> str:
     return "\n".join(lines)
 
 
-def stated_probability(r: ReactionOut) -> float:
-    """Blend the Juster answer with the stated probability, and respect attention."""
+def stated_probability(r: ReactionOut, offer: bool = True) -> float:
+    """Blend the Juster answer with the stated probability. For offers, someone who would
+    ignore or only skim it can't also be very likely to take it up."""
     p = 0.6 * JUSTER.get(r.juster, 0.5) + 0.4 * r.likelihood
-    if r.attention == "ignore":
+    if offer and r.attention == "ignore":
         p = min(p, 0.08)
-    elif r.attention == "skim":
+    elif offer and r.attention == "skim":
         p = min(p, 0.35)
     return round(max(0.0, min(1.0, p)), 4)
 
@@ -165,7 +158,7 @@ async def react_all(
             out = await llm.json(
                 task="react",
                 model=model,
-                system=SYSTEM,
+                system=system_for(spec),
                 user=user,
                 schema=ReactionOut,
                 temperature=temperature,
@@ -178,13 +171,13 @@ async def react_all(
             model = models[(idx + run + 1) % len(models)]
             try:
                 out = await llm.json(
-                    task="react", model=model, system=SYSTEM, user=user, schema=ReactionOut,
+                    task="react", model=model, system=system_for(spec), user=user, schema=ReactionOut,
                     temperature=temperature, mock_ctx={"persona": p.model_dump(), "spec": spec.model_dump(), "run": run},
                 )
             except LLMError:
                 return
         out = _normalize(out, spec)
-        r = Reaction(**out.model_dump(), persona_id=p.id, run=run, model=model, p_stated=stated_probability(out))
+        r = Reaction(**out.model_dump(), persona_id=p.id, run=run, model=model, p_stated=stated_probability(out, lens_of(spec).offer))
         async with lock:
             results.append(r)
         if on_reaction:

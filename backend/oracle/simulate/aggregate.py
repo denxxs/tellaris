@@ -5,11 +5,15 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Any
 
+import math
+
 import numpy as np
 
 from ..population.models import Persona
+from ..world.countries import blocs, countries
 from ..scenario.models import ScenarioSpec
-from .calibrate import Calibration, apply_array, kind_for
+from ..scenario.lenses import lens_of
+from .calibrate import Calibration, apply_array
 from .reaction import Reaction
 
 BOOTSTRAP = 1000
@@ -43,8 +47,9 @@ class Aggregator:
         self.core = [p for p in self.people if p.influencer_voice is None]
         buyers = [p for p in self.core if p.is_buyer]
         self.focus = buyers or self.core
-        self.action = kind_for(spec.subject_kind) == "action"
-        self.reach = spec.assumed_reach if self.action else 1.0
+        self.lens = lens_of(spec)
+        self.action = self.lens.say_do
+        self.reach = spec.assumed_reach if self.lens.reach else 1.0
         self.max_runs = max((len(v) for v in self.by_person.values()), default=1)
 
     # ---------- per-person numbers ----------
@@ -68,7 +73,7 @@ class Aggregator:
             w = np.ones(len(people))
         return w
 
-    def _summary(self, people: list[Persona]) -> dict[str, Any]:
+    def _summary(self, people: list[Persona], boots_n: int = BOOTSTRAP) -> dict[str, Any]:
         if not people:
             return {"n": 0}
         m = self._matrix(people)
@@ -78,9 +83,9 @@ class Aggregator:
         point = _wmean(cal, w) * self.reach
         # Bootstrap over people and over which ensemble sample we trust.
         n = len(people)
-        boots = np.empty(BOOTSTRAP)
+        boots = np.empty(boots_n)
         valid_counts = (~np.isnan(m)).sum(axis=1)
-        for b in range(BOOTSTRAP):
+        for b in range(boots_n):
             idx = self.rng.integers(0, n, n)
             pick = (self.rng.random(n) * valid_counts[idx]).astype(int)
             vals = m[idx, pick]
@@ -258,6 +263,117 @@ class Aggregator:
             {"option": spec.outcomes[1], "share": round(1 - _wmean(yes, w), 4)},
         ]
 
+    def _option_ci(self, option: str) -> list[float]:
+        """Likely range for one option's share, by resampling people."""
+        if not self.focus:
+            return [0.0, 0.0]
+        vals = np.array([np.mean([(r.option_probs or {}).get(option, 0.0) for r in self.by_person[p.id]]) for p in self.focus])
+        w = self._weights(self.focus)
+        n = len(vals)
+        boots = np.empty(400)
+        for b in range(400):
+            idx = self.rng.integers(0, n, n)
+            boots[b] = _wmean(vals[idx], w[idx])
+        lo, hi = np.nanpercentile(boots, [5, 95])
+        return [round(float(lo), 4), round(float(hi), 4)]
+
+    # ---------- where it works and where it doesn't ----------
+
+    @staticmethod
+    def _age_band(age: int) -> str:
+        return "18-29" if age < 30 else "30-44" if age < 45 else "45-59" if age < 60 else "60+"
+
+    def _dims(self) -> dict[str, tuple[str, Any, Any]]:
+        """Dimension id -> (label, key function, display function)."""
+        cs = countries()
+        age_label = {"18-29": "Under 30s", "30-44": "30 to 44 year olds", "45-59": "45 to 59 year olds", "60+": "Over 60s"}
+        income_label = {"low": "Lower incomes", "middle": "Middle incomes", "high": "Higher incomes", "very high": "Top earners"}
+        gender_label = {"woman": "Women", "man": "Men", "non-binary person": "Non-binary people"}
+        isco = ["", "Managers and owners", "Professionals", "Technicians", "Clerical workers", "Service and sales workers",
+                "Farmers", "Trades workers", "Machine operators", "Elementary jobs"]
+
+        def region(p: Persona) -> str:
+            c = cs.get(p.country)
+            if not c:
+                return "Other"
+            if c.region.startswith("Europe"):
+                eu = set(blocs()["EU"].members) | {"GBR", "CHE", "NOR"} if "EU" in blocs() else set()
+                return "Western Europe" if p.country in eu else "Eastern Europe and Central Asia"
+            return c.region.replace("Middle East, North Africa, Afghanistan & Pakistan", "Middle East, North Africa and Pakistan")
+
+        return {
+            "country": ("Country", lambda p: p.country, lambda k: cs[k].name if k in cs else k),
+            "region": ("Region", region, lambda k: k),
+            "age": ("Age", lambda p: self._age_band(p.age), lambda k: age_label.get(k, k)),
+            "gender": ("Gender", lambda p: p.gender, lambda k: gender_label.get(k, k)),
+            "income": ("Income", lambda p: p.income_band, lambda k: income_label.get(k, k)),
+            "work": ("Type of work", lambda p: "Not working" if p.isco == 0 else isco[p.isco], lambda k: k),
+            "segment": ("Group", lambda p: p.segment, lambda k: k),
+            "company": ("Company", lambda p: p.company_type, lambda k: k.replace("_", " ").capitalize()),
+        }
+
+    def splits(self, head: dict[str, Any]) -> dict[str, Any]:
+        """Breakdowns on every dimension, and the cells that really differ from the overall answer."""
+        dims = self._dims()
+        focus = self.focus
+        if len(focus) < 20:
+            return {"dimensions": {}, "hot": [], "cold": []}
+        overall = head.get("value", 0.0)
+        o_lo, o_hi = head.get("ci", [overall, overall])
+        min_n = 12
+
+        def cells(keyfn) -> dict[str, list[Persona]]:
+            out: dict[str, list[Persona]] = defaultdict(list)
+            for p in focus:
+                out[keyfn(p)].append(p)
+            return out
+
+        dimensions: dict[str, Any] = {}
+        for dim_id, (label, keyfn, show) in dims.items():
+            groups = cells(keyfn)
+            if len(groups) < 2:
+                continue
+            rows = []
+            for k, members in groups.items():
+                if len(members) < min_n:
+                    continue
+                s = self._summary(members, boots_n=300)
+                rows.append({"key": k, "label": show(k), "n": s["n"], "value": s["value"], "ci": s["ci"], "people": s.get("people")})
+            if len(rows) >= 2:
+                rows.sort(key=lambda r: -r["value"])
+                dimensions[dim_id] = {"label": label, "rows": rows, "hidden": sum(1 for v in groups.values() if len(v) < min_n)}
+
+        # Pairs that tend to tell a story ("Under 30s in India").
+        pairs = [("age", "country"), ("age", "region"), ("gender", "country"), ("income", "country"), ("age", "gender"), ("work", "country")]
+        candidates = []
+        for dim_id, (label, keyfn, show) in dims.items():
+            if dim_id in dimensions:
+                for r in dimensions[dim_id]["rows"]:
+                    candidates.append({"label": r["label"], "dims": [dim_id], **{k: r[k] for k in ("n", "value", "ci", "people")}})
+        for a, b in pairs:
+            if a not in dimensions or b not in dimensions:
+                continue
+            la, ka, sa = dims[a]
+            lb, kb, sb = dims[b]
+            groups = cells(lambda p: (ka(p), kb(p)))
+            for (va, vb), members in groups.items():
+                if len(members) < min_n:
+                    continue
+                s = self._summary(members, boots_n=300)
+                joiner = " in " if b in ("country", "region") else ", "
+                candidates.append({"label": f"{sa(va)}{joiner}{sb(vb)}", "dims": [a, b], **{k: s[k] for k in ("n", "value", "ci")}, "people": s.get("people")})
+
+        def score(c: dict[str, Any]) -> float:
+            return abs(c["value"] - overall) * math.sqrt(c["n"])
+
+        hot = [c for c in candidates if c["ci"][0] > o_hi]
+        cold = [c for c in candidates if c["ci"][1] < o_lo]
+        for c in hot + cold:
+            c["vs_overall"] = round(c["value"] - overall, 4)
+        hot.sort(key=lambda c: -score(c))
+        cold.sort(key=lambda c: -score(c))
+        return {"dimensions": dimensions, "hot": hot[:8], "cold": cold[:8], "overall": overall, "min_n": min_n}
+
     def model_agreement(self) -> list[dict[str, Any]]:
         by_model: dict[str, list[float]] = defaultdict(list)
         focus_ids = {p.id for p in self.focus}
@@ -315,7 +431,7 @@ class Aggregator:
         )
         revenue = None
         price = self.spec.price
-        if price and self.action and head.get("adopters") is not None:
+        if price and self.lens.revenue and head.get("adopters") is not None:
             per_month = {"month": 1.0, "per-seat-month": 1.0, "year": 1 / 12, "usage": 1.0}.get(price.period)
             if per_month is not None:
                 customers = head["adopters"]
@@ -326,13 +442,27 @@ class Aggregator:
                     "currency": price.currency,
                     "note": "Adopters times the list price, one seat each, at full ramp by the end of the time frame.",
                 }
+        leading = None
+        dist = self.outcome_distribution()
+        if self.spec.outcome_type == "categorical" and isinstance(dist, list) and dist:
+            top = max(dist, key=lambda d: d["share"])
+            leading = {"option": top["option"], "share": top["share"], "ci": self._option_ci(top["option"])}
+            label = f"Most chosen: {top['option']}"
+        elif self.spec.outcome_type == "numeric" and isinstance(dist, dict):
+            label = f"Typical answer{f' ({dist.get(chr(117) + chr(110) + chr(105) + chr(116))})' if dist.get('unit') else ''}"
+        elif not self.action:
+            first = self.spec.outcomes[0]
+            label = f"Share who say “{first}”" if first.lower() not in ("yes", "y") else "Share who say yes"
         return {
             "headline": {
                 **head,
+                "leading": leading,
                 "label": label,
                 "reach": self.reach,
                 "if_aware": head.get("calibrated"),
                 "kind": "action" if self.action else "belief",
+                "lens": self.lens.id,
+                "lens_label": self.lens.label,
                 "calibration": self.cal.model_dump(),
                 "samples": sum(len(self.by_person[p.id]) for p in self.focus),
                 "agents_total": len(self.people),
@@ -352,4 +482,5 @@ class Aggregator:
             "wtp": self.wtp(),
             "model_agreement": self.model_agreement(),
             "quotes": self.quotes(),
+            "splits": self.splits(head),
         }

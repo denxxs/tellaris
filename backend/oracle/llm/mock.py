@@ -87,7 +87,9 @@ def compile_scenario(ctx: dict[str, Any]) -> dict[str, Any]:
     targets = ctx.get("targets") or [c for c in find_mentions(prompt)] or ["USA"]
 
     belief = bool(re.search(r"\bvote|referendum|election|plebiscite|survey|approve of|support the\b|policy|\blaw\b|ban\b", low))
-    b2b = (not belief) and bool(re.search(r"b2b|saas|enterprise|for (teams|companies|businesses)|founders?|crm|api\b|workflow|platform", low))
+    opinionish = bool(re.search(r"\bthink of|opinion|prefer|favou?rite|which (name|one|option)|love it|hate it|pineapple|would you rather|funny|like better", low))
+    personal = bool(re.search(r"would (you|people) (move|quit|switch|try|eat|date|leave|relocate|give up)|\bfour-day|4-day week|\bsabbatical", low))
+    b2b = (not belief) and not opinionish and not personal and bool(re.search(r"b2b|saas|enterprise|for (teams|companies|businesses)|founders?|crm|api\b|workflow|platform", low))
     kind = "event" if belief else ("pricing" if re.search(r"\bpric(e|ing)\b", low) and "launch" not in low else "product")
 
     m = re.search(r"outcomes?:\s*([^.?\n]+)", prompt, re.IGNORECASE)
@@ -159,7 +161,21 @@ def compile_scenario(ctx: dict[str, Any]) -> dict[str, Any]:
         f"Within the next {horizon} months, would you {first.lower()} this?" if not belief
         else f"How will you personally decide? Options: {', '.join(outcomes)}."
     )
+    lens = "b2b" if b2b else "forecast" if belief else "opinion" if opinionish else "personal" if personal else "consumer"
+    scope = "global" if re.search(r"\bworld|global|everywhere|worldwide|every country", low) else "countries"
+    ages = [(r"gen ?z|zoomers?", 18, 28, "Gen Z"), (r"millennials?", 29, 44, "Millennials"), (r"gen ?x", 45, 60, "Gen X"), (r"boomers?|retirees?|over[- ]60", 61, 80, "Over 60s"), (r"teens?|teenagers?", 15, 19, "Teenagers"), (r"students?", 18, 25, "Students")]
+    for pat, lo, hi, name in ages:
+        if re.search(pat, low) and lens != "b2b":
+            gender = "woman" if re.search(r"\bwomen\b|\bfemale", low) else "man" if re.search(r"\bmen\b|\bmale", low) else "any"
+            segments = [{"name": name if gender == "any" else f"{name} {'women' if gender == 'woman' else 'men'}", "occupations": [], "weight": 1.0, "is_buyer": True, "age_min": lo, "age_max": hi, "gender": gender}]
+            break
+    if re.search(r"dog owners?|own a dog", low):
+        segments.append({"name": "Dog owners", "occupations": [], "weight": 1.0, "is_buyer": True, "trait": "owns a dog", "trait_share": 0.33})
+    if lens in ("opinion", "personal", "forecast"):
+        segments = [s for s in segments if not set(s.get("occupations", [])) & {"founder_b2b_saas"}] or segments
     return {
+        "lens": lens,
+        "scope": scope,
         "title": _title(prompt),
         "question": f"Share of the target population who choose '{first}' within {horizon} months",
         "subject_kind": kind,
@@ -634,6 +650,25 @@ def public_brief(ctx: dict[str, Any]) -> dict[str, Any]:
     return {"description": " ".join(keep) or text}
 
 
+def clarify(ctx: dict[str, Any]) -> dict[str, Any]:
+    from ..world.countries import find_mentions
+
+    spec = compile_scenario({"prompt": ctx["prompt"], "targets": ctx.get("targets") or []})
+    low = ctx["prompt"].lower()
+    qs = []
+    if spec["lens"] in ("b2b", "consumer") and not spec["price"]:
+        qs.append({"id": "price", "question": "What will it cost a typical customer?", "why": "Price changes who says yes.", "kind": "single",
+                   "options": ["Free", "Under $10 a month", "$10 to $50 a month", "Over $50 a month"], "default": "$10 to $50 a month"})
+    if not ctx.get("targets") and not find_mentions(ctx["prompt"]) and spec["scope"] != "global":
+        qs.append({"id": "where", "question": "Where should Oracle simulate people?", "why": "Different countries answer very differently.", "kind": "single",
+                   "options": ["United States", "India", "Europe", "Whole world"], "default": "United States"})
+    if spec["lens"] in ("b2b", "consumer") and not re.search(r"\d+\s*(months?|years?)", low):
+        qs.append({"id": "horizon", "question": "Over what time frame?", "why": "Adoption builds over time.", "kind": "single",
+                   "options": ["3 months", "6 months", "12 months", "2 years"], "default": "12 months"})
+    return {"reading": spec["question"], "lens": spec["lens"], "lens_reason": "From how the question is phrased", "scope": spec["scope"], "questions": qs}
+
+
 HANDLERS["public_brief"] = public_brief
+HANDLERS["clarify"] = clarify
 HANDLERS["society_turn"] = society_turn
 HANDLERS["file_facts"] = file_facts

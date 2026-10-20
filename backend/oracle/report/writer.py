@@ -13,6 +13,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from ..llm import LLMError, llm
+from ..scenario.lenses import lens_of
 from ..scenario.models import ScenarioSpec
 
 
@@ -87,8 +88,11 @@ class Report(BaseModel):
     confidence_note: str = Field(description="How much to trust this and why")
 
 
-REPORT_SYSTEM = """You are a senior strategy analyst writing the result of a large multi-agent simulation.
-Write for a founder or executive who needs to decide what to do next.
+REPORT_SYSTEM = """You are a sharp analyst writing up the result of a large multi-agent simulation of real people.
+Write for whoever asked: a founder deciding a launch, a researcher, or someone curious about a fun question.
+Match the tone to the question: crisp and decision-focused for business; lively but still evidence-based for casual or silly ones.
+For non-business questions, 'recommendations' become the most interesting findings and how to dig further, and levers become
+variations worth testing (a different wording, country, age group or price).
 
 Rules:
 - Use ONLY numbers present in the data. Quote them as percentages with no false precision.
@@ -124,7 +128,11 @@ def _compact(results: dict[str, Any]) -> dict[str, Any]:
 
 async def write_report(spec: ScenarioSpec, results: dict[str, Any], model: str) -> Report:
     payload = json.dumps(_compact(results), default=str)[:60000]
-    user = f"SCENARIO:\n{spec.model_dump_json(indent=1)}\n\nSIMULATION RESULTS (JSON):\n{payload}"
+    lens = lens_of(spec)
+    user = (
+        f"LENS: {lens.label}. {lens.report_tone}\n\n"
+        f"SCENARIO:\n{spec.model_dump_json(indent=1)}\n\nSIMULATION RESULTS (JSON):\n{payload}"
+    )
     return await llm.json(
         task="report", model=model, system=REPORT_SYSTEM, user=user, schema=Report, temperature=0.3,
         mock_ctx={"spec": spec.model_dump(), "results": results},
