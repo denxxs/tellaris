@@ -20,6 +20,8 @@ from ..providers import PROVIDERS
 from ..scenario.lenses import LENSES
 from ..world.countries import global_sample
 from ..backtest.runner import BacktestRequest, builtin_cases, job_view, start_backtest
+from ..backtest.track import ResolveRequest as ResolveRequestModel
+from ..backtest.track import TrackRequest as TrackRequestModel
 from ..config import PROVIDER_KEY_ENV, env, settings_store
 from ..events import hub
 from ..llm import llm
@@ -532,6 +534,68 @@ async def calibration() -> dict[str, Any]:
         saved = await store.calibration(kind)
         out[kind] = saved or {"kind": kind, "a": a, "b": b, "source": "default", "n_cases": 0}
     return out
+
+
+# ------------------------------------------------------------------ track record
+
+@app.get("/api/track")
+async def track_record() -> dict[str, Any]:
+    from ..backtest import track
+
+    preds = await store.predictions()
+    return {"predictions": preds, "summary": track.summary(preds)}
+
+
+@app.get("/api/runs/{run_id}/track")
+async def run_predictions(run_id: str) -> list[dict[str, Any]]:
+    return await store.predictions(run_id)
+
+
+@app.post("/api/runs/{run_id}/track")
+async def track_run(run_id: str, req: TrackRequestModel) -> dict[str, Any]:
+    from ..backtest import track
+
+    run = await store.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "Run not found")
+    try:
+        pred = track.freeze(run, req)
+    except track.PredictionError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    await store.save_prediction(pred)
+    return pred
+
+
+@app.post("/api/track/{pred_id}/resolve")
+async def resolve_prediction(pred_id: str, req: ResolveRequestModel) -> dict[str, Any]:
+    from ..backtest import track
+
+    pred = await store.prediction(pred_id)
+    if not pred:
+        raise HTTPException(404, "Prediction not found")
+    if pred["status"] == "resolved":
+        raise HTTPException(400, "Already resolved. Delete it and track the run again to start over.")
+    done = track.resolve(pred, req)
+    await store.save_prediction(done)
+    return done
+
+
+@app.delete("/api/track/{pred_id}")
+async def delete_prediction(pred_id: str) -> dict[str, bool]:
+    await store.delete_prediction(pred_id)
+    return {"ok": True}
+
+
+@app.post("/api/track/fit/{kind}")
+async def fit_from_track(kind: str) -> dict[str, Any]:
+    from ..backtest import track
+
+    if kind not in DEFAULT_PARAMS:
+        raise HTTPException(404, "Unknown kind")
+    try:
+        return await track.fit(kind)
+    except track.PredictionError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.delete("/api/calibration/{kind}")

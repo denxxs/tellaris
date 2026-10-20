@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button, Card, CardHead, ErrorNote, Meter, Notice, PageHead, Pill, Slider, Toggle } from "@/components/ui";
+import { Button, Card, CardHead, ErrorNote, Meter, PageHead, Pill, Slider, Toggle } from "@/components/ui";
+import { TrackRecord } from "@/components/track/TrackRecord";
 import { api, type BacktestCase, type BacktestJob, type Calibration } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { ago, cx, pctSmart } from "@/lib/format";
@@ -64,11 +65,13 @@ export default function AccuracyPage() {
   return (
     <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
       <PageHead title="Accuracy">
-        Run Oracle on questions whose real answers are known, see how far off it is, and let it learn a correction from the gap.
+        Score Oracle against what really happened, and let it learn a correction from the gap.
       </PageHead>
       <div className="mb-6">
-        <Notice>Models may already know these famous outcomes, so scores here are optimistic. The honest test is your own cases from after your models were trained.</Notice>
+        <TrackRecord onCalibrated={refresh} />
       </div>
+      <h2 className="t-section mb-1">Past events</h2>
+      <p className="mb-4 max-w-[70ch] text-[14px] leading-5 text-muted">A quick check on famous outcomes. Models may already know them, so these scores are optimistic; your track record is the honest test.</p>
       {error && (
         <div className="mb-6">
           <ErrorNote>{error}</ErrorNote>
@@ -137,10 +140,10 @@ export default function AccuracyPage() {
                   <div>
                     <div className="text-[14px]">{KIND[c.kind as keyof typeof KIND] ?? c.kind}</div>
                     <div className="text-[12px] text-faint">
-                      {c.source === "backtest" ? `Learned from ${c.n_cases} cases` : "Default"}, factor {c.a}, shift {c.b}
+                      {c.source === "backtest" ? `Learned from ${c.n_cases} past events` : c.source === "track record" ? `Learned from ${c.n_cases} tracked predictions` : "Default"}, factor {c.a}, shift {c.b}
                     </div>
                   </div>
-                  {c.source === "backtest" ? (
+                  {c.source !== "default" ? (
                     <Button size="sm" variant="ghost" onClick={() => api.resetCalibration(c.kind).then(refresh)}>
                       Reset
                     </Button>

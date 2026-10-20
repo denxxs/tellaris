@@ -96,6 +96,14 @@ export const api = {
   backtest: (id: string) => req<BacktestJob>(`/api/backtest/${id}`),
   backtests: () => req<BacktestJob[]>("/api/backtests"),
   calibration: () => req<Record<string, Calibration>>("/api/calibration"),
+  trackRecord: () => req<{ predictions: Prediction[]; summary: TrackSummary }>("/api/track"),
+  runPredictions: (id: string) => req<Prediction[]>(`/api/runs/${id}/track`),
+  track: (id: string, body: { resolves_on: string; note?: string }) => req<Prediction>(`/api/runs/${id}/track`, { method: "POST", body: JSON.stringify(body) }),
+  resolvePrediction: (pid: string, body: { actual: number; source?: string }) =>
+    req<Prediction>(`/api/track/${pid}/resolve`, { method: "POST", body: JSON.stringify(body) }),
+  deletePrediction: (pid: string) => req<{ ok: boolean }>(`/api/track/${pid}`, { method: "DELETE" }),
+  fitFromTrack: (kind: string) =>
+    req<{ calibration: Calibration; n: number; mae_before: number; mae_after: number }>(`/api/track/fit/${kind}`, { method: "POST" }),
   resetCalibration: (kind: string) => req<{ ok: boolean }>(`/api/calibration/${kind}`, { method: "DELETE" }),
 };
 
@@ -116,6 +124,43 @@ export type Settings = {
 export type BacktestCase = { id: string; kind: "action" | "belief"; as_of: string; targets: string[]; actual: number; prompt: string; source: string };
 
 export type Calibration = { kind: string; a: number; b: number; source: string; n_cases: number };
+
+export type Prediction = {
+  id: string;
+  run_id: string;
+  created_at: number;
+  made_on: string;
+  resolves_on: string;
+  note: string;
+  title: string;
+  question: string;
+  measure: string;
+  outcome: string;
+  targets: string[];
+  lens: string | null;
+  kind: "action" | "belief";
+  predicted: number;
+  ci: [number, number] | null;
+  stated: number | null;
+  status: "open" | "resolved";
+  actual: number | null;
+  source: string;
+  resolved_at: number | null;
+  blind?: boolean;
+  error?: number;
+  within_range?: boolean;
+};
+
+export type TrackSummary = {
+  total: number;
+  open: number;
+  due: number;
+  resolved: number;
+  mae?: number;
+  within_range?: number;
+  points?: { id: string; title: string; predicted: number; actual: number; kind: string }[];
+  by_kind: Record<string, { n: number; mae: number; mae_stated: number; can_fit: boolean }>;
+};
 
 export type BacktestRow = {
   case_id: string;
