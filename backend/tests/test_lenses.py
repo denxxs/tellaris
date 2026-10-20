@@ -36,7 +36,7 @@ def test_opinion_question_uses_opinion_lens(client):
     assert spec["outcome_type"] == "categorical"
     assert h["kind"] == "belief" and h["lens"] == "opinion" and h["reach"] == 1.0
     assert h["leading"]["option"] in spec["outcomes"] and 0 <= h["leading"]["ci"][0] <= h["leading"]["share"] <= h["leading"]["ci"][1] <= 1
-    assert h["label"].startswith("Most chosen")
+    assert h["label"].startswith("Share choosing") and h["leading"]["option"]
     assert not r["results"].get("committees")
     assert h.get("revenue") is None
 
@@ -88,3 +88,17 @@ def test_clarifying_questions(client):
     # Answers are folded into what the planner reads.
     _, r = run(client, {"prompt": "An app that reminds people to drink water", "targets": ["USA"], "clarifications": [{"question": "What will it cost a typical customer?", "answer": "$3 a month"}]})
     assert "$3 a month" in r["prompt"] or "$3 a month" in r["spec"]["subject"] or r["spec"]["price"]["amount"] == 3
+
+
+def test_global_clarify_never_asks_where(client):
+    c = client.post("/api/scenario/clarify", json={"prompt": "An app that reminds people to drink water", "scope": "global"}).json()
+    assert c["scope"] == "global"
+    assert "where" not in {q["id"] for q in c["questions"]}
+
+
+def test_spots_are_not_repeated_under_two_names(client):
+    _, r = run(client, {"prompt": "Pineapple on pizza: love it or hate it? Outcomes: Love it, It's fine, Never.", "targets": ["ITA", "USA", "BRA", "JPN"]})
+    sp = r["results"]["splits"]
+    keys = [(c["n"], c["value"], tuple(c["ci"])) for c in sp["hot"] + sp["cold"]]
+    assert len(keys) == len(set(keys))
+    assert r["results"]["headline"]["label"].startswith("Share choosing")

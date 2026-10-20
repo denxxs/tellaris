@@ -26,6 +26,17 @@ cd backend && python -m oracle          # API on :8000
 cd frontend && npm run dev              # app on :3000
 ```
 
+## Any question, not just products
+
+Ask about a B2B launch, a price rise, a policy vote, a habit, an opinion or something silly ("is pineapple on pizza OK?"). Before a run, Oracle reads the question and shows how it understood it:
+
+- **Lens**: how people are asked and how answers become the headline. *B2B launch* (buying committees, say-do correction, revenue), *Consumer product* (awareness, say-do gap, price), *Personal choice*, *Opinion and culture* (no awareness or revenue, just what people think) and *Forecast*. Oracle picks one and you can change it before the run or re-run a finished one with another lens. The B2B lens is locked by a golden test so it stays exactly as accurate as before.
+- **Questions**: if something important is missing (price, where, time frame), Oracle asks up to four short questions: multiple choice, yes/no, number or free text. Every one can be skipped or left to Oracle.
+- **Groups by anything**: jobs, age range, gender, or a shared trait such as "owns a dog" with its share of adults, sized from real data.
+- **Whole world**: instead of picking countries, simulate the largest countries in every region (Quick: 20 countries, about 71% of the world's adults; Deep: 32 countries, about 79%). The **Where it works** tab then shows the groups that are clearly above or below the overall answer, a map shaded by country, and every breakdown by country, region, age, gender, income, type of work and company. Only differences whose likely ranges don't overlap are called out.
+
+Multiple-choice questions show the most chosen option and every option's share; number questions show the typical answer and its range.
+
 ## How a run works
 
 You write a paragraph (and optionally attach a pitch deck, product doc, pricing page or research). Everything else is automatic, and you can watch each step live:

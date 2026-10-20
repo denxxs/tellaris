@@ -194,7 +194,6 @@ class Runner:
         await self.stage("reactions", "start")
         total = len(people) * self.cfg.runs_per_agent
         done_count = 0
-        by_id = {p.id: p for p in people}
 
         async def on_reaction(r: Reaction, p: Persona) -> None:
             nonlocal done_count

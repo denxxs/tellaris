@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ClarifyPanel, initialAnswers, toClarifications, type Answers } from "@/components/composer/ClarifyPanel";
 import { CountryPicker } from "@/components/composer/CountryPicker";
 import { FileDrop } from "@/components/composer/FileDrop";
 import { ScenarioEditor, estimateCalls } from "@/components/composer/ScenarioEditor";
 import { RunTable } from "@/components/run/RunTable";
-import { Button, Card, CardHead, ErrorNote, Field, Notice, PageHead, Segmented, Skeleton, Textarea } from "@/components/ui";
+import { Button, Card, CardHead, ErrorNote, Field, Notice, PageHead, Segmented, Skeleton, Textarea, Toggle } from "@/components/ui";
 import { WorldMap } from "@/components/world/WorldMap";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { int } from "@/lib/format";
-import type { RunConfig, RunListItem, Spec, UploadedFile, World } from "@/lib/types";
+import type { Clarification, LensId, RunConfig, RunListItem, Spec, UploadedFile, World } from "@/lib/types";
 
 const EXAMPLES = [
   {
@@ -34,6 +35,16 @@ const EXAMPLES = [
     label: "A policy vote",
     text: "If the EU banned the sale of new combustion-engine cars from 2035, would voters in Germany, France and Poland support or oppose it today? Outcomes: Support, Oppose.",
     targets: ["DEU", "FRA", "POL"],
+  },
+  {
+    label: "Pineapple on pizza",
+    text: "Pineapple on pizza: what do people actually think of it, and does it split by country and age? Outcomes: Love it, It's fine, Never.",
+    targets: ["ITA", "USA", "BRA", "JPN"],
+  },
+  {
+    label: "Would Gen Z move abroad?",
+    text: "Would Gen Z in India, Nigeria and the Philippines move abroad for a job paying 50% more, if it meant leaving family for at least 3 years?",
+    targets: ["IND", "NGA", "PHL"],
   },
   {
     label: "Fintech across Africa",
@@ -71,17 +82,24 @@ export default function NewSimulation() {
   const [world, setWorld] = useState<World | null>(null);
   const [spec, setSpec] = useState<Spec | null>(null);
   const [config, setConfig] = useState<RunConfig | null>(null);
-  const [busy, setBusy] = useState<"review" | "run" | null>(null);
+  const [busy, setBusy] = useState<"review" | "run" | "think" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<RunListItem[] | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [scope, setScope] = useState<"countries" | "global">("countries");
+  const [depth, setDepth] = useState<"quick" | "deep">("quick");
+  const [clar, setClar] = useState<Clarification | null>(null);
+  const [answers, setAnswers] = useState<Answers>({});
+  const [lens, setLens] = useState<LensId | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.runs().then((r) => setRecent(r.slice(0, 5))).catch(() => setRecent([]));
   }, []);
 
-  const activeTargets = useMemo(() => spec?.targets ?? targets, [spec, targets]);
+  const globalTargets = useMemo(() => (meta ? meta.global[depth] : []), [meta, depth]);
+  const activeTargets = useMemo(() => spec?.targets ?? (scope === "global" ? globalTargets : targets), [spec, scope, globalTargets, targets]);
   useEffect(() => {
     if (!activeTargets.length) {
       setWorld(null);
@@ -92,14 +110,32 @@ export default function NewSimulation() {
   }, [activeTargets, spec]);
 
   const sizeCfg = SIZES.find((s) => s.value === size)!;
-  const baseConfig = useMemo<RunConfig | null>(() => (meta ? { ...meta.defaults, agents: sizeCfg.agents, runs_per_agent: sizeCfg.runs } : null), [meta, sizeCfg]);
+  const baseConfig = useMemo<RunConfig | null>(() => {
+    if (!meta) return null;
+    if (scope === "global") return { ...meta.defaults, agents: depth === "deep" ? 1200 : 400, runs_per_agent: 1, influencer_voices: 0 };
+    return { ...meta.defaults, agents: sizeCfg.agents, runs_per_agent: sizeCfg.runs };
+  }, [meta, sizeCfg, scope, depth]);
   const canGo = prompt.trim().length >= 10;
+  const fileIds = files.map((f) => f.id);
+  const editing = () => {
+    setClar(null);
+    setSpec(null);
+  };
 
   async function review() {
     setError(null);
     setBusy("review");
     try {
-      const r = await api.preview(prompt, targets, files.map((f) => f.id));
+      const r = await api.preview({
+        prompt,
+        targets: scope === "global" ? [] : targets,
+        file_ids: fileIds,
+        lens,
+        scope,
+        global_depth: depth,
+        clarifications: toClarifications(clar, answers),
+      });
+      setClar(null);
       setSpec(r.spec);
       setWorld(r.world);
       setConfig(baseConfig);
@@ -111,18 +147,47 @@ export default function NewSimulation() {
     }
   }
 
-  async function run() {
+  async function launch(opts: { lens: LensId | null; withAnswers: boolean }) {
     setError(null);
     setBusy("run");
     try {
       const { id } = await api.createRun({
         prompt,
-        targets: spec ? spec.targets : targets,
+        targets: spec ? spec.targets : scope === "global" ? [] : targets,
         config: config ?? baseConfig ?? undefined,
         spec: spec ?? undefined,
-        file_ids: files.map((f) => f.id),
+        file_ids: fileIds,
+        lens: opts.lens,
+        scope: spec ? spec.scope : scope,
+        global_depth: depth,
+        clarifications: opts.withAnswers ? toClarifications(clar, answers) : [],
       });
       router.push(`/runs/${id}`);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(null);
+    }
+  }
+
+  /** Run: let the orchestrator read it first, ask only if it needs to, otherwise go straight away. */
+  async function run() {
+    if (spec) return launch({ lens: spec.lens ?? null, withAnswers: false });
+    if (clar) return launch({ lens, withAnswers: true });
+    setError(null);
+    setBusy("think");
+    try {
+      const c = await api.clarify(prompt, scope === "global" ? [] : targets, fileIds, scope);
+      const chosen = lens ?? c.lens;
+      setLens(chosen);
+      if (c.scope === "global" && scope === "countries" && !targets.length) setScope("global");
+      if (c.questions.length) {
+        setClar(c);
+        setAnswers(initialAnswers(c));
+        setBusy(null);
+        setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
+        return;
+      }
+      await launch({ lens: chosen, withAnswers: false });
     } catch (e) {
       setError((e as Error).message);
       setBusy(null);
@@ -134,7 +199,7 @@ export default function NewSimulation() {
   return (
     <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
       <PageHead title="New simulation">
-        Describe a product, a price, a policy or anything you want to predict, and attach any documents you have. Oracle builds the people it depends on, lets each one decide, lets them talk it over, and tells you what is likely to happen.
+        Ask anything about people: a launch, a price, a policy, a habit, an opinion or something silly. Attach documents if you have them. Oracle builds the people it depends on, lets each one decide, lets them talk it over, and tells you what is likely to happen and where.
       </PageHead>
       {meta?.mock && (
         <div className="mb-6">
@@ -151,7 +216,7 @@ export default function NewSimulation() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <div className="flex flex-col gap-6 lg:col-span-7">
           <Card>
-            <Field label="What do you want to know?" hint="Name the product or idea, the price if there is one, who it is for, where, and the time frame.">
+            <Field label="What do you want to know?" hint="Who, where and when help. For a product, include the price. Oracle asks if anything important is missing.">
               {(id) => (
                 <Textarea
                   id={id}
@@ -159,7 +224,7 @@ export default function NewSimulation() {
                   value={prompt}
                   onChange={(e) => {
                     setPrompt(e.target.value);
-                    if (spec) setSpec(null);
+                    if (spec || clar) editing();
                   }}
                   onKeyDown={(e) => {
                     if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGo) run();
@@ -175,12 +240,40 @@ export default function NewSimulation() {
               <p className="mt-1.5 text-[12px] text-faint">Optional. Oracle reads them to get the product, price and audience right. People only see what a customer could see, never internal numbers.</p>
             </div>
             <div className="mt-5">
-              <Field label="Target countries" hint="Optional. Leave empty and Oracle picks the markets that matter.">
-                {(id) => <CountryPicker id={id} value={spec?.targets ?? targets} onChange={(v) => (spec ? setSpec({ ...spec, targets: v, target_weights: {} }) : setTargets(v))} />}
-              </Field>
+              <Toggle
+                checked={scope === "global"}
+                onChange={(v) => {
+                  setScope(v ? "global" : "countries");
+                  editing();
+                }}
+                label="Whole world"
+                description={scope === "global" ? "Oracle simulates the largest countries in every region and shows where it works and where it doesn't." : "Simulate across every region instead of picking countries."}
+              />
+              {scope === "global" ? (
+                <div className="mt-3">
+                  <Segmented
+                    label="Global depth"
+                    value={depth}
+                    onChange={(v) => {
+                      setDepth(v);
+                      editing();
+                    }}
+                    options={[
+                      { value: "quick", label: "Quick", sub: `${meta?.global.quick.length ?? 20} countries, 400 people` },
+                      { value: "deep", label: "Deep", sub: `${meta?.global.deep.length ?? 32} countries, 1,200 people` },
+                    ]}
+                  />
+                </div>
+              ) : (
+                <div className="mt-4">
+                  <Field label="Target countries" hint="Optional. Leave empty and Oracle picks the markets that matter.">
+                    {(id) => <CountryPicker id={id} value={spec?.targets ?? targets} onChange={(v) => (spec ? setSpec({ ...spec, targets: v, target_weights: {} }) : setTargets(v))} />}
+                  </Field>
+                </div>
+              )}
             </div>
             <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
-              <div>
+              <div className={scope === "global" ? "invisible" : undefined} aria-hidden={scope === "global"}>
                 <div className="mb-2 text-[14px] font-medium">Size</div>
                 <Segmented
                   label="Simulation size"
@@ -199,9 +292,11 @@ export default function NewSimulation() {
                     Adjust setup first
                   </Button>
                 )}
-                <Button size="lg" variant="primary" onClick={run} disabled={!canGo || !!busy} busy={busy === "run"}>
-                  Run simulation
-                </Button>
+                {!clar && (
+                  <Button size="lg" variant="primary" onClick={run} disabled={!canGo || !!busy} busy={busy === "run" || busy === "think"}>
+                    {busy === "think" ? "Reading your question" : "Run simulation"}
+                  </Button>
+                )}
               </div>
             </div>
             {error && (
@@ -211,7 +306,23 @@ export default function NewSimulation() {
             )}
           </Card>
 
-          {!spec && (
+          {clar && (
+            <div ref={panelRef} className="scroll-mt-4">
+              <ClarifyPanel
+                c={clar}
+                lens={lens}
+                onLens={setLens}
+                answers={answers}
+                onAnswers={setAnswers}
+                onRun={() => launch({ lens, withAnswers: true })}
+                onSkip={() => launch({ lens, withAnswers: false })}
+                onCancel={() => setClar(null)}
+                busy={busy === "run"}
+              />
+            </div>
+          )}
+
+          {!spec && !clar && (
             <Card>
               <CardHead title="Start from an example" />
               <ul className="flex flex-col">
@@ -221,7 +332,9 @@ export default function NewSimulation() {
                       onClick={() => {
                         setPrompt(ex.text);
                         setTargets(ex.targets);
-                        setSpec(null);
+                        setScope("countries");
+                        setLens(null);
+                        editing();
                       }}
                       className="group flex w-full flex-col gap-0.5 py-2.5 text-left"
                     >
@@ -242,7 +355,11 @@ export default function NewSimulation() {
         <Card pad={false}>
           <div className="px-5 pt-5">
             <CardHead title="Who shapes these markets" aside={influencers.length ? `${influencers.length} outside ${influencers.length === 1 ? "influence" : "influences"}` : undefined}>
-              {activeTargets.length ? "Arrows show outside countries and blocs that affect your target countries. Thicker means stronger." : "Pick a country to see who shapes it."}
+              {scope === "global" && !spec
+                ? `The ${activeTargets.length} countries a global run simulates, covering most of the world's adults.`
+                : activeTargets.length
+                  ? "Arrows show outside countries and blocs that affect your target countries. Thicker means stronger."
+                  : "Pick a country to see who shapes it."}
             </CardHead>
           </div>
           <div className="px-2">{meta ? <WorldMap world={world} targets={activeTargets} label="Target countries and the influences on them" /> : <Skeleton className="mx-3 aspect-[2/1]" />}</div>

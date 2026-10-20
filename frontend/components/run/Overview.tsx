@@ -36,6 +36,12 @@ export function useAgents(live: LiveState): MapAgent[] {
   );
 }
 
+function fmtNum(v: number | null | undefined) {
+  if (v == null || Number.isNaN(v)) return "–";
+  const a = Math.abs(v);
+  return a >= 1000 ? Math.round(v).toLocaleString("en-US") : a >= 10 ? v.toFixed(0) : v.toFixed(1);
+}
+
 /** The KPI strip: one container split by dividers. The answer figure leads. */
 function AnswerStrip({ live, running }: { live: LiveState; running: boolean }) {
   const h = live.results?.headline;
@@ -47,14 +53,38 @@ function AnswerStrip({ live, running }: { live: LiveState; running: boolean }) {
     return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
   }, [live.scores, live.personas]);
 
-  const cells = [
+  const outcomes = live.results?.outcomes;
+  const options = Array.isArray(outcomes) ? [...outcomes].sort((a, b) => b.share - a.share) : null;
+  const numeric = outcomes && !Array.isArray(outcomes) ? outcomes : null;
+  const first = live.spec?.outcomes?.[0] ?? "yes";
+  const countries = live.spec?.targets.length ?? 0;
+
+  const cells = h?.leading && options
+    ? [
+        { label: "Runner-up", value: options[1] ? pctSmart(options[1].share) : "–", sub: options[1] ? options[1].option : "Only one option" },
+        { label: "People represented", value: h.people ? people(h.people) : "–", sub: "Estimated real headcount" },
+        { label: "Countries", value: int(countries), sub: live.spec?.scope === "global" ? "Global sample" : "Simulated" },
+        { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
+      ]
+    : numeric
+      ? [
+          { label: "Average", value: fmtNum(numeric.mean), sub: numeric.unit ?? "Mean of all answers" },
+          { label: "People represented", value: h?.people ? people(h.people) : "–", sub: "Estimated real headcount" },
+          { label: "Countries", value: int(countries), sub: "Simulated" },
+          { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
+        ]
+      : [
     {
       label: h ? h.kind === "action" ? "Among those who hear about it" : "Before correction" : "Leaning yes so far",
       value: h ? pctSmart(h.kind === "action" ? h.if_aware : h.stated) : raw == null ? "–" : pctSmart(raw),
       sub: h ? (h.kind === "action" ? `${pctSmart(h.reach)} expected to hear about it` : "What people said") : "Raw, before any correction",
     },
     { label: "People represented", value: h?.people ? people(h.people) : "–", sub: h?.people ? "Estimated real headcount" : "Known when people are built" },
-    { label: h?.kind === "belief" ? "Expected to agree" : "Expected to say yes", value: h?.adopters != null ? people(h.adopters) : "–", sub: h?.adopters != null ? "Answer × people represented" : "Known at the end" },
+    {
+      label: h?.kind === "belief" ? (first.toLowerCase() === "yes" ? "Expected to say yes" : `Expected to say “${first}”`) : "Expected to say yes",
+      value: h?.adopters != null ? people(h.adopters) : "–",
+      sub: h?.adopters != null ? "Answer × people represented" : "Known at the end",
+    },
     h?.revenue
       ? { label: "Implied monthly revenue", value: money(h.revenue.monthly, h.revenue.currency), sub: `${money(h.revenue.monthly_ci[0], h.revenue.currency)} to ${money(h.revenue.monthly_ci[1], h.revenue.currency)} at list price` }
       : { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
@@ -63,8 +93,39 @@ function AnswerStrip({ live, running }: { live: LiveState; running: boolean }) {
   return (
     <Card pad={false} className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]">
       <div className="border-b border-border p-5 lg:border-b-0 lg:border-r">
-        <div className="text-[14px] font-medium text-text">{h ? h.label : "Answer"}</div>
-        {h ? (
+        <div className="text-[14px] font-medium text-text">{h ? (h.leading && options ? "Most chosen" : h.label) : "Answer"}</div>
+        {h && h.leading && options ? (
+          <>
+            <div className="mt-1 flex items-baseline gap-3">
+              <span className="t-answer">{pctSmart(h.leading.share)}</span>
+              <span className="truncate text-[16px] text-text">{h.leading.option}</span>
+            </div>
+            <div className="mt-1 text-[13px] text-muted">
+              Likely between <span className="num text-text">{pctSmart(h.leading.ci[0])}</span> and <span className="num text-text">{pctSmart(h.leading.ci[1])}</span>
+            </div>
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {options.map((o) => (
+                <li key={o.option} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_44px] items-center gap-2 text-[13px]">
+                  <span className="truncate text-text">{o.option}</span>
+                  <span className="h-1.5 rounded-full bg-raised">
+                    <span className={cx("block h-full rounded-full", o.option === h.leading!.option ? "bg-yes" : "bg-text/40")} style={{ width: `${o.share * 100}%` }} />
+                  </span>
+                  <span className="num text-right text-muted">{pctSmart(o.share)}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : h && numeric ? (
+          <>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="t-answer">{fmtNum(numeric.median)}</span>
+              {numeric.unit && <span className="text-[14px] text-muted">{numeric.unit}</span>}
+            </div>
+            <div className="mt-1 text-[13px] text-muted">
+              Most answers between <span className="num text-text">{fmtNum(numeric.p10)}</span> and <span className="num text-text">{fmtNum(numeric.p90)}</span>
+            </div>
+          </>
+        ) : h ? (
           <>
             <div className="t-answer mt-1">{pctSmart(h.value)}</div>
             <div className="mt-1 text-[13px] text-muted">

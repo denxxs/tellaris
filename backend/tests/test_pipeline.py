@@ -1,6 +1,5 @@
 """End-to-end runs through the API with the offline mock model."""
 
-import asyncio
 import time
 
 import pytest

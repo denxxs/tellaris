@@ -42,7 +42,7 @@ class Clarification(BaseModel):
 
 
 def _lens_lines() -> str:
-    return "\n".join(f"- {l.id}: {l.label}. {l.description}" for l in LENSES.values())
+    return "\n".join(f"- {x.id}: {x.label}. {x.description}" for x in LENSES.values())
 
 
 SYSTEM = f"""You prepare a question for a simulation of real people. Read the user's description (and any files) and decide:
@@ -57,17 +57,32 @@ SYSTEM = f"""You prepare a question for a simulation of real people. Read the us
    Never ask for internal or sensitive data."""
 
 
-async def clarify(prompt: str, targets: list[str], context: str, model: str) -> Clarification:
+async def clarify(prompt: str, targets: list[str], context: str, model: str, scope: str | None = None) -> Clarification:
+    where = (
+        "The user chose the whole world. Do not ask where."
+        if scope == "global"
+        else f"Countries the user picked: {', '.join(targets) if targets else 'none'}"
+    )
     user = (
         f"Today is {date.today().isoformat()}.\n"
-        f"Countries the user picked: {', '.join(targets) if targets else 'none'}\n\n"
+        f"{where}\n\n"
         + (f"FILES:\n{context[:12000]}\n\n" if context else "")
         + f"DESCRIPTION:\n\"\"\"\n{prompt}\n\"\"\""
     )
-    return await llm.json(
+    c = await llm.json(
         task="clarify", model=model, system=SYSTEM, user=user, schema=Clarification, temperature=0.2,
-        mock_ctx={"prompt": prompt + ("\n" + context[:2000] if context else ""), "targets": targets},
+        mock_ctx={"prompt": prompt + ("\n" + context[:2000] if context else ""), "targets": targets, "scope": scope},
     )
+    if scope == "global":
+        # The user already decided; never second-guess it.
+        c.scope = "global"
+        c.questions = [q for q in c.questions if not _asks_where(q)]
+    return c
+
+
+def _asks_where(q: Question) -> bool:
+    text = f"{q.id} {q.question}".lower()
+    return any(w in text for w in ("where", "which countr", "which market", "region"))
 
 
 def apply_answers(prompt: str, answers: list[dict[str, str]]) -> str:

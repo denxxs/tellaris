@@ -395,13 +395,13 @@ def react(ctx: dict[str, Any]) -> dict[str, Any]:
     elif pos:
         quote = r.choice([
             f"As a {occ}, this would actually save me time. I'd try it if the setup is quick.",
-            f"If it does what it says, I'd push for it - but I want a pilot first.",
+            "If it does what it says, I'd push for it - but I want a pilot first.",
             "Looks useful. I'd put it in front of my team next month.",
         ])
     else:
         quote = r.choice([
-            f"We already have something for this. Not switching unless it's clearly better.",
-            f"Not a priority for me right now, honestly.",
+            "We already have something for this. Not switching unless it's clearly better.",
+            "Not a priority for me right now, honestly.",
             f"Sounds nice, but {objections[0].lower()}.",
             "I'd need to see proof from a company like mine before I even look.",
         ])
@@ -659,7 +659,7 @@ def clarify(ctx: dict[str, Any]) -> dict[str, Any]:
     if spec["lens"] in ("b2b", "consumer") and not spec["price"]:
         qs.append({"id": "price", "question": "What will it cost a typical customer?", "why": "Price changes who says yes.", "kind": "single",
                    "options": ["Free", "Under $10 a month", "$10 to $50 a month", "Over $50 a month"], "default": "$10 to $50 a month"})
-    if not ctx.get("targets") and not find_mentions(ctx["prompt"]) and spec["scope"] != "global":
+    if not ctx.get("targets") and not find_mentions(ctx["prompt"]) and spec["scope"] != "global" and ctx.get("scope") != "global":
         qs.append({"id": "where", "question": "Where should Oracle simulate people?", "why": "Different countries answer very differently.", "kind": "single",
                    "options": ["United States", "India", "Europe", "Whole world"], "default": "United States"})
     if spec["lens"] in ("b2b", "consumer") and not re.search(r"\d+\s*(months?|years?)", low):

@@ -1,4 +1,4 @@
-import type { Committee, FeedItem, Meta, Profile, Run, RunConfig, RunListItem, PersonaSummary, ProviderInfo, Spec, UploadedFile, World, ChatMessage } from "./types";
+import type { Clarification, LensId, Committee, FeedItem, Meta, Profile, Run, RunConfig, RunListItem, PersonaSummary, ProviderInfo, Spec, UploadedFile, World, ChatMessage } from "./types";
 
 export const API = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
@@ -34,8 +34,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   meta: () => req<Meta>("/api/meta"),
-  preview: (prompt: string, targets: string[], file_ids: string[] = []) =>
-    req<{ spec: Spec; world: World }>("/api/scenario/preview", { method: "POST", body: JSON.stringify({ prompt, targets, file_ids }) }),
+  preview: (body: { prompt: string; targets: string[]; file_ids?: string[]; lens?: LensId | null; scope?: string | null; global_depth?: string; clarifications?: { question: string; answer: string }[] }) =>
+    req<{ spec: Spec; world: World }>("/api/scenario/preview", { method: "POST", body: JSON.stringify(body) }),
+  clarify: (prompt: string, targets: string[], file_ids: string[] = [], scope: "countries" | "global" = "countries") =>
+    req<Clarification>("/api/scenario/clarify", { method: "POST", body: JSON.stringify({ prompt, targets, file_ids, scope }) }),
   upload: async (files: File[]): Promise<{ files: UploadedFile[]; errors: string[] }> => {
     const form = new FormData();
     for (const f of files) form.append("files", f);
@@ -51,13 +53,23 @@ export const api = {
   deleteFile: (id: string) => req<{ ok: boolean }>(`/api/files/${id}`, { method: "DELETE" }),
   feed: (id: string) => req<FeedItem[]>(`/api/runs/${id}/feed`),
   headcount: (spec: Spec) =>
-    req<{ segments: { name: string; total: number; by_country: Record<string, number> }[]; total: number }>("/api/scenario/headcount", {
+    req<{ segments: { name: string; total: number; by_country: Record<string, number>; estimated?: boolean }[]; total: number }>("/api/scenario/headcount", {
       method: "POST",
       body: JSON.stringify({ spec }),
     }),
   world: (targets: string[], spec?: Spec) =>
     req<World>("/api/world/influence", { method: "POST", body: JSON.stringify({ targets, sectors: spec?.sectors ?? [], spec }) }),
-  createRun: (body: { prompt: string; targets?: string[]; config?: Partial<RunConfig>; spec?: Spec; file_ids?: string[] }) =>
+  createRun: (body: {
+    prompt: string;
+    targets?: string[];
+    config?: Partial<RunConfig>;
+    spec?: Spec;
+    file_ids?: string[];
+    lens?: LensId | null;
+    scope?: "countries" | "global" | null;
+    global_depth?: "quick" | "deep";
+    clarifications?: { question: string; answer: string }[];
+  }) =>
     req<{ id: string }>("/api/runs", { method: "POST", body: JSON.stringify(body) }),
   runs: () => req<RunListItem[]>("/api/runs"),
   run: (id: string) => req<Run>(`/api/runs/${id}`),

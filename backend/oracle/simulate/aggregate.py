@@ -345,11 +345,22 @@ class Aggregator:
 
         # Pairs that tend to tell a story ("Under 30s in India").
         pairs = [("age", "country"), ("age", "region"), ("gender", "country"), ("income", "country"), ("age", "gender"), ("work", "country")]
+        # The same people can turn up under two names (Italy and Western Europe when Italy is the
+        # only Western European country). Keep the first, simplest name for each set of people.
         candidates = []
+        seen: set[frozenset[str]] = set()
+
+        def add(cell: dict[str, Any], members: list[Persona]) -> None:
+            key = frozenset(p.id for p in members)
+            if key not in seen:
+                seen.add(key)
+                candidates.append(cell)
+
         for dim_id, (label, keyfn, show) in dims.items():
             if dim_id in dimensions:
+                groups = cells(keyfn)
                 for r in dimensions[dim_id]["rows"]:
-                    candidates.append({"label": r["label"], "dims": [dim_id], **{k: r[k] for k in ("n", "value", "ci", "people")}})
+                    add({"label": r["label"], "dims": [dim_id], **{k: r[k] for k in ("n", "value", "ci", "people")}}, groups[r["key"]])
         for a, b in pairs:
             if a not in dimensions or b not in dimensions:
                 continue
@@ -361,7 +372,7 @@ class Aggregator:
                     continue
                 s = self._summary(members, boots_n=300)
                 joiner = " in " if b in ("country", "region") else ", "
-                candidates.append({"label": f"{sa(va)}{joiner}{sb(vb)}", "dims": [a, b], **{k: s[k] for k in ("n", "value", "ci")}, "people": s.get("people")})
+                add({"label": f"{sa(va)}{joiner}{sb(vb)}", "dims": [a, b], **{k: s[k] for k in ("n", "value", "ci")}, "people": s.get("people")}, members)
 
         def score(c: dict[str, Any]) -> float:
             return abs(c["value"] - overall) * math.sqrt(c["n"])
@@ -447,9 +458,11 @@ class Aggregator:
         if self.spec.outcome_type == "categorical" and isinstance(dist, list) and dist:
             top = max(dist, key=lambda d: d["share"])
             leading = {"option": top["option"], "share": top["share"], "ci": self._option_ci(top["option"])}
-            label = f"Most chosen: {top['option']}"
+            # The value still measures the first option; the leading option travels separately.
+            label = f"Share choosing “{self.spec.outcomes[0]}”"
         elif self.spec.outcome_type == "numeric" and isinstance(dist, dict):
-            label = f"Typical answer{f' ({dist.get(chr(117) + chr(110) + chr(105) + chr(116))})' if dist.get('unit') else ''}"
+            unit = dist.get("unit")
+            label = f"Typical answer ({unit})" if unit else "Typical answer"
         elif not self.action:
             first = self.spec.outcomes[0]
             label = f"Share who say “{first}”" if first.lower() not in ("yes", "y") else "Share who say yes"

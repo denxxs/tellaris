@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -98,7 +98,7 @@ async def meta() -> dict[str, Any]:
         "sectors": SECTORS,
         "channels": channels(),
         "stages": [{"id": s[0], "label": s[1]} for s in STAGES],
-        "lenses": [{"id": l.id, "label": l.label, "description": l.description} for l in LENSES.values()],
+        "lenses": [{"id": x.id, "label": x.label, "description": x.description} for x in LENSES.values()],
         "global": {d: global_sample(d) for d in ("quick", "deep")},
         "model_examples": MODEL_EXAMPLES,
         "defaults": RunConfig().model_dump(),
@@ -122,6 +122,7 @@ class ClarifyRequest(BaseModel):
     prompt: str = Field(min_length=10, max_length=20000)
     targets: list[str] = Field(default_factory=list)
     file_ids: list[str] = Field(default_factory=list)
+    scope: Literal["countries", "global"] | None = None
 
 
 @app.post("/api/scenario/clarify")
@@ -131,7 +132,7 @@ async def clarify_endpoint(req: ClarifyRequest) -> dict[str, Any]:
 
     context, _ = files_mod.bundle(req.file_ids, budget=12000)
     try:
-        c = await clarify(req.prompt, req.targets, context, settings_store.get().roles.planner)
+        c = await clarify(req.prompt, req.targets, context, settings_store.get().roles.planner, scope=req.scope)
     except Exception as exc:  # noqa: BLE001 - never block a run on this step
         log.warning("clarify failed: %s", exc)
         return {"reading": "", "lens": None, "lens_reason": "", "scope": "countries", "questions": [], "error": str(exc)[:300]}
@@ -313,7 +314,7 @@ async def persona(run_id: str, pid: str) -> dict[str, Any]:
     results = run.get("results") or {}
     net = (results.get("diffusion") or {}).get("network") or {}
     nodes = {n["id"]: n for n in net.get("nodes", [])}
-    contact_ids = [l["target"] if l["source"] == pid else l["source"] for l in net.get("links", []) if pid in (l["source"], l["target"])]
+    contact_ids = [e["target"] if e["source"] == pid else e["source"] for e in net.get("links", []) if pid in (e["source"], e["target"])]
     contacts = []
     for cid in dict.fromkeys(contact_ids):
         cp = await store.persona(run_id, cid)

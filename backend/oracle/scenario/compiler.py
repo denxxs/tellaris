@@ -9,7 +9,7 @@ from ..llm import llm
 from ..world.countries import blocs, company_types, countries, expand_codes, find_mentions, global_sample, occupations, resolve
 from pydantic import BaseModel
 
-from .lenses import LENSES, default_lens
+from .lenses import default_lens
 from .models import Force, ScenarioSpec, Segment
 
 SECTORS = [
