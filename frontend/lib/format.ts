@@ -20,6 +20,13 @@ export const signedPts = (v: number | null | undefined) => {
 
 export const money = (v: number | null | undefined, currency = "USD") => {
   if (v == null || Number.isNaN(v)) return "–";
+  if (Math.abs(v) >= 100_000) {
+    try {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency, notation: "compact", maximumFractionDigits: 1 }).format(v);
+    } catch {
+      return `${(v / 1e6).toFixed(1)}M ${currency}`;
+    }
+  }
   try {
     return new Intl.NumberFormat("en-US", { style: "currency", currency, minimumFractionDigits: v < 100 ? 2 : 0, maximumFractionDigits: v < 100 ? 2 : 0 }).format(v);
   } catch {

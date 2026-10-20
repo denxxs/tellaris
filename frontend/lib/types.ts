@@ -134,6 +134,7 @@ export type Results = {
     calibration: { kind: string; a: number; b: number; source: string; n_cases: number };
     samples: number;
     agents_total: number;
+    revenue?: { customers: number; monthly: number; monthly_ci: [number, number]; currency: string; note: string } | null;
   };
   outcomes: { option: string; share: number }[] | { unit: string | null; median: number; p10: number; p90: number; mean: number } | null;
   attention: Record<string, number>;

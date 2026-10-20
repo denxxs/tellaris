@@ -68,6 +68,9 @@ def test_full_run_and_whatif(client):
     assert len(res["diffusion"]["rounds"]) == 3
     assert res["wtp"]["curve"]
     assert run["report"]["headline"]
+    rev = h["revenue"]
+    assert rev and rev["customers"] == h["adopters"] and rev["monthly"] == round(h["adopters"] * 49, 2)
+    assert "say yes" in h["label"] or "adopt" in h["label"]
 
     events = client.get(f"/api/runs/{run_id}/events").text
     for t in ("scenario", "world", "personas", "reactions", "results", "report", "done"):
@@ -145,6 +148,7 @@ def test_files_society_and_profiles(client):
     facts = run["research"]["facts"]
     assert any(f["source_urls"][0].startswith("file:") for f in facts)
     assert any(not f["public"] for f in facts), "internal numbers must be kept from people"
+    assert "burn" not in run["spec"]["subject"].lower(), "the description people see must not carry internal figures"
 
     feed = client.get(f"/api/runs/{run_id}/feed").json()
     kinds = {it["kind"] for it in feed}

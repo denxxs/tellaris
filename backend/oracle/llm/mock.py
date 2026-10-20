@@ -623,9 +623,17 @@ def file_facts(ctx: dict[str, Any]) -> dict[str, Any]:
     facts = []
     for s in keyed[:8]:
         internal = bool(re.search(r"internal|confidential|target|roadmap|burn|runway|forecast", s, re.I))
-        facts.append({"statement": s, "relevance": "From your documents", "countries": [], "stance": "neutral", "source_urls": [f"file:{names[0]}"], "public": not internal})
+        facts.append({"statement": s, "relevance": "From your documents", "countries": [], "stance": "neutral", "source_urls": [f"file:{names[0]}"], "customer_visible": not internal})
     return {"facts": facts, "competitors": [], "price_points": []}
 
 
+def public_brief(ctx: dict[str, Any]) -> dict[str, Any]:
+    text = ctx.get("subject") or ""
+    internal = re.compile(r"hosted|hosting|cloud run|firebase|postgres|internal|not working|roadmap|burn|target", re.I)
+    keep = [s for s in re.split(r"(?<=[.!?])\s+", text) if not internal.search(s)]
+    return {"description": " ".join(keep) or text}
+
+
+HANDLERS["public_brief"] = public_brief
 HANDLERS["society_turn"] = society_turn
 HANDLERS["file_facts"] = file_facts

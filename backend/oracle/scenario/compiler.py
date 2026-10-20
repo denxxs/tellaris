@@ -7,6 +7,8 @@ from datetime import date
 
 from ..llm import llm
 from ..world.countries import blocs, company_types, countries, expand_codes, find_mentions, occupations, resolve
+from pydantic import BaseModel
+
 from .models import Force, ScenarioSpec, Segment
 
 SECTORS = [
@@ -27,7 +29,8 @@ Rules:
 - Add "diffusion" to modes when word of mouth, virality or public opinion matters.
 - Targets: ISO3 codes. If the user names none, choose the most relevant markets (max 3).
 - forces: outside pressures that change the outcome, especially ones from countries/blocs that are NOT targets (e.g. EU AI Act and GDPR affecting Indian IT firms with EU clients; US interest rates; Chinese competitors). Be concrete.
-- assumed_reach: realistic share of the target audience that will even hear about this within the horizon. New startups usually reach well under 30% of a market.
+- assumed_reach: realistic share of the WHOLE target audience (all the people in the segments, often millions) that will even hear about this within the horizon. A new or little-known company with no big launch budget usually reaches 0.2-2% of a national market in a year; a well-funded launch maybe 5%; a household brand or a law in the news 30-90%.
+- price: when there are several plans, use the plan a typical buyer in the main segment would start on (usually the cheapest paid plan), name the other plans in the subject, and keep the unit exactly as written (per workspace, per seat, per month). Never use the top tier as the price unless the user says so.
 - research_queries: 3-6 web searches that would ground the simulation in current facts (competitors, prices, regulations, recent news).
 - Be neutral. Do not assume success.
 - Society (word of mouth) is always simulated, so always include "diffusion" in modes.
@@ -129,4 +132,32 @@ async def compile_scenario(prompt: str, model: str, overrides: list[str] | None 
     spec = normalize(spec, prompt, overrides)
     if "diffusion" not in spec.modes:
         spec.modes.append("diffusion")
+    if context:
+        spec.subject = await public_brief(spec, prompt, context, model)
     return spec
+
+
+BRIEF_SYSTEM = """You write what a prospective customer in the target market would actually see about this offer:
+the website, the pricing page, a sales demo and the first days of a free trial. Write 4-8 plain sentences.
+Include: what it is and does, who it is for, the price and plans as a customer would see them, notable features and claims,
+and anything a customer would directly notice while using it.
+Leave out internal details a customer cannot see: hosting and architecture, internal providers and integrations being
+wired up, internal credit mechanics, costs, roadmaps, targets, team. Do not argue for or against it."""
+
+
+class _Brief(BaseModel):
+    description: str
+
+
+async def public_brief(spec: ScenarioSpec, prompt: str, context: str, model: str) -> str:
+    """The scenario's description, stripped of internals a customer could not know."""
+    user = (
+        f"Target market: {', '.join(spec.targets)}. Question: {spec.question}\n"
+        + (f"Price as the scenario has it: {spec.price.amount:g} {spec.price.currency} per {spec.price.period}\n" if spec.price else "")
+        + f"\nUSER DESCRIPTION:\n{prompt}\n\nDOCUMENTS:\n{context[:30000]}"
+    )
+    try:
+        out = await llm.json(task="public_brief", model=model, system=BRIEF_SYSTEM, user=user, schema=_Brief, temperature=0.2, mock_ctx={"subject": spec.subject})
+        return out.description.strip() or spec.subject
+    except Exception:  # noqa: BLE001 - keep the planner's description if this step fails
+        return spec.subject

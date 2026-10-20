@@ -306,11 +306,26 @@ class Aggregator:
 
     def results(self) -> dict[str, Any]:
         head = self._summary(self.focus)
+        first = self.spec.outcomes[0].strip().lower()
+        verb = "say yes" if first in ("yes", "y", "true", "agree") else first
         label = (
-            f"Realistic share who {self.spec.outcomes[0].lower()} within {self.spec.horizon_months} months"
+            f"Realistic share who {verb} within {self.spec.horizon_months} months"
             if self.action and self.spec.outcome_type != "numeric"
             else f"Probability: {self.spec.outcomes[0]}"
         )
+        revenue = None
+        price = self.spec.price
+        if price and self.action and head.get("adopters") is not None:
+            per_month = {"month": 1.0, "per-seat-month": 1.0, "year": 1 / 12, "usage": 1.0}.get(price.period)
+            if per_month is not None:
+                customers = head["adopters"]
+                revenue = {
+                    "customers": customers,
+                    "monthly": round(customers * price.amount * per_month, 2),
+                    "monthly_ci": [round(x * head.get("people", 0) * price.amount * per_month, 2) for x in head["ci"]],
+                    "currency": price.currency,
+                    "note": "Adopters times the list price, one seat each, at full ramp by the end of the time frame.",
+                }
         return {
             "headline": {
                 **head,
@@ -321,6 +336,7 @@ class Aggregator:
                 "calibration": self.cal.model_dump(),
                 "samples": sum(len(self.by_person[p.id]) for p in self.focus),
                 "agents_total": len(self.people),
+                "revenue": revenue,
             },
             "outcomes": self.outcome_distribution(),
             "attention": self.attention(),

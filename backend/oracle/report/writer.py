@@ -96,7 +96,9 @@ Rules:
 - Explain WHY using the segment, country, objection and influence data.
 - Call out outside influences (e.g. a bloc's regulation affecting a target country) when the data shows an effect.
 - Recommendations must be concrete and testable. Levers must be scenario edits that can be re-simulated.
-- confidence_note: mention sample size, interval width, model agreement and that simulations are not ground truth."""
+- If the question is about revenue, MRR or a customer target, use headline.revenue (customers and monthly revenue at list price) to answer it directly, and make the headline, verdict and summary agree with those numbers.
+- Distinguish what simulated customers could see from internal facts (public=false); internal facts may explain risks but were not seen by the people.
+- confidence_note: mention sample size, interval width, model agreement, how much the result depends on the assumed awareness (headline.reach), and that simulations are not ground truth."""
 
 
 def _compact(results: dict[str, Any]) -> dict[str, Any]:

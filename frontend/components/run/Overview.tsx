@@ -8,7 +8,7 @@ import { Button, Card, CardHead, Empty, Meter, Skeleton } from "@/components/ui"
 import { WorldMap, type MapAgent } from "@/components/world/WorldMap";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
-import { cx, int, people, pctSmart, shortJob, stanceText } from "@/lib/format";
+import { cx, int, money, people, pctSmart, shortJob, stanceText } from "@/lib/format";
 import type { LiveState } from "@/lib/useRunStream";
 import { Crowd } from "./Crowd";
 import { SocietyFeed } from "./Society";
@@ -55,7 +55,9 @@ function AnswerStrip({ live, running }: { live: LiveState; running: boolean }) {
     },
     { label: "People represented", value: h?.people ? people(h.people) : "–", sub: h?.people ? "Estimated real headcount" : "Known when people are built" },
     { label: h?.kind === "belief" ? "Expected to agree" : "Expected to say yes", value: h?.adopters != null ? people(h.adopters) : "–", sub: h?.adopters != null ? "Answer × people represented" : "Known at the end" },
-    { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
+    h?.revenue
+      ? { label: "Implied monthly revenue", value: money(h.revenue.monthly, h.revenue.currency), sub: `${money(h.revenue.monthly_ci[0], h.revenue.currency)} to ${money(h.revenue.monthly_ci[1], h.revenue.currency)} at list price` }
+      : { label: "Simulated", value: int(live.order.length), sub: `${int(answers)} answers` },
   ];
 
   return (

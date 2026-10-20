@@ -81,6 +81,18 @@ async def enrich(
             )
         except LLMError:
             out = EnrichedBatch(people=[])
+            if len(batch) > 1:
+                # One bad reply shouldn't leave eight people nameless: retry in halves.
+                for half in (batch[: len(batch) // 2], batch[len(batch) // 2 :]):
+                    try:
+                        part = await llm.json(
+                            task="enrich_personas", model=model, system=SYSTEM,
+                            user=f"Simulation context (for flavour only, do not mention it): {context}\n\nPeople:\n" + "\n".join(_brief(p) for p in half),
+                            schema=EnrichedBatch, temperature=0.9, mock_ctx={"people": [p.model_dump() for p in half]},
+                        )
+                        out.people.extend(part.people)
+                    except LLMError:
+                        pass
         for e in out.people:
             p = by_id.get(e.id)
             if p is None:

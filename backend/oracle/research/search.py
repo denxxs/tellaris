@@ -143,9 +143,31 @@ async def research(
 
 
 FILES_SYSTEM = """You turn a user's own documents (pitch decks, product docs, pricing pages, research) into facts for a simulation.
-Extract 4-12 concrete facts: what the product does, its price and plans, who it is for, claims it makes, competitors named, market numbers.
-Mark public=false for anything a customer or member of the public could not know (internal targets, costs, roadmaps, confidential figures).
+Extract 4-14 concrete facts: what the product does, its price and plans, who it is for, claims it makes, competitors named,
+market numbers, and important internal realities (architecture, gaps, costs, roadmap) the analyst should know.
+
+For each fact set customer_visible:
+- true ONLY if a prospective customer would see it on the website, pricing page, a sales demo or marketing material,
+  or would directly notice it while using a free trial (for example the price, the features, the languages offered).
+- false for everything else: hosting and architecture, internal tools and providers, configuration, what is or isn't
+  wired up internally, internal pricing mechanics, costs, targets, roadmaps, team, investors, confidential numbers.
+When unsure, use false. Simulated customers only ever see customer_visible facts; the analyst sees all of them.
 Use source_urls = ["file:<file name>"] for each fact. Do not invent anything that is not in the documents."""
+
+
+class FileFact(BaseModel):
+    statement: str
+    relevance: str = ""
+    countries: list[str] = Field(default_factory=list)
+    stance: str = "neutral"
+    customer_visible: bool = Field(default=False, description="True only if a prospective customer would see or notice it")
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class FileFactSheet(BaseModel):
+    facts: list[FileFact] = Field(default_factory=list)
+    competitors: list[str] = Field(default_factory=list)
+    price_points: list[str] = Field(default_factory=list)
 
 
 async def facts_from_files(context: str, subject: str, targets: list[str], model: str) -> FactSheet:
@@ -153,9 +175,17 @@ async def facts_from_files(context: str, subject: str, targets: list[str], model
     if not context:
         return FactSheet()
     user = f"Subject: {subject}\nTarget countries: {', '.join(targets)}\n\nDOCUMENTS:\n{context}"
-    sheet = await llm.json(
-        task="file_facts", model=model, system=FILES_SYSTEM, user=user, schema=FactSheet, temperature=0.2,
+    raw = await llm.json(
+        task="file_facts", model=model, system=FILES_SYSTEM, user=user, schema=FileFactSheet, temperature=0.2,
         mock_ctx={"context": context[:4000]},
+    )
+    sheet = FactSheet(
+        facts=[
+            Fact(statement=f.statement, relevance=f.relevance, countries=f.countries, stance=f.stance, source_urls=f.source_urls, public=f.customer_visible)
+            for f in raw.facts
+        ],
+        competitors=raw.competitors,
+        price_points=raw.price_points,
     )
     for f in sheet.facts:
         f.source_urls = [u if u.startswith("file:") else f"file:{u}" for u in f.source_urls] or ["file:your documents"]
