@@ -325,7 +325,7 @@ class Aggregator:
             "by_occupation": self._group(lambda p: p.occupation_id, lambda p: p.occupation, min_n=2, limit=20),
             "by_seniority": self._group(lambda p: p.seniority),
             "by_company_type": self._group(lambda p: p.company_type),
-            "by_country_segment": self._group(lambda p: f"{p.country}|{p.segment}", lambda p: f"{p.country_name} · {p.segment}"),
+            "by_country_segment": self._group(lambda p: f"{p.country}|{p.segment}", lambda p: f"{p.country_name}, {p.segment}"),
             "influence_effects": self.influence_effects(),
             "influencer_voices": self.voices(),
             "drivers": self.drivers(),
