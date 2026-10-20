@@ -37,6 +37,8 @@
   --sea: #ffffff;
   --grid: #e8eaec;
   --live: #d99a00;
+  /* Knowledge graph entity kinds: fixed categorical order, validated (dataviz validate_palette). */
+  --kg-1: #2a78d6; --kg-2: #eb6834; --kg-3: #1baf7a; --kg-4: #eda100; --kg-5: #e87ba4; --kg-6: #008300; --kg-7: #e34948;
   color-scheme: light;
 }
 
@@ -53,6 +55,7 @@
     --pill-warning-bg: #2a2110; --pill-warning-ink: #e3b04b;
     --pill-neutral-bg: #232323; --pill-neutral-ink: #d0d0d0;
     --land: #1d1f20; --land-target: #2d3233; --sea: #111111; --grid: #262626; --live: #e3b04b;
+    --kg-1: #3987e5; --kg-2: #d95926; --kg-3: #199e70; --kg-4: #c98500; --kg-5: #d55181; --kg-6: #008300; --kg-7: #e66767;
     color-scheme: dark;
   }
 }
@@ -68,6 +71,7 @@
   --pill-warning-bg: #2a2110; --pill-warning-ink: #e3b04b;
   --pill-neutral-bg: #232323; --pill-neutral-ink: #d0d0d0;
   --land: #1d1f20; --land-target: #2d3233; --sea: #111111; --grid: #262626; --live: #e3b04b;
+    --kg-1: #3987e5; --kg-2: #d95926; --kg-3: #199e70; --kg-4: #c98500; --kg-5: #d55181; --kg-6: #008300; --kg-7: #e66767;
   color-scheme: dark;
 }
 

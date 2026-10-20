@@ -17,6 +17,8 @@ from .population.models import Persona
 from .population.sampler import PopulationBuilder
 from .report.writer import extract_themes, write_report
 from .files import bundle
+from .research.graph import build_graph, mentions
+from .research.graph import context_for as graph_context_for
 from .research.search import FactSheet, facts_from_files, research
 from .scenario.clarify import apply_answers
 from .scenario.compiler import compile_scenario, normalize
@@ -34,7 +36,8 @@ log = logging.getLogger("oracle.pipeline")
 
 STAGES = [
     ("scenario", "Understanding the question", 0.0, 0.07),
-    ("research", "Researching the real world", 0.07, 0.14),
+    ("research", "Researching the real world", 0.07, 0.12),
+    ("graph", "Mapping the topic", 0.12, 0.14),
     ("world", "Mapping influence between countries", 0.14, 0.18),
     ("population", "Building the population", 0.18, 0.32),
     ("reactions", "Simulating individual reactions", 0.32, 0.72),
@@ -167,6 +170,20 @@ class Runner:
         else:
             await self.stage("research", "skipped")
 
+        # 2b. Knowledge graph of the topic.
+        graph: dict[str, Any] | None = None
+        if self.cfg.knowledge_graph:
+            await self.stage("graph", "start")
+            try:
+                graph = await build_graph(spec, sheet.facts, roles.analyst)
+                await self.ch.emit("graph", graph)
+                await self.stage("graph", "done", entities=len(graph["entities"]), links=len(graph["relations"]))
+            except Exception as exc:  # noqa: BLE001 - the graph helps but must never stop a run
+                await self.log(f"Couldn't map the topic, continuing without it: {exc}", "warn")
+                await self.stage("graph", "skipped")
+        else:
+            await self.stage("graph", "skipped")
+
         # 3. World
         await self.stage("world", "start")
         extra = [
@@ -202,7 +219,11 @@ class Runner:
             if done_count % 25 == 0:
                 await self.progress("reactions", done_count / max(total, 1))
 
-        reactions = await react_all(people, spec, sheet.facts, crowd, self.cfg.runs_per_agent, self.cfg.temperature, on_reaction)
+        # The business lens keeps its locked prompt; other lenses get each person's slice of the graph.
+        known_for = None
+        if graph and lens_of(spec).id != "b2b":
+            known_for = graph_context_for(graph, {p.country: p.country_name for p in people})
+        reactions = await react_all(people, spec, sheet.facts, crowd, self.cfg.runs_per_agent, self.cfg.temperature, on_reaction, known_for=known_for)
         await self.ch.flush()
         await store.save_reactions(self.id, [r.model_dump() for r in reactions])
         if not reactions:
@@ -265,6 +286,13 @@ class Runner:
             await self.stage("diffusion", "done", posts=summary.get("society", {}).get("posts", 0))
         else:
             await self.stage("diffusion", "skipped")
+
+        if graph:
+            talk = await store.feed(self.id) if "diffusion" in results else []
+            found = mentions(graph, reactions, talk, {p.id: p for p in people})
+            for e in graph["entities"]:
+                e["mentions"] = found.get(e["id"], {"people": 0, "lean": None, "samples": []})
+            results["graph"] = graph
 
         # 8. Themes + report
         await self.stage("report", "start")

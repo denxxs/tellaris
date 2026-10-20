@@ -683,6 +683,52 @@ def interview_digest(ctx: dict[str, Any]) -> dict[str, Any]:
     return {"summary": f"{len(answers)} people answered. The most common thread: {top}.", "themes": themes}
 
 
+def knowledge_graph(ctx: dict[str, Any]) -> dict[str, Any]:
+    """A plausible map from the setup alone: the product, its alternatives, groups, outside factors, places
+    and the concepts the canned answers argue about."""
+    spec, facts = ctx["spec"], ctx.get("facts") or []
+    ents: list[dict[str, Any]] = [{"id": "product", "name": spec["title"].split(":")[0][:60], "type": "product", "summary": spec["subject"][:200]}]
+    rels: list[dict[str, Any]] = []
+    for i, c in enumerate(spec.get("competitors") or ["What people use today"]):
+        cid = f"alt-{i}"
+        ents.append({"id": cid, "name": c, "type": "competitor", "summary": f"An alternative people already know: {c}."})
+        rels.append({"source": "product", "target": cid, "label": "competes with", "detail": f"{c} is what many would compare it with."})
+    for i, s in enumerate(spec.get("segments") or []):
+        sid = f"group-{i}"
+        ents.append({"id": sid, "name": s["name"], "type": "customer", "summary": s.get("description") or s["name"], "countries": s.get("countries") or []})
+        rels.append({"source": "product", "target": sid, "label": "aimed at", "detail": f"It is meant for {s['name'].lower()}."})
+    for i, f in enumerate(spec.get("forces") or []):
+        fid = f"force-{i}"
+        kind = "policy" if f.get("channel") == "regulation" else "event"
+        ents.append({"id": fid, "name": f["name"], "type": kind, "summary": f.get("description", ""), "countries": f.get("affects") or []})
+        rels.append({"source": fid, "target": "product", "label": "hurts" if f.get("direction") == "hurts" else "helps" if f.get("direction") == "helps" else "affects", "detail": f.get("description", "")})
+    from ..world.countries import countries as _countries
+
+    cs = _countries()
+    for iso in spec.get("targets", [])[:6]:
+        name = cs[iso].name if iso in cs else iso
+        ents.append({"id": f"place-{iso.lower()}", "name": name, "type": "place", "summary": "One of the countries simulated.", "countries": [iso]})
+        rels.append({"source": "product", "target": f"place-{iso.lower()}", "label": "launches in", "detail": f"People in {name} are simulated."})
+    concepts = [
+        ("price", "Price", ["cost", "cheaper", "budget", "pay"], "What it costs compared with what people pay now."),
+        ("trust", "Trust and proof", ["proof", "trust", "case study", "peers"], "Whether people believe it works for someone like them."),
+        ("security", "Data security", ["security", "data-protection", "compliance"], "Worries about where data goes and who checks it."),
+        ("habit", "Habit and switching", ["switching", "habits", "already have"], "The pull of what people already do."),
+    ]
+    for cid, name, aliases, summary in concepts:
+        ents.append({"id": cid, "name": name, "type": "concept", "summary": summary, "aliases": aliases})
+    rels += [
+        {"source": "price", "target": "product", "label": "decides for", "detail": "Price is the first thing many weigh."},
+        {"source": "trust", "target": "product", "label": "unlocks", "detail": "Proof from people like them makes it easier to say yes."},
+        {"source": "security", "target": "product", "label": "slows", "detail": "Data and compliance reviews slow decisions down."},
+        {"source": "habit", "target": "alt-0", "label": "keeps people on", "detail": "Habits keep people with what they already use."},
+    ]
+    if facts:
+        ents.append({"id": "research", "name": "Market facts", "type": "concept", "summary": facts[0]["statement"][:200], "facts": [1]})
+        rels.append({"source": "research", "target": "product", "label": "shapes", "detail": facts[0]["statement"][:200], "facts": [1]})
+    return {"entities": ents, "relations": rels}
+
+
 def reflect(ctx: dict[str, Any]) -> dict[str, Any]:
     """Weigh what you remember: memories that disagree and matter most pull you a little."""
     p, cur, start, mems = ctx["persona"], ctx["p"], ctx["start"], ctx.get("memories") or []
@@ -742,6 +788,7 @@ HANDLERS["public_brief"] = public_brief
 HANDLERS["clarify"] = clarify
 HANDLERS["society_turn"] = society_turn
 HANDLERS["reflect"] = reflect
+HANDLERS["knowledge_graph"] = knowledge_graph
 HANDLERS["interview_answer"] = interview_answer
 HANDLERS["interview_digest"] = interview_digest
 HANDLERS["file_facts"] = file_facts

@@ -77,7 +77,7 @@ def _facts_for(p: Persona, facts: list[Fact]) -> list[Fact]:
     return [f for f in facts if f.public and (not f.countries or p.country in f.countries)][:8]
 
 
-def build_prompt(p: Persona, spec: ScenarioSpec, facts: list[Fact]) -> str:
+def build_prompt(p: Persona, spec: ScenarioSpec, facts: list[Fact], known: list[str] | None = None) -> str:
     lines = ["WHO YOU ARE:", p.card(), ""]
     if p.exposures:
         lines.append("OUTSIDE FORCES IN YOUR WORLD (code: description):")
@@ -94,6 +94,9 @@ def build_prompt(p: Persona, spec: ScenarioSpec, facts: list[Fact]) -> str:
     if rel:
         lines.append("Known facts:")
         lines += [f"- {f.statement}" for f in rel]
+    if known:
+        lines.append("What someone in your position would likely know about who and what is involved:")
+        lines += [f"- {k}" for k in known]
     lines += [
         "",
         f"Time frame: the next {spec.horizon_months} months.",
@@ -145,6 +148,7 @@ async def react_all(
     runs_per_agent: int,
     temperature: float,
     on_reaction: Callable[[Reaction, Persona], Awaitable[None]] | None = None,
+    known_for: Callable[[Persona], list[str]] | None = None,
 ) -> list[Reaction]:
     if not models:
         raise ValueError("no crowd models configured")
@@ -153,7 +157,7 @@ async def react_all(
 
     async def one(idx: int, p: Persona, run: int) -> None:
         model = models[(idx + run) % len(models)]
-        user = build_prompt(p, spec, facts)
+        user = build_prompt(p, spec, facts, known_for(p) if known_for else None)
         try:
             out = await llm.json(
                 task="react",
