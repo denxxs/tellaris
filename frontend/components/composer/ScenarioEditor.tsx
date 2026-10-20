@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Chip, Field, Input, Segmented, Select, Slider, Textarea, Toggle } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
-import { int, pct, people, shortJob, titleCase } from "@/lib/format";
+import { int, people, shortJob, titleCase } from "@/lib/format";
 import type { FeedStyle, Force, LensId, RunConfig, Segment, Spec, WhatIfEvent } from "@/lib/types";
 import { CountryPicker } from "./CountryPicker";
 
@@ -370,8 +370,8 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
         </Button>
       </Section>
 
-      <Section title="Outside factors" aside="Regulation, competitors or economic pressure that people will feel. They are drawn on the map and shape what people feel. Real news is added automatically.">
-        {spec.forces.length === 0 && <p className="text-[13px] text-muted">None added. The influence map still applies.</p>}
+      <Section title="Things you know are true" aside="Facts the news may not carry yet that people will feel, like a rule you know is coming. Everyone they apply to has them in mind. Real news is added automatically, and future what-ifs go under What-if events.">
+        {spec.forces.length === 0 && <p className="text-[13px] text-muted">None added.</p>}
         {spec.forces.map((f, i) => (
           <div key={i} className="flex flex-col gap-3 border-b border-border pb-5 last:border-0 last:pb-0">
             <div className="flex flex-wrap items-center gap-3">
@@ -381,7 +381,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
               </Button>
             </div>
             <Textarea aria-label="What it does" rows={2} value={f.description} onChange={(e) => setForce(i, { description: e.target.value })} />
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Select label="Comes from" value={f.origin} onChange={(v) => setForce(i, { origin: v })} options={originOptions} />
               <Select
                 label="Effect"
@@ -393,12 +393,12 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
                   { value: "mixed", label: "Mixed effect" },
                 ]}
               />
-              <Slider label="Strength" value={f.strength} min={0} max={1} step={0.05} onChange={(v) => setForce(i, { strength: v })} format={(v) => pct(v)} />
+
             </div>
           </div>
         ))}
         <Button size="sm" className="self-start" onClick={() => set("forces", [...spec.forces, newForce()])}>
-          Add factor
+          Add a fact
         </Button>
       </Section>
 

@@ -233,22 +233,22 @@ class PopulationBuilder:
                             strength=e.strength, note=e.note, origin=e.origin,
                         )
                     )
+        # Factors the user stated as true reach everyone they apply to: no odds, no guessed strength.
         for f in self.spec.forces:
             if not self._force_applies(f, iso, sector, o):
                 continue
-            if self.rng.random() < _clip(0.25 + f.strength * 0.85):
-                name = f.origin
-                if f.origin in countries():
-                    name = countries()[f.origin].name
-                elif f.origin in blocs():
-                    name = blocs()[f.origin].name
-                out.append(
-                    Exposure(
-                        source=f.origin, source_name=name, channel=f.channel, strength=f.strength,
-                        note=f"{f.name}: {f.description}".strip(": "), direction=f.direction, origin="scenario",
-                    )
+            name = f.origin
+            if f.origin in countries():
+                name = countries()[f.origin].name
+            elif f.origin in blocs():
+                name = blocs()[f.origin].name
+            out.append(
+                Exposure(
+                    source=f.origin, source_name=name, channel=f.channel, strength=f.strength,
+                    note=f"{f.name}: {f.description}".strip(": "), direction=f.direction, origin="scenario",
                 )
-        out.sort(key=lambda x: -x.strength)
+            )
+        out.sort(key=lambda x: (x.origin != "scenario", -x.strength))  # what the user stated always stays
         return out[:6]
 
     @staticmethod

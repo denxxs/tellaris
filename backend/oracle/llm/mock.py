@@ -135,18 +135,7 @@ def compile_scenario(ctx: dict[str, Any]) -> dict[str, Any]:
         else:
             segments = [{"name": "Adults", "description": "Representative adults", "occupations": [], "weight": 1.0, "is_buyer": True}]
 
-    forces = []
-    if "EU" not in targets and any(t in targets for t in ["IND", "USA", "GBR", "AUS", "SGP", "ISR", "CAN"]) and (b2b or "ai" in low.split()):
-        forces.append({
-            "name": "EU AI Act and GDPR obligations", "origin": "EU", "affects": [], "sectors": ["software", "it_services", "finance"],
-            "channel": "regulation", "direction": "hurts", "strength": 0.55,
-            "description": "Vendors and IT-services firms serving EU clients must show data protection, transparency and risk controls, which slows procurement of new AI tools.",
-        })
-    if b2b:
-        forces.append({
-            "name": "Tighter software budgets", "origin": "USA", "affects": [], "sectors": ["software", "it_services"], "channel": "monetary",
-            "direction": "hurts", "strength": 0.4, "description": "Higher interest rates keep CFOs consolidating tools and cutting seats.",
-        })
+    forces = []  # only what the user states; the offline model doesn't read that from the prompt
     modes = ["reaction"]
     if b2b:
         modes.append("committee")

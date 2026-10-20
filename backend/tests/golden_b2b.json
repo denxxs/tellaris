@@ -1,11 +1,11 @@
 {
  "headline": {
-  "stated": 0.106,
-  "calibrated": 0.0833,
-  "value": 0.0833,
+  "stated": 0.1242,
+  "calibrated": 0.0965,
+  "value": 0.0965,
   "ci": [
-   0.0699,
-   0.0957
+   0.0817,
+   0.1112
   ],
   "reach": 1.0,
   "n": 120,
@@ -13,17 +13,17 @@
   "adopters": null
  },
  "by_country": {
-  "IND": 0.0457,
-  "USA": 0.1597
+  "IND": 0.0482,
+  "USA": 0.1946
  },
  "by_segment": {
-  "IT services staff": 0.0468,
-  "Finance leaders": 0.1574,
-  "Financial analysts": 0.0429,
-  "Startup founders": 0.2435
+  "IT services staff": 0.046,
+  "Finance leaders": 0.1875,
+  "Financial analysts": 0.0534,
+  "Startup founders": 0.4614
  },
- "committees": 0.027,
- "society_final": 0.0906,
+ "committees": 0.0585,
+ "society_final": 0.1218,
  "spec": {
   "b2b": true,
   "modes": [

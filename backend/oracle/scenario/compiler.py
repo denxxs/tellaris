@@ -51,7 +51,7 @@ Rules:
 - Set b2b=true only for the b2b lens; buying committees are simulated then.
 - Add "diffusion" to modes when word of mouth, virality or public opinion matters.
 - Targets: ISO3 codes. If the user names none, choose the most relevant markets (max 3), unless scope is global.
-- forces: outside pressures that change the outcome, especially ones from countries/blocs that are NOT targets (e.g. EU AI Act and GDPR affecting Indian IT firms with EU clients; US interest rates; Chinese competitors). Be concrete.
+- forces: ONLY outside pressures the user explicitly states as true now (e.g. "new data rules in India start next year"), with affects/sectors as the user describes. Never add your own: real current affairs are found separately from the news, and hypotheticals go in events. Usually empty.
 - assumed_reach: ONLY if the user states how many people will hear about it (e.g. "we expect 5% of the market to hear of it"), as a share 0-1. Otherwise null. Never estimate it.
 - price: when there are several plans, use the plan a typical buyer in the main segment would start on (usually the cheapest paid plan), name the other plans in the subject, and keep the unit exactly as written (per workspace, per seat, per month). Never use the top tier as the price unless the user says so.
 - research_queries: 3-6 web searches that would ground the simulation in current facts (competitors, prices, regulations, recent news).
