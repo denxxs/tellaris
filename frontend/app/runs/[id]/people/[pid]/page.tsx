@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { PersonaChat } from "@/components/people/Chat";
 import { Avatar } from "@/components/people/Avatar";
+import { MindCard } from "@/components/people/MindCard";
 import { Card, CardHead, Chip, ErrorNote, Pill, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
@@ -130,7 +131,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                 {p.age}-year-old {p.gender}, {shortJob(p.occupation)} ({p.seniority}) at a {companyLabel(p.company_type).toLowerCase()} in {countryName(p.country)}. In the group “{p.segment}”.
               </p>
             </div>
-            <dl className="flex gap-8">
+            <dl className="flex flex-wrap gap-x-8 gap-y-3">
               <div>
                 <dt className="text-[13px] text-muted">First answer</dt>
                 <dd className={cx("t-kpi mt-1", stanceText(mean))}>{pctSmart(mean)}</dd>
@@ -139,6 +140,12 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                 <div>
                   <dt className="text-[13px] text-muted">After the conversation</dt>
                   <dd className={cx("t-kpi mt-1", stanceText(finalP))}>{pctSmart(finalP)}</dd>
+                </div>
+              )}
+              {p?.mind?.reflection && (
+                <div>
+                  <dt className="text-[13px] text-muted">After reflecting</dt>
+                  <dd className={cx("t-kpi mt-1", stanceText(p.mind.reflection.p))}>{pctSmart(p.mind.reflection.p)}</dd>
                 </div>
               )}
             </dl>
@@ -174,6 +181,8 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                   )}
                 </Card>
               )}
+
+              {p?.mind && p.mind.memories.length > 0 && <MindCard mind={p.mind} name={p.name} />}
 
               <Card>
                 <CardHead title="In the conversation">{said.length ? `${said.length} ${said.length === 1 ? "thing" : "things"} they said to their network.` : "They read what others said but did not post."}</CardHead>

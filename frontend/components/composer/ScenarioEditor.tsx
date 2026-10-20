@@ -41,7 +41,7 @@ export function estimateCalls(spec: Spec, c: RunConfig) {
   const agents = c.agents + c.influencer_voices;
   let calls = 2 + Math.ceil(agents / 8) + agents * c.runs_per_agent + 2;
   if (spec.modes.includes("committee")) calls += c.committees * (spec.committee_roles.length * c.committee_rounds + 1);
-  if (spec.modes.includes("diffusion")) calls += Math.min(c.diffusion_agent_cap, c.agents) * c.diffusion_rounds;
+  if (spec.modes.includes("diffusion")) calls += Math.min(c.diffusion_agent_cap, c.agents) * (c.diffusion_rounds + (c.memory === false ? 0 : 1));
   if (c.research) calls += 1;
   return calls;
 }
@@ -363,6 +363,14 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
             <Toggle checked={spec.modes.includes("committee")} onChange={(v) => toggleMode("committee", v)} label="Buying committees" description="Companies debate the purchase before deciding." />
           )}
           <Toggle checked={spec.modes.includes("diffusion")} onChange={(v) => toggleMode("diffusion", v)} label="Society" description="People post, reply to each other and change their minds over several rounds." />
+          {spec.modes.includes("diffusion") && (
+            <Toggle
+              checked={config.memory ?? true}
+              onChange={(v) => onConfig({ ...config, memory: v })}
+              label="Memory and reflection"
+              description="People remember what they saw and think it over once at the end. One extra model call per person in the conversation."
+            />
+          )}
           <Toggle checked={config.research} onChange={(v) => onConfig({ ...config, research: v })} label="Web research" description="Ground people in current facts, prices and competitors." />
           <Field label="Awareness" hint="Share of the audience who would realistically hear about it in the time frame.">
             {(id) => <Slider id={id} value={spec.assumed_reach} min={0.02} max={1} step={0.01} onChange={(v) => set("assumed_reach", v)} format={(v) => pct(v)} />}

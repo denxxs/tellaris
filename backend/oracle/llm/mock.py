@@ -628,7 +628,29 @@ def society_turn(ctx: dict[str, Any]) -> dict[str, Any]:
         "juster": int(round(new * 10)),
         "changed": changed,
         "why": ("People I trust are more positive than I was." if new > cur else "What I'm reading makes me more cautious.") if changed else "Nothing new for me here.",
+        "takeaway": (
+            f"{(visible[0].get('author_name') or 'Someone').split(' ')[0]} sees it {'differently' if abs((visible[0].get('p') or cur) - cur) > 0.2 else 'the way I do'}."
+            if visible else ("The news made me think again." if news else "")
+        ),
     }
+
+
+def reflect(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Weigh what you remember: memories that disagree and matter most pull you a little."""
+    p, cur, start, mems = ctx["persona"], ctx["p"], ctx["start"], ctx.get("memories") or []
+    r = _rng("reflect", p["id"], len(mems))
+    ranked = sorted(mems, key=lambda m: -m["importance"])
+    picked = [m["n"] for m in ranked if m["kind"] != "said"][: r.choice([0, 1, 2, 2, 3])]
+    news = any(m["kind"] == "news" for m in mems if m["n"] in picked)
+    new = _clip(cur + (-0.04 if news else 0.02) * p["traits"]["conformity"] + r.gauss(0, 0.03), 0.01, 0.99)
+    moved = new - start
+    if abs(moved) < 0.08:
+        belief = "I've heard people out, but I'm about where I started."
+    elif moved > 0:
+        belief = "Hearing from people I trust made me warmer to it than I expected."
+    else:
+        belief = "The more I heard, the more doubts I had. I'd wait and see."
+    return {"belief": belief, "juster": int(round(new * 10)), "influences": picked, "changed_mind": abs(moved) >= 0.08}
 
 
 def file_facts(ctx: dict[str, Any]) -> dict[str, Any]:
@@ -671,4 +693,5 @@ def clarify(ctx: dict[str, Any]) -> dict[str, Any]:
 HANDLERS["public_brief"] = public_brief
 HANDLERS["clarify"] = clarify
 HANDLERS["society_turn"] = society_turn
+HANDLERS["reflect"] = reflect
 HANDLERS["file_facts"] = file_facts
