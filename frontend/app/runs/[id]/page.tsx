@@ -4,6 +4,7 @@ import { AnimatePresence } from "motion/react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { CommitteesTab, CountriesTab, GroupsTab, InfluenceTab, MethodTab, PricingTab, ReasonsTab } from "@/components/run/Details";
+import { NewsTimelineTab, fmtDay } from "@/components/run/NewsTimeline";
 import { SocietyTab } from "@/components/run/Society";
 import { AskGroup, type GroupPreset } from "@/components/run/AskGroup";
 import { KnowledgeGraphTab } from "@/components/run/KnowledgeGraph";
@@ -18,7 +19,7 @@ import { useMeta } from "@/lib/meta";
 import { ago } from "@/lib/format";
 import { useRunStream } from "@/lib/useRunStream";
 
-type TabId = "overview" | "ask" | "graph" | "society" | "where" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "people" | "method";
+type TabId = "overview" | "ask" | "graph" | "news" | "society" | "where" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "people" | "method";
 
 const VERDICT: Record<string, { label: string; tone: "yes" | "no" | "neutral" }> = {
   strong: { label: "Strong", tone: "yes" },
@@ -51,6 +52,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
     if (r) {
       if (r.splits && Object.keys(r.splits.dimensions).length) t.push({ id: "where", label: "Where it works" });
       if (r.diffusion?.rounds?.length) t.push({ id: "society", label: "Society" });
+      if (r.as_of) t.push({ id: "news", label: "News and timeline" });
       if (r.graph?.entities?.length) t.push({ id: "graph", label: "Knowledge graph" });
       t.push({ id: "people", label: "People" }, { id: "countries", label: "Countries" }, { id: "groups", label: "Groups" }, { id: "influence", label: "Outside influence" }, { id: "reasons", label: "Why and why not" });
       if (r.wtp) t.push({ id: "pricing", label: "Pricing" });
@@ -123,6 +125,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
           <p className="mt-1 text-[12px] text-faint">
             {targets.map(countryName).join(", ")}
             {live.run && `${targets.length ? ". " : ""}Started ${ago(live.run.created_at).toLowerCase()}.`}
+            {r?.as_of && ` News as of ${fmtDay(r.as_of)}.`}
             {live.run?.parent_id && (
               <>
                 {" "}
@@ -214,6 +217,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
       )}
       {r && tab === "ask" && <AskGroup id={id} r={r} preset={askPreset} />}
       {r && tab === "graph" && r.graph && <KnowledgeGraphTab g={r.graph} runId={id} />}
+      {r && tab === "news" && <NewsTimelineTab r={r} />}
       {r && tab === "countries" && <CountriesTab r={r} live={live} />}
       {r && tab === "groups" && <GroupsTab r={r} />}
       {r && tab === "influence" && <InfluenceTab r={r} live={live} />}

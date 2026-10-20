@@ -424,6 +424,10 @@ async def chat(run_id: str, pid: str, req: ChatRequest) -> dict[str, Any]:
             if earlier else ""
         )
         + _mind_context(p.get("mind"))
+        + (
+            "\n\nNEWS YOU'VE COME ACROSS:\n" + "\n".join(f"- {n['published']}, {n['source']}: {n['headline']}" for n in p["news"])
+            if p.get("news") else ""
+        )
     )
     messages = [{"role": "system", "content": f"{CHAT_SYSTEM}\n\n{context}"}, *history[-20:], {"role": "user", "content": req.message}]
     model = (settings_store.get().roles.crowd or [settings_store.get().roles.planner])[0]

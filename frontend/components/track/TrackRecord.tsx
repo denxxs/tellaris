@@ -80,6 +80,7 @@ function ResolveForm({ p, onDone }: { p: Prediction; onDone: () => void }) {
 function Row({ p, onChange }: { p: Prediction; onChange: () => void }) {
   const { countryName } = useMeta();
   const [resolving, setResolving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const due = p.status === "open" && p.resolves_on <= today();
   const off = p.error ?? null;
   return (
@@ -130,6 +131,25 @@ function Row({ p, onChange }: { p: Prediction; onChange: () => void }) {
         {p.status === "open" && !resolving && (
           <Button size="sm" variant={due ? "primary" : "secondary"} onClick={() => setResolving(true)}>
             Enter the real result
+          </Button>
+        )}
+        {p.status === "open" && !resolving && (
+          <Button
+            size="sm"
+            busy={refreshing}
+            disabled={refreshing}
+            title="Run the same people again with today's news, and see what moved"
+            onClick={async () => {
+              setRefreshing(true);
+              try {
+                const res = await api.whatif(p.run_id, "Refreshed with today's news", {});
+                window.location.href = `/runs/${res.id}`;
+              } catch {
+                setRefreshing(false);
+              }
+            }}
+          >
+            Refresh with today&apos;s news
           </Button>
         )}
         <Button

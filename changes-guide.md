@@ -9,9 +9,9 @@ Ten features borrowed (as ideas only) from other simulation projects: MiroFish, 
 | 3 | [Asking a group](#3-asking-a-group) | TinyTroupe, Synthetic Users | Done |
 | 4 | [Knowledge graph](#4-knowledge-graph) for each simulation | MiroFish | Done |
 | 5 | [Ranked feed](#5-ranked-feed) with likes, reshares and a viral mode | OASIS | Done |
-| 6 | Timeline of events | AgentSociety, Concordia | Next |
-| 7 | Mid-run news | MiroFish | Planned |
-| 8 | Personas from your customer data | Electric Twin, Synthetic Users | Planned |
+| 6 | [Current news and the timeline](#6-current-news-and-the-timeline) | AgentSociety, Concordia | Done |
+| 7 | Mid-run news | MiroFish | Folded into 6 |
+| 8 | Personas from your customer data | Electric Twin, Synthetic Users | Next |
 | 9 | Shareable reports | Commercial tools | Planned |
 | 10 | Bigger, cheaper crowds | OASIS | Planned |
 
@@ -373,3 +373,122 @@ With the demo model the numbers show the mechanics only. With real models, peopl
 - The ranking weights are hand-set, not fitted to any real platform.
 - Likes and reshares only change who sees what. They don't change anyone's view directly; that happens through what people read.
 - Older runs have no reach data, so the card doesn't appear on them.
+
+---
+
+## 6. Current news and the timeline
+
+*This also covers #7 (mid-run news). Fetching news partway through a run would add nothing, since a run takes minutes and the news doesn't change in that time. What #7 was meant for is now covered by what-if events and by "Refresh with today's news".*
+
+### What it does
+
+Oracle is a real-world helper, not a made-up world. Every run now starts from the world as it is today:
+- **Real current affairs, automatically.** Oracle searches the news around the question for every run, whatever the type of question. It keeps stories that are relevant and recent enough to matter, each with its real date, outlet and link.
+- **People only know the news they'd come across.** A story everyone's talking about reaches most people in that country. Specialist news reaches only the people it concerns: an RBI circular reaches an Indian finance worker, not an Indian Gen Z student. Foreign news rarely travels unless it's huge.
+- **Real time.** The conversation runs through real calendar periods, from today to the end of the time frame.
+- **Real scheduled events**, such as a rule taking effect or a launch date, are found in the news and land in the period they happen.
+- **What-if events are optional,** and you place them on the timeline yourself: "a rival cuts its price in month 5", "a new law in year 3". They're always shown as assumptions. Oracle also runs the same people with real news only, so you can see exactly what your assumptions change.
+- **An "as of" date on every result,** and **Refresh with today's news** on tracked predictions.
+
+### What was done
+
+- **Setup:**
+  - **Current news** switch under How to simulate (on by default, two extra model calls).
+  - New **What-if events** section. Each event has:
+    - what happens, and details;
+    - **When:** the picker uses the time frame's own units: months for up to 18 months ("Month 3 (Jan 2027)"), quarters up to 4 years, years beyond ("Year 3 (2029)");
+    - **Where:** everywhere or one country;
+    - **How widely heard:** everyone, widely covered, or only the people it concerns (with "Who follows it closely");
+    - **Effect:** helps, hurts or mixed.
+- **Live progress:** a "Read the news" stage.
+- **New tab, "News and timeline":**
+  - **The timeline:** a chart from Today to the end of the time frame showing the share leaning yes (per period) and projected adoption (monthly).
+    - Markers: solid for real scheduled events, hollow for your what-ifs, with dashed lines when they're what-ifs.
+    - The dashed lines show the base case without your what-ifs, with a sentence comparing where they end.
+    - Hovering reads out both figures at any point.
+    - Select an event, on the chart or in the list, for its details, how many people heard it and its source.
+  - **The world right now:** every news item with:
+    - date, how long ago, outlet, and the headline linking to the article;
+    - how widely it was covered, which countries, whether it helps or hurts the case, and whether it's still in effect or takes effect later;
+    - **Known by:** the share of simulated people who know it, overall and per country;
+    - a country filter.
+
+    When no news was used, it says why: search off, news off, or nothing relevant found.
+- **Run header:** "News as of 20 Oct 2026".
+- **Profiles:** a **News they know** card. Profile chat knows those stories too.
+- **Track record:** **Refresh with today's news** on open predictions. It reruns the same people with fresh news. The new run marks stories that are "New since the original run" and shows how far the answer moved.
+- **Backtests** switch news off: today's news would leak into past cases.
+
+### How it works
+
+1. **Finding the news** (`backend/oracle/research/news.py`, `gather_news`):
+   - **Planning searches:** one model call writes 6–8 news searches about the category and the world around it (prices, the economy people feel, regulation, competitors, trends, upcoming events), not just the product name.
+   - **Searching:** news search (DuckDuckGo News, or Tavily in news mode) returns results **with publish dates from the source**. Results without a date, or dated after today, are dropped.
+   - **Selecting:** a second call picks 4–14 items. Each item must point to one numbered result, and its date, outlet and link are copied from that result, never written by the model. The model judges:
+     - **reach:** mass, broad or niche;
+     - **audiences:** who follows it closely;
+     - **age skew**;
+     - **stance;**
+     - **relevance;**
+     - **whether it's still in effect;**
+     - **any scheduled future date it announces.**
+2. **Relevant and recent:**
+   - `score = relevance × 0.5^(age in days / 60)`;
+   - stories still in effect (a law, a price change) don't fall below 60% of their relevance;
+   - items scoring under 0.15 are dropped, and at most 14 are kept.
+3. **Who knows what** (`know_chance`, `assign`):
+   - starting chance by reach: 85% mass, 45% broad, 7% niche;
+   - foreign news is cut to a fifth (mass) or a sixteenth (other);
+   - global news is at 80%;
+   - if the story concerns the person's work or interests (matched against their sector, job, group and information sources), it rises to at least 80%;
+   - age skew raises or lowers it by up to 30%, and openness adjusts it slightly;
+   - each person gets their top four known stories, chosen by a fixed draw, so reruns agree.
+4. **Into the prompts:** every person's prompt now starts with today's date (so real models don't reason as if it's their training year) and "News you've come across recently", with dates and outlets. This applies to all question types, B2B included.
+5. **The timeline** (`backend/oracle/simulate/timeline.py`):
+   - Society rounds become equal periods of the time frame. With 12 months and 3 rounds, each round is 4 months, labelled "Oct 2026 to Feb 2027".
+   - Events land in the period they fall in:
+     - real scheduled ones from the news (`upcoming` dates within the time frame);
+     - your what-ifs.
+   - In each period, people hear an event by the same rules as news.
+   - People are told "It is now Feb 2027 to Jun 2027" and the news they heard that period.
+6. **No more invented news:** the model-written outside factors no longer appear as news items each round. They still act through the influence map and what people feel. This is the one deliberate change to B2B numbers: in the golden test, opinion after the conversation went from 5.6% to 9.3%. The headline and everything else are identical. The golden file was re-recorded on purpose.
+7. **Base case:** when a run has what-if events, the conversation runs a second time on the same people with real events only. Its opinion and adoption curves are stored as `results.timeline.base`. This costs a second conversation, and setup includes it in the model-call estimate.
+8. **Storage:**
+   - `results.as_of`, `results.news`, `results.news_status` and `results.timeline` hold the date, the news items, why news is missing if it is, and the periods, events, curves and base case;
+   - `persona.news` holds the stories each person knows;
+   - `spec.events` holds your what-ifs;
+   - on a rerun, `results.comparison.new_news` lists the new stories.
+   - No new table.
+
+**Files:** `backend/oracle/research/news.py` (new), `backend/oracle/simulate/timeline.py` (new), `backend/oracle/simulate/society.py` (periods and events instead of invented news), `backend/oracle/simulate/reaction.py` (today's date and news), `backend/oracle/pipeline.py` (news stage, assignment, timeline, base case), `backend/oracle/scenario/models.py` (`events`, `TimelineEvent`, `news` setting), `backend/oracle/population/models.py` (`news` on a person), `backend/oracle/api/app.py` (chat knows the news), `backend/oracle/backtest/runner.py` (news off), `backend/oracle/llm/mock.py` (offline search planning and selection), `backend/tests/test_news.py`, `backend/tests/golden_b2b.json` (re-recorded), `frontend/components/run/NewsTimeline.tsx` (new), `frontend/components/composer/ScenarioEditor.tsx`, `frontend/app/runs/[id]/page.tsx`, `frontend/app/runs/[id]/people/[pid]/page.tsx`, `frontend/components/track/TrackRecord.tsx`, `frontend/components/run/Overview.tsx`, `frontend/lib/types.ts`.
+
+### How to test
+
+Automated: `cd backend && python -m pytest tests/test_news.py tests/test_golden.py`. It uses a fake news search, so no internet is needed. It checks:
+- recent news outranks old news, unless the old story is still in effect;
+- a niche finance story reaches an Indian finance worker (70% or more) but not an Indian student (under 12%) or a Brazilian, while mass news reaches the student;
+- who knows what is the same on reruns, and finance people know finance news more often;
+- time labels follow the horizon (months, quarters, years), and periods and events map to the right rounds;
+- real scheduled events keep their source, and what-ifs outside the time frame are left out;
+- a full run uses only news from the search results, with real dates, and people's profiles carry news from those results;
+- a what-if "rival goes free" lands in the right period, reaches people, and ends lower than the base case;
+- switching news off removes it;
+- B2B results match the re-recorded golden file.
+
+By hand (needs a search provider in Models; DuckDuckGo is free and the default):
+1. Run "Would people in India and Brazil pay $3 a month for Penny, an app that tracks spending automatically?" The live progress shows "Read the news". The header says "News as of" today's date.
+2. Open **News and timeline**. Check the stories are real (select a headline to open the article) and dated. Compare **Known by** across countries.
+3. Open a few people from the **People** tab. Their **News they know** differs by country and job. Ask one in chat what they've heard lately.
+4. Start a new run with **Adjust setup first** → **What-if events** → add "Walnut makes its app free", Month 5, India, Widely covered, Makes a yes less likely. In the timeline, a hollow marker sits at month 5, and the dashed base-case lines show the result with real news only.
+5. Try a 5-year question: the When picker switches to years.
+6. On **Accuracy**, track a run, then select **Refresh with today's news** on it.
+
+With the demo model, the stories are real (search is real), but the demo picks and judges them with simple rules, so its "helps / hurts" labels are rough. A real model judges them properly.
+
+### Known limits
+
+- News search covers roughly the last year and depends on the search provider. Smaller markets and non-English news can be thin.
+- Backtests run without news, because news search can't reliably return only stories from before a past date.
+- Reach and audiences are the model's judgement, and the matching to people is by keywords.
+- What-if events affect the conversation (opinion after talking, adoption), not first reactions, which happen today before the events.
+- The base case doubles the cost of the conversation when you add what-if events.

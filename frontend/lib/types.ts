@@ -27,6 +27,67 @@ export type Force = {
   description: string;
 };
 
+export type Reach = "mass" | "broad" | "niche";
+
+export type WhatIfEvent = {
+  name: string;
+  description: string;
+  at_month: number;
+  countries: string[];
+  reach: Reach;
+  audiences: string[];
+  direction: "helps" | "hurts" | "mixed";
+};
+
+export type NewsItem = {
+  id: string;
+  headline: string;
+  summary: string;
+  published: string;
+  source: string;
+  url: string;
+  countries: string[];
+  reach: Reach;
+  audiences: string[];
+  age_skew: "young" | "old" | "all";
+  stance: "helps" | "hurts" | "neutral";
+  relevance: number;
+  lasting: boolean;
+  upcoming: string | null;
+  score: number;
+  known_share: number | null;
+  known_by_country: Record<string, number>;
+};
+
+export type TimelineEventOut = {
+  id: string;
+  kind: "scheduled" | "assumed";
+  name: string;
+  description: string;
+  at_month: number;
+  date: string;
+  when: string;
+  label: string;
+  countries: string[];
+  reach: Reach;
+  direction: "helps" | "hurts" | "mixed";
+  source?: string;
+  url?: string;
+  round: number | null;
+  heard_share?: number;
+};
+
+export type Timeline = {
+  as_of: string;
+  horizon_months: number;
+  unit: "month" | "quarter" | "year";
+  periods: { round: number; start_month: number; end_month: number; label: string }[];
+  events: TimelineEventOut[];
+  opinion: { round: number; value: number }[];
+  adoption: { month: number; adoption: number }[];
+  base: { opinion: { round: number; value: number }[]; adoption: { month: number; adoption: number }[] } | null;
+};
+
 export type Spec = {
   lens?: LensId | null;
   scope?: "countries" | "global";
@@ -53,6 +114,7 @@ export type Spec = {
   competitors: string[];
   assumed_reach: number;
   research_queries: string[];
+  events?: WhatIfEvent[];
   key_uncertainties: string[];
   assumptions: string[];
 };
@@ -68,6 +130,7 @@ export type RunConfig = {
   research: boolean;
   memory?: boolean;
   knowledge_graph?: boolean;
+  news?: boolean;
   feed_style?: FeedStyle;
   influence_threshold: number;
   seed: number | null;
@@ -211,7 +274,11 @@ export type Results = {
   splits?: Splits;
   graph?: KGraph;
   seed?: number;
-  comparison?: { parent_id: string; parent_title: string; parent_value: number; delta: number; society?: { parent: SocietyPoint; this: SocietyPoint; delta: number } };
+  as_of?: string;
+  news?: NewsItem[];
+  news_status?: "ok" | "off" | "no_search" | "none_found";
+  timeline?: Timeline;
+  comparison?: { parent_id: string; parent_title: string; parent_value: number; delta: number; parent_as_of?: string; new_news?: string[]; society?: { parent: SocietyPoint; this: SocietyPoint; delta: number } };
 };
 
 export type KGKind = "product" | "competitor" | "company" | "regulator" | "policy" | "technology" | "customer" | "place" | "event" | "concept";
@@ -376,8 +443,11 @@ export type ReflectionSummary = {
   examples?: { persona_id: string; name: string; country: string; occupation: string; from: number; to: number; belief: string }[];
 };
 
+export type KnownNews = { id: string; headline: string; published: string; source: string; url: string; reach: Reach };
+
 export type Persona = {
   mind?: Mind;
+  news?: KnownNews[];
   id: string;
   country: string;
   country_name: string;

@@ -61,7 +61,7 @@ async def _run_case(case: Case, req: BacktestRequest) -> dict[str, Any]:
     m = _OUTCOMES.search(case.prompt)
     cfg = RunConfig(
         agents=req.agents, runs_per_agent=req.runs_per_agent, committees=0, diffusion_rounds=0,
-        influencer_voices=0, research=False, seed=17,
+        influencer_voices=0, research=False, news=False, seed=17,  # today's news would leak into past cases
     )
     run_id = await start_run(RunRequest(prompt=prompt, targets=case.targets, config=cfg))
     task = tasks.get(run_id)

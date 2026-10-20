@@ -50,6 +50,7 @@ class Persona(BaseModel):
     represents: float = 0.0  # real people this agent stands for (estimate)
     influencer_voice: str | None = None  # bloc/country code if sampled as an outside voice
     group_trait: str | None = None  # a defining trait from their group, e.g. "owns a dog"
+    news: list[dict] = Field(default_factory=list)  # current affairs this person has come across
 
     # Filled in by enrichment
     name: str = ""

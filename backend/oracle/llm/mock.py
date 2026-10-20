@@ -601,7 +601,11 @@ def society_turn(ctx: dict[str, Any]) -> dict[str, Any]:
     peers = [v["p"] for v in visible if v.get("p") is not None]
     target = sum(peers) / len(peers) if peers else cur
     pull = t["conformity"] * 0.6 * (target - cur)
-    news_effect = (-0.06 if any(w in news.lower() for w in ("regulat", "act", "budget", "ban", "rate")) else 0.04) if news else 0
+    dirs = ctx.get("news_dirs") or []
+    if dirs:
+        news_effect = sum({"helps": 0.06, "hurts": -0.08}.get(d, 0.0) for d in dirs)
+    else:
+        news_effect = (-0.06 if any(w in news.lower() for w in ("regulat", "act", "budget", "ban", "rate")) else 0.04) if news else 0
     new = _clip(cur + pull + news_effect + r.gauss(0, 0.04), 0.01, 0.99)
     changed = abs(new - cur) > 0.05
     activity = 0.12 + 0.3 * t["openness"] + (0.15 if abs(cur - 0.5) > 0.3 else 0) + (0.1 if news else 0)
@@ -800,7 +804,54 @@ def clarify(ctx: dict[str, Any]) -> dict[str, Any]:
 
 HANDLERS["public_brief"] = public_brief
 HANDLERS["clarify"] = clarify
+_COUNTRY_WORDS = {"IND": "india", "BRA": "brazil", "USA": "united states", "GBR": "britain", "DEU": "germany", "FRA": "france", "JPN": "japan", "IDN": "indonesia", "NGA": "nigeria", "MEX": "mexico", "ITA": "italy", "CHN": "china"}
+_STOP = {"would", "people", "month", "their", "which", "about", "automatically", "app", "that", "with", "will", "pay"}
+
+
+def _topic(spec: dict[str, Any]) -> list[str]:
+    words = [w.strip(",.?$").lower() for w in spec["subject"].split()]
+    return [w for w in words if len(w) >= 5 and w not in _STOP and not w[0].isdigit()][:3]
+
+
+def news_queries(ctx: dict[str, Any]) -> dict[str, Any]:
+    spec = ctx["spec"]
+    topic = " ".join(_topic(spec)) or spec["subject"][:40]
+    names = [_COUNTRY_WORDS.get(t, t) for t in spec["targets"][:3]]
+    qs = [f"{n} {topic} news" for n in names] + [f"{n} consumer prices economy" for n in names]
+    return {"queries": qs[:8]}
+
+
+def news_items(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Offline selection: keep real results that name a target country, judged by simple rules."""
+    spec, hits = ctx["spec"], ctx.get("hits") or []
+    sectors = spec.get("sectors") or []
+    topic = _topic(spec)
+    items = []
+    for i, h in enumerate(hits):
+        text = f"{h['title']} {h['snippet']}".lower()
+        countries = [t for t in spec["targets"] if _COUNTRY_WORDS.get(t, "~") in text]
+        if not countries:
+            continue
+        on_topic = any(w[:5] in text for w in topic)
+        hurts = any(w in text for w in ("fee", "ban", "fine", "fraud", "cut", "layoff", "inflation", "rule", "tax"))
+        m = re.search(r"(20\d\d-\d\d-\d\d)", h["snippet"])
+        n = len(items)
+        items.append({
+            "hit": i + 1, "headline": h["title"][:90], "summary": (h["snippet"] or h["title"])[:200],
+            "countries": countries, "reach": "mass" if n == 0 else "broad" if n < 4 else "niche",
+            "audiences": ([sectors[0]] if sectors else []) + (["finance"] if any(w in text for w in ("bank", "rbi", "payment", "finance")) else []),
+            "age_skew": "young" if any(w in text for w in ("gen z", "student", "young")) else "all",
+            "stance": "hurts" if hurts else "helps" if n % 3 == 1 else "neutral",
+            "relevance": round(max(0.3, (0.9 if on_topic else 0.55) - 0.04 * n), 2), "lasting": n % 3 == 0, "upcoming": m.group(1) if m else None,
+        })
+        if len(items) >= 10:
+            break
+    return {"items": items}
+
+
 HANDLERS["society_turn"] = society_turn
+HANDLERS["news_queries"] = news_queries
+HANDLERS["news_items"] = news_items
 HANDLERS["reflect"] = reflect
 HANDLERS["knowledge_graph"] = knowledge_graph
 HANDLERS["interview_answer"] = interview_answer

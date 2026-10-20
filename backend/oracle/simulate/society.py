@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..llm import LLMError, llm
 from ..population.models import Persona
+from ..research.news import draw, know_chance
 from ..scenario.models import ScenarioSpec
 from .calibrate import Calibration, apply_array
 from .diffusion import bass_projection, build_network
@@ -104,10 +105,14 @@ async def run_society(
     memory: bool = True,
     minds_out: dict[str, dict[str, Any]] | None = None,
     feed_style: str = "word_of_mouth",
+    events: list[dict[str, Any]] | None = None,
+    periods: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Run the society. With memory on, each person keeps and recalls memories and reflects at the end;
     their memories and reflection are written into minds_out (person id -> record).
-    feed_style picks how each person's feed is chosen (see feed.py); word_of_mouth is the original."""
+    feed_style picks how each person's feed is chosen (see feed.py); word_of_mouth is the original.
+    Each round is a period of real time (periods); events land in their round and reach only the
+    people who would hear of them. Without events, no news enters the conversation."""
     platform = feed_style in ("ranked", "viral")
     rng = np.random.default_rng(seed)
     first: dict[str, Reaction] = {}
@@ -151,6 +156,9 @@ async def run_society(
         counter[0] += 1
         return f"f{counter[0]:05d}"
 
+    period_label = {pr["round"]: pr["label"] for pr in periods or []}
+    timeline_events = [e for e in events or [] if e.get("round")]
+
     def snapshot(rnd: int, changed: int = 0, news: str | None = None, posts: int = 0, replies: int = 0) -> dict[str, Any]:
         vals = np.array([state[pid] for pid in pids])
         cal_vals = apply_array(vals, cal)
@@ -168,6 +176,7 @@ async def run_society(
             "replies": replies,
             "sharers": posts + replies,
             "news": news,
+            "period": period_label.get(rnd),
         }
 
     def tally(items: list[dict[str, Any]]) -> None:
@@ -201,7 +210,6 @@ async def run_society(
     if on_round:
         await on_round(history[-1])
 
-    news_forces = [f for f in spec.forces if f.strength >= 0.4]
     examples: list[dict[str, Any]] = []
     item_by_id = {it["id"]: it for it in feed}
     fs = FeedState()
@@ -211,16 +219,29 @@ async def run_society(
     engaged = {"likes": 0, "reshares": 0}
 
     for rnd in range(1, rounds + 1):
-        news = None
-        news_item = None
-        if 0 <= rnd - 1 < len(news_forces):
-            f = news_forces[rnd - 1]
-            news = f"{f.name}: {f.description}".strip(": ")
-            news_item = _item(id=new_id(), round=rnd, kind="news", text=news, title=f.name, origin=f.origin, direction=f.direction)
-            feed.append(news_item)
-            item_by_id[news_item["id"]] = news_item
-            if on_items:
-                await on_items([news_item])
+        # Events landing in this period, and who hears each one.
+        landing = []
+        for e in timeline_events:
+            if e["round"] != rnd:
+                continue
+            ni = _item(
+                id=new_id(), round=rnd, kind="news", text=f"{e['name']}: {e.get('description') or ''}".strip(": "), title=e["name"],
+                origin=e["countries"][0] if len(e["countries"]) == 1 else "global", direction=e.get("direction", "mixed"),
+                event_kind=e["kind"], event_id=e["id"], url=e.get("url"), source=e.get("source"), when=e.get("label"), heard=0,
+            )
+            feed.append(ni)
+            item_by_id[ni["id"]] = ni
+            landing.append((e, ni))
+        heard: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+        for pid in pids:
+            heard[pid] = [(e, ni) for e, ni in landing if draw(seed, pid, e["id"]) < know_chance(by_id[pid], e["countries"], e["reach"], e.get("audiences") or [])]
+            for _, ni in heard[pid]:
+                ni["heard"] += 1
+        for e, ni in landing:
+            e["heard_share"] = round(ni["heard"] / max(len(pids), 1), 3)
+        news = "; ".join(e["name"] for e, _ in landing) or None
+        if on_items and landing:
+            await on_items([ni for _, ni in landing])
 
         talk_so_far = [it for it in feed if it["kind"] in ("post", "reply")]
         shown = {pid: pick(feed_style, pid, rnd, talk_so_far, g, fs, names, feed_rng) for pid in pids}
@@ -236,7 +257,9 @@ async def run_society(
             nonlocal changed_count
             p = by_id[pid]
             visible = shown[pid]
-            if not visible and not news:
+            mine = heard.get(pid, [])
+            my_news = "\n".join(f"- {e['name']}" + (f": {e['description']}" if e.get("description") else "") for e, _ in mine) or None
+            if not visible and not my_news:
                 new_state[pid] = state[pid]
                 return
             lines = [
@@ -255,13 +278,14 @@ async def run_society(
                     kind = "reply" if it["kind"] == "reply" and item_by_id.get(it.get("parent") or "", {}).get("author") == pid else "saw"
                     imp = 0.85 if kind == "reply" else seen_importance(it.get("p"), state[pid], it["agrees"] + it["disagrees"])
                     mind.add(rnd, kind, it["text"], imp, who=it["author_name"], item=it["id"])
-                if news:
-                    mind.add(rnd, "news", news, 0.8, item=news_item["id"] if news_item else None)
+                for e, ni in mine:
+                    mind.add(rnd, "news", e["name"], 0.8, item=ni["id"])
             user = (
                 f"YOU:\n{p.card()}\n\nTHE TOPIC: {spec.subject}\nThe question for you: {spec.persona_question}\n"
-                f"Your current view: {state[pid]:.0%}.\n" + past
+                + (f"It is now {period_label[rnd]}.\n" if rnd in period_label else "")
+                + f"Your current view: {state[pid]:.0%}.\n" + past
                 + ("YOUR FEED:\n" + "\n".join(lines) + "\n\n" if lines else "")
-                + (f"NEWS: {news}\n\n" if news else "")
+                + (f"NEWS YOU HEARD THIS PERIOD:\n{my_news}\n\n" if my_news else "")
                 + "What do you do?"
             )
             model = models[(i + rnd) % len(models)]
@@ -269,7 +293,10 @@ async def run_society(
                 t = await llm.json(
                     task="society_turn", model=model, system=FEED_SYSTEM if platform else SYSTEM, user=user,
                     schema=FeedTurn if platform else Turn, temperature=temperature,
-                    mock_ctx={"persona": p.model_dump(), "p": state[pid], "visible": visible, "news": news, "spec": spec.model_dump(), "round": rnd, "platform": platform},
+                    mock_ctx={
+                        "persona": p.model_dump(), "p": state[pid], "visible": visible, "news": my_news, "news_dirs": [e.get("direction") for e, _ in mine],
+                        "spec": spec.model_dump(), "round": rnd, "platform": platform,
+                    },
                 )
             except LLMError:
                 new_state[pid] = state[pid]
