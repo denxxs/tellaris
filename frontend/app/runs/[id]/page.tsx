@@ -5,6 +5,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { CommitteesTab, CountriesTab, GroupsTab, InfluenceTab, MethodTab, PricingTab, ReasonsTab } from "@/components/run/Details";
 import { SocietyTab } from "@/components/run/Society";
+import { AskGroup, type GroupPreset } from "@/components/run/AskGroup";
 import { TrackButton } from "@/components/run/TrackButton";
 import { WhereItWorks } from "@/components/run/WhereItWorks";
 import { Overview } from "@/components/run/Overview";
@@ -16,7 +17,7 @@ import { useMeta } from "@/lib/meta";
 import { ago } from "@/lib/format";
 import { useRunStream } from "@/lib/useRunStream";
 
-type TabId = "overview" | "society" | "where" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "people" | "method";
+type TabId = "overview" | "ask" | "society" | "where" | "countries" | "groups" | "influence" | "reasons" | "pricing" | "committees" | "people" | "method";
 
 const VERDICT: Record<string, { label: string; tone: "yes" | "no" | "neutral" }> = {
   strong: { label: "Strong", tone: "yes" },
@@ -31,6 +32,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const live = useRunStream(id);
   const { meta, countryName } = useMeta();
   const [tab, setTab] = useState<TabId>("overview");
+  const [askPreset, setAskPreset] = useState<GroupPreset | null>(null);
   const [person, setPerson] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
   const close = useCallback(() => setPerson(null), []);
@@ -51,10 +53,11 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
       t.push({ id: "people", label: "People" }, { id: "countries", label: "Countries" }, { id: "groups", label: "Groups" }, { id: "influence", label: "Outside influence" }, { id: "reasons", label: "Why and why not" });
       if (r.wtp) t.push({ id: "pricing", label: "Pricing" });
       if (r.committees?.n) t.push({ id: "committees", label: "Buying committees" });
+      if (live.status === "done") t.push({ id: "ask", label: "Ask a group" });
       t.push({ id: "method", label: "Method" });
     }
     return t;
-  }, [r]);
+  }, [r, live.status]);
 
   const targets = live.spec?.targets ?? [];
   const usedMock = Object.keys(live.usage?.by_model ?? {}).some((m) => m.startsWith("mock/")) || (meta?.mock && running);
@@ -192,7 +195,18 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
 
       {tab === "overview" && <Overview id={id} live={live} running={running} onSelect={setPerson} onTab={(t) => setTab(t as TabId)} />}
       {r && tab === "society" && <SocietyTab id={id} live={live} r={r} onSelect={setPerson} />}
-      {r && tab === "where" && r.splits && <WhereItWorks r={r} live={live} measure={measure} />}
+      {r && tab === "where" && r.splits && (
+        <WhereItWorks
+          r={r}
+          live={live}
+          measure={measure}
+          onAsk={live.status === "done" ? (g) => {
+            setAskPreset(g);
+            setTab("ask");
+          } : undefined}
+        />
+      )}
+      {r && tab === "ask" && <AskGroup id={id} r={r} preset={askPreset} />}
       {r && tab === "countries" && <CountriesTab r={r} live={live} />}
       {r && tab === "groups" && <GroupsTab r={r} />}
       {r && tab === "influence" && <InfluenceTab r={r} live={live} />}

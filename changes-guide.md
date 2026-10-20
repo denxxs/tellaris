@@ -6,8 +6,8 @@ Ten features borrowed (as ideas only) from other simulation projects: MiroFish, 
 |---|---|---|---|
 | 1 | [Track record](#1-track-record) | Aaru and other commercial tools (published predictions) | Done |
 | 2 | [Memory and reflection](#2-memory-and-reflection) | Generative Agents, AgentSociety | Done |
-| 3 | Asking a group | TinyTroupe, Synthetic Users | Next |
-| 4 | Starting from your documents | MiroFish | Planned |
+| 3 | [Asking a group](#3-asking-a-group) | TinyTroupe, Synthetic Users | Done |
+| 4 | Knowledge graph for each simulation (from your prompt, files and research) | MiroFish | Next |
 | 5 | Ranked feed | OASIS | Planned |
 | 6 | Timeline of events | AgentSociety, Concordia | Planned |
 | 7 | Mid-run news | MiroFish | Planned |
@@ -136,3 +136,68 @@ By hand:
 - Memories are per run. People don't remember earlier simulations.
 - Reflection is reported next to the answer, not folded into it. If tracked predictions (feature 1) show that the post-reflection number is the better predictor, it can become the headline later.
 - With the demo model, reflections are canned sentences; real models write them in each person's voice.
+
+---
+
+## 3. Asking a group
+
+### What it does
+
+After a simulation finishes, you can put a follow-up question to everyone, or to any group in it, without running it again. For example: "What price would make you say yes?", "Which of these three names do you trust?", "How much do you worry about money, 0 to 10?". Each person answers in character, from what they decided and what they remember. The answers come back like a small survey: a chart, a short summary, themes and quotes.
+
+### What was done
+
+- **Run page:** a new **Ask a group** tab on finished runs.
+  - **Who to ask:** everyone; any group from the breakdowns (country, region, age, gender, income, type of work, group, company); or one of the suggested **Where it works / where it struggles** spots, such as "Under 30s in India".
+  - **Your question**, and an **answer type**: open answer, multiple choice (2–8 options), a number (with an optional unit), or 0 to 10.
+  - **People to ask:** 5 to 200 (default 40). The model call count is shown.
+- **Results**, newest first, saved with the run:
+  - a two- or three-sentence summary;
+  - a chart for the answer type: option shares, the typical number with its range, or the spread of 0–10 scores;
+  - the same split by **people who leaned yes** and **people who leaned no**, e.g. what price yes-leaners would pay versus no-leaners;
+  - **themes**: select one to see only the answers behind it;
+  - every answer, with the person's name, job, age and country, linking to their profile.
+- **Where it works:** each hot and cold spot has an **Ask them why** link that opens Ask a group with that group already chosen.
+- **Backend:** a new `interviews` table (existing tables untouched) and the endpoints below.
+
+### How it works
+
+1. **Finding the group.** The group is a set of breakdown keys, e.g. `{"age": "18-29", "country": "IND"}`. People match when every key matches, using the same definitions as Where it works (`aggregate.breakdowns()`). Spots now carry their keys, so a spot maps straight to a group.
+2. **Picking people.** A plain random sample of the group, without repeats. The same question to the same group picks the same people. People are not picked by how many real people they stand for, because the numbers are weighted afterwards; doing both would count big countries twice. Random picking also means smaller countries get heard.
+3. **Asking.** One model call per person, with their profile, their first answer and reasons, and their reflection if they had one (feature 2). Answers come back as text plus the structured value for the type. Multiple-choice answers are matched to the exact option.
+4. **Summing up.** Each answer counts for the real people that person stands for, so the numbers describe the group, not the sample. Choice gives weighted shares, numbers give the weighted median and 10th–90th percentiles, and 0–10 gives the weighted average plus counts per score. Everything is split by yes and no leaners when each side has at least 3 people. One summary call to the analyst model writes the summary and groups answers into up to six themes, which must point at real answers.
+5. **Runs in the background.** Asking returns at once; the tab checks progress every second until the interview is done.
+
+**API**
+
+| Method | Path | Does |
+|---|---|---|
+| POST | `/api/runs/{id}/interviews` | Start an interview. Body: `question`, `kind` (open, choice, number, scale), `options`, `unit`, `group`, `limit` |
+| GET | `/api/runs/{id}/interviews` | A run's interviews, newest first |
+| GET | `/api/interviews/{iid}` | One interview (poll while running) |
+| DELETE | `/api/interviews/{iid}` | Remove it |
+
+**Files:** `backend/oracle/simulate/interview.py` (new), `backend/oracle/simulate/aggregate.py` (spot keys, `breakdowns()`), `backend/oracle/store.py`, `backend/oracle/api/app.py`, `backend/oracle/llm/mock.py` (offline `interview_answer`, `interview_digest`), `backend/tests/test_interview.py`, `frontend/components/run/AskGroup.tsx` (new), `frontend/components/run/WhereItWorks.tsx`, `frontend/app/runs/[id]/page.tsx`, `frontend/lib/api.ts`, `frontend/lib/types.ts`.
+
+### How to test
+
+Automated: `cd backend && python -m pytest tests/test_interview.py`. It checks:
+- a multiple-choice question to one country asks only that country, and the option shares add up to 100%;
+- number and 0–10 questions give a sensible median, range and counts;
+- group labels read correctly ("India", "Under 30s");
+- the same question picks the same people;
+- bad requests are refused (one option only, a group nobody is in, an unknown run).
+
+By hand:
+1. Open any finished simulation that has a Where it works tab. Runs from before this change have no spot shortcuts until re-run, but the group pickers still work.
+2. **Where it works** → **Ask them why** on a spot. The **Ask a group** tab opens with that group chosen.
+3. Ask "Which of these names would you trust?" as **Multiple choice** with three options. Watch the progress bar, then read the chart, the yes/no split, the themes and the quotes.
+4. Choose **Ask everyone instead**, ask "What is the most you'd pay a month?" as **A number** with unit USD. The typical answer and its range appear.
+5. Ask an open question and select a theme to filter the quotes.
+6. Reload the page. The interviews are still there. **Remove** deletes one.
+
+### Known limits
+
+- People answer from what they decided and remember in this run, not from new research. Questions far from the topic get plausible but ungrounded answers.
+- Results are not tracked like predictions yet. A "track this answer" option would be a small addition to feature 1.
+- With the demo model, answers and themes are canned; real models answer in each person's voice.

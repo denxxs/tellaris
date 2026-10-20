@@ -209,7 +209,7 @@ export type Results = {
   comparison?: { parent_id: string; parent_title: string; parent_value: number; delta: number };
 };
 
-export type SplitCell = { label: string; dims: string[]; n: number; value: number; ci: [number, number]; people?: number; vs_overall?: number };
+export type SplitCell = { label: string; dims: string[]; keys?: Record<string, string>; n: number; value: number; ci: [number, number]; people?: number; vs_overall?: number };
 export type Splits = {
   dimensions: Record<string, { label: string; rows: { key: string; label: string; n: number; value: number; ci: [number, number]; people?: number }[]; hidden: number }>;
   hot: SplitCell[];
