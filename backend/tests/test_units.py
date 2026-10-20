@@ -229,6 +229,25 @@ def test_bedrock_credentials_are_explicit(tmp_path):
     store.update({"secrets": {"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": ""}, "bedrock_machine_credentials": True, "extra": {"AWS_PROFILE": "personal"}})
     assert bedrock_kwargs(store.get()) == {"aws_region_name": "eu-west-1", "aws_profile_name": "personal"}
 
+    # A Bedrock API key wins over everything and is sent as the bearer token.
+    store.update({"secrets": {"AWS_BEARER_TOKEN_BEDROCK": "bedrock-api-key-abcdef123456"}, "bedrock_machine_credentials": False})
+    assert bedrock_kwargs(store.get()) == {"api_key": "bedrock-api-key-abcdef123456", "aws_region_name": "eu-west-1"}
+    assert store.public()["secrets"]["AWS_BEARER_TOKEN_BEDROCK"]["masked"] == "••••3456"
+
+
+def test_machine_bedrock_key_ignored_unless_allowed(tmp_path, monkeypatch):
+    import os
+
+    from oracle.config import SettingsStore
+
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "someone-elses-key")
+    SettingsStore(tmp_path / "s.json")
+    assert "AWS_BEARER_TOKEN_BEDROCK" not in os.environ
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "my-own-key")
+    store = SettingsStore(tmp_path / "s2.json")
+    store.update({"bedrock_machine_credentials": True})
+    assert os.environ.get("AWS_BEARER_TOKEN_BEDROCK") == "my-own-key"
+
 
 async def test_bedrock_call_without_credentials_fails_cleanly():
     from oracle.llm import LLMError, llm

@@ -69,7 +69,7 @@ class ModelRoles(BaseModel):
 
 # Secrets that are never exported to the environment; they are passed straight to
 # the calls that need them (AWS Bedrock), so nothing else on the machine sees them.
-SECRET_FIELDS = {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"}
+SECRET_FIELDS = {"AWS_BEARER_TOKEN_BEDROCK", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"}
 # Plain Bedrock settings, also passed per call rather than exported.
 BEDROCK_PLAIN = {"AWS_REGION_NAME", "AWS_PROFILE"}
 
@@ -94,6 +94,7 @@ class SettingsStore:
     def __init__(self, path: Path = SETTINGS_PATH):
         self._path = path
         self._lock = threading.Lock()
+        self._machine_bedrock_key: str | None = None  # remembered before we hide it
         self._settings = self._load()
         self._apply_env()
 
@@ -113,6 +114,14 @@ class SettingsStore:
         for var, value in self._settings.extra.items():
             if value and var not in BEDROCK_PLAIN:
                 os.environ[var] = value
+        # LiteLLM reads a Bedrock API key from the environment on its own. Unless the user
+        # allowed this computer's AWS credentials, keep any such key out of this process.
+        if self._machine_bedrock_key is None:
+            self._machine_bedrock_key = os.environ.get("AWS_BEARER_TOKEN_BEDROCK", "")
+        if self._settings.bedrock_machine_credentials and self._machine_bedrock_key:
+            os.environ["AWS_BEARER_TOKEN_BEDROCK"] = self._machine_bedrock_key
+        else:
+            os.environ.pop("AWS_BEARER_TOKEN_BEDROCK", None)
 
     def get(self) -> UserSettings:
         with self._lock:
@@ -195,6 +204,9 @@ def bedrock_kwargs(s: UserSettings) -> dict[str, Any]:
     """Credentials for one Bedrock call. Saved keys win; otherwise the machine's AWS
     credentials, but only when the user has explicitly allowed that."""
     region = s.extra.get("AWS_REGION_NAME") or "us-east-1"
+    if s.secrets.get("AWS_BEARER_TOKEN_BEDROCK"):
+        # A Bedrock API key (long-term, or short-term up to 12 hours). It belongs to one region.
+        return {"api_key": s.secrets["AWS_BEARER_TOKEN_BEDROCK"], "aws_region_name": region}
     if s.secrets.get("AWS_ACCESS_KEY_ID") and s.secrets.get("AWS_SECRET_ACCESS_KEY"):
         out: dict[str, Any] = {
             "aws_access_key_id": s.secrets["AWS_ACCESS_KEY_ID"],
@@ -210,5 +222,5 @@ def bedrock_kwargs(s: UserSettings) -> dict[str, Any]:
             out["aws_profile_name"] = s.extra["AWS_PROFILE"]
         return out
     raise PermissionError(
-        "AWS Bedrock has no keys. Add an access key on the Models page, or allow this computer's AWS credentials there."
+        "AWS Bedrock has no keys. Add a Bedrock API key or an access key on the Models page, or allow this computer's AWS credentials there."
     )

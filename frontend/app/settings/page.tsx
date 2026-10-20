@@ -113,12 +113,18 @@ function ModelPicker({
               <Field
                 key={f.env}
                 label={f.label}
-                hint={f.secret ? (secrets[f.env] === "" ? "Will be removed when you save." : saved?.set ? `Saved, ending ${saved.masked.replace(/•/g, "")}. Never shown or shared.` : f.optional ? "Optional." : undefined) : undefined}
+                hint={
+                  f.secret && secrets[f.env] === ""
+                    ? "Will be removed when you save."
+                    : f.secret && saved?.set
+                      ? `Saved, ending ${saved.masked.replace(/•/g, "")}. Never shown or shared.`
+                      : f.hint
+                }
               >
                 {(fid) =>
                   f.secret ? (
                     <div className="flex gap-2">
-                      <Input id={fid} type="password" autoComplete="off" placeholder={saved?.set ? saved.masked : f.optional ? "Optional" : "Paste it here"} value={secrets[f.env] ?? ""} onChange={(e) => setSecrets({ ...secrets, [f.env]: e.target.value })} />
+                      <Input id={fid} type="password" autoComplete="off" placeholder={saved?.set ? saved.masked : "Paste it here"} value={secrets[f.env] ?? ""} onChange={(e) => setSecrets({ ...secrets, [f.env]: e.target.value })} />
                       {saved?.set && (
                         <Button variant="ghost" onClick={() => setSecrets({ ...secrets, [f.env]: "" })}>
                           Remove
@@ -140,7 +146,7 @@ function ModelPicker({
             checked={machine}
             onChange={setMachine}
             label="Allow this computer's AWS credentials"
-            description="Only used when no access key is saved above. Bedrock would then bill whichever AWS account this computer is signed in to (its default profile, or the profile you name below). Leave this off if that might be a client's account."
+            description="Only used when no API key or access key is saved above. Bedrock would then bill whichever AWS account this computer is signed in to (its default profile, or the profile you name below). Leave this off if that might be a client's account."
           />
           {machine && (
             <div className="mt-4 max-w-sm">
@@ -291,7 +297,8 @@ export default function ModelsPage() {
     if (prov === "mock") return <Pill tone="warning">Demo model</Pill>;
     const info = catalog.find((c) => c.id === prov);
     if (prov === "bedrock") {
-      const keyed = (s.secrets.AWS_ACCESS_KEY_ID?.set || !!secrets.AWS_ACCESS_KEY_ID) && (s.secrets.AWS_SECRET_ACCESS_KEY?.set || !!secrets.AWS_SECRET_ACCESS_KEY);
+      const has = (k: string) => (s.secrets[k]?.set && secrets[k] !== "") || !!secrets[k];
+      const keyed = has("AWS_BEARER_TOKEN_BEDROCK") || (has("AWS_ACCESS_KEY_ID") && has("AWS_SECRET_ACCESS_KEY"));
       return keyed ? <Pill tone="positive">Ready</Pill> : machine ? <Pill tone="warning">Using this computer&apos;s AWS account</Pill> : <Pill tone="negative">Needs AWS keys</Pill>;
     }
     const hasKey = !info?.key_env || s.keys[prov]?.set || !!keys[prov];
@@ -407,7 +414,7 @@ export default function ModelsPage() {
                 .filter((p) => p !== "mock" && p !== "ollama")
                 .map((p) =>
                   p === "bedrock"
-                    ? `AWS Bedrock: ${s.secrets.AWS_ACCESS_KEY_ID?.set ? "access key saved" : s.bedrock_machine_credentials ? "this computer's AWS credentials" : "missing"}`
+                    ? `AWS Bedrock: ${s.secrets.AWS_BEARER_TOKEN_BEDROCK?.set ? "API key saved" : s.secrets.AWS_ACCESS_KEY_ID?.set ? "access key saved" : s.bedrock_machine_credentials ? "this computer's AWS credentials" : "missing"}`
                     : `${catalog.find((c) => c.id === p)?.label ?? p}: ${s.keys[p]?.set || keys[p] ? "ready" : "missing"}`,
                 )
                 .join(", ") || "None needed"}
