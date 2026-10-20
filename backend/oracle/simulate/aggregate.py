@@ -37,7 +37,7 @@ class Aggregator:
         self.cal = cal
         self.rng = np.random.default_rng(seed)
         self.by_person: dict[str, list[Reaction]] = defaultdict(list)
-        for r in reactions:
+        for r in sorted(reactions, key=lambda r: (r.persona_id, r.run)):  # stable order, reproducible ranges
             self.by_person[r.persona_id].append(r)
         self.people = [p for p in people if p.id in self.by_person]
         self.core = [p for p in self.people if p.influencer_voice is None]
