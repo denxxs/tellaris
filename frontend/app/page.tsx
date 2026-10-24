@@ -63,7 +63,7 @@ type Size = (typeof SIZES)[number]["value"];
 const FLOW = [
   { title: "Understand", text: "Your words and files become a precise question: who decides, where, at what price, over what time." },
   { title: "Research", text: "Facts from your files and the web: competitors, prices, rules, news." },
-  { title: "Map influence", text: "Finds the countries and blocs pressing on your markets, like EU rules on Indian IT firms." },
+  { title: "Map ties abroad", text: "Finds who your markets sell to, buy from and have friends and family in, from trade, Facebook and UN data." },
   { title: "Build people", text: "Real job and income data for each country become people with names, stories and pressures." },
   { title: "Each person decides", text: "Privately, in their own words, several times across your models." },
   { title: "Companies meet", text: "For B2B, buying groups argue it out and decide to buy, pilot or pass." },

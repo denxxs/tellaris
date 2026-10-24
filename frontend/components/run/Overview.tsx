@@ -253,7 +253,7 @@ export function Overview({ id, live, running, onSelect, onTab }: { id: string; l
         <Card pad={false} className="lg:col-span-4">
           <div className="px-5 pt-5">
             <CardHead title="The world of this simulation" aside={`${int(agents.length - voices)} people${voices ? `, ${voices} outside voices` : ""}`}>
-              Each dot is one simulated person, coloured by their answer. Arrows are outside countries and blocs pressing on your markets.
+              Each dot is one simulated person, coloured by their answer. Arrows are the countries and blocs your markets are most tied to through trade, friendships and people living abroad.
             </CardHead>
           </div>
           <div className="px-2 pb-3">

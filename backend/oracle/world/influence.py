@@ -1,23 +1,22 @@
-"""Influence map: who shapes decisions in the target countries, and through what.
+"""Influence map: which countries and blocs the targets are tied to, and through what.
 
-The graph has countries and blocs as nodes and directed, typed edges
-(regulation, outsourcing, capital, ...). Given target countries we pull in
-direct influencers, plus second-order influencers whose effect survives decay,
-and scenario-specific forces the scenario builder discovered.
+Every tie is measured (see ties.py): who buys a country's goods and services, where its imports
+come from, where its people's friends abroad live, where those who left now live, and EU law
+for EU members. The largest few per channel are shown. Things the user states are true come in
+as scenario edges.
 """
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
-import networkx as nx
 from pydantic import BaseModel, Field
 
-from ..config import load_json
+from . import ties as ties_mod
 from .countries import blocs, countries
+from .ties import CHANNELS
 
-SECOND_ORDER_DECAY = 0.5
+TOP_PER_CHANNEL = 3  # how many partners per kind of tie to show and to tell people about
 
 
 class InfluenceEdge(BaseModel):
@@ -27,7 +26,7 @@ class InfluenceEdge(BaseModel):
     strength: float
     sectors: list[str]
     note: str
-    origin: str = "map"  # map | rule | scenario
+    origin: str = "data"  # data | scenario
 
 
 class Influencer(BaseModel):
@@ -38,27 +37,12 @@ class Influencer(BaseModel):
     kind: str  # country | bloc
     total_strength: float
     edges: list[InfluenceEdge] = Field(default_factory=list)
-    via: list[str] = Field(default_factory=list)  # for second-order effects
+    via: list[str] = Field(default_factory=list)  # unused: only direct, measured ties
     order: int = 1
 
 
-@lru_cache
-def base_edges() -> list[InfluenceEdge]:
-    """Hand-written edges, plus rule-generated edges for every country.
-    A hand edge wins over a rule edge with the same source, target and channel."""
-    from .rules import generated_edges
-
-    hand = [InfluenceEdge.model_validate(e) for e in load_json("influence.json")["edges"]]
-    known = {(e.source, e.target, e.channel) for e in hand}
-    cs = countries()
-    valid = set(cs) | set(blocs())
-    rules = [InfluenceEdge.model_validate(e) for e in generated_edges() if (e["source"], e["target"], e["channel"]) not in known]
-    return [e for e in hand + rules if e.source in valid and e.target in valid]
-
-
-@lru_cache
 def channels() -> dict[str, str]:
-    return load_json("influence.json")["_meta"]["channels"]
+    return {k: v["about"] for k, v in CHANNELS.items()} | {"scenario": "Something you said is true"}
 
 
 def node_name(code: str) -> str:
@@ -69,82 +53,65 @@ def node_name(code: str) -> str:
     return code
 
 
-def build_graph(extra: list[InfluenceEdge] | None = None) -> nx.MultiDiGraph:
-    g = nx.MultiDiGraph()
-    for code, c in countries().items():
-        g.add_node(code, name=c.name, kind="country", region=c.region)
-    for code, b in blocs().items():
-        g.add_node(code, name=b.name, kind="bloc", region="bloc")
-    for e in [*base_edges(), *(extra or [])]:
-        g.add_edge(e.source, e.target, key=f"{e.channel}:{e.origin}", **e.model_dump())
-    return g
+def _pct(x: float) -> str:
+    return f"{x:.0%}" if x >= 0.01 else "under 1%"
+
+
+def measured_edges(target: str) -> list[InfluenceEdge]:
+    """The target's largest measured ties, per channel. Only data: shares come straight from the
+    sources in ties.py; nothing is weighted or judged."""
+    out: list[InfluenceEdge] = []
+    tname = node_name(target)
+    eu = blocs().get("EU")
+    if eu and target in eu.members:
+        out.append(InfluenceEdge(source="EU", target=target, channel="regulation", strength=1.0, sectors=["all"],
+                                 note=CHANNELS["regulation"]["text"].format(tgt=tname), origin="data"))
+    for ch, spec in CHANNELS.items():
+        if spec["list"] is None:
+            continue
+        for src, share, extra in ties_mod.partners(target, ch)[:TOP_PER_CHANNEL]:
+            if src == target or (src not in countries() and src not in blocs()):
+                continue
+            sname = node_name(src)
+            if src == "EU":
+                sname = "other EU countries" if eu and target in eu.members else "the EU"
+            note = spec["text"].format(src=sname, tgt=tname, pct=_pct(share), n=f"{extra.get('n', 0):,}")
+            note = note[0].upper() + note[1:]
+            note += ties_mod.pair_note(target, src) + f". Source: {ties_mod.SOURCES[ch]}" + (f" {extra['year']}" if extra.get("year") else "") + "."
+            out.append(InfluenceEdge(source=src, target=target, channel=ch, strength=round(share, 4), sectors=spec["sectors"], note=note, origin="data"))
+    return out
 
 
 def expand(
     targets: list[str],
     extra: list[InfluenceEdge] | None = None,
-    threshold: float = 0.25,
+    threshold: float = 0.0,  # kept for old callers; measured ties aren't cut by a judged strength
     sectors: list[str] | None = None,
 ) -> list[Influencer]:
-    """Influencers of the targets, strongest first.
+    """Countries and blocs tied to the targets, strongest tie first.
 
-    sectors narrows to edges that touch the scenario's sectors (or 'all').
-    Blocs that targets belong to still count: EU rules matter to Germany.
+    sectors narrows to ties that touch the scenario's sectors (or everyone).
     """
-    g = build_graph(extra)
     target_set = set(targets)
     sector_set = set(sectors or [])
 
-    def relevant(data: dict[str, Any]) -> bool:
+    def relevant(e: InfluenceEdge) -> bool:
         if not sector_set:
             return True
-        s = set(data["sectors"])
-        return "all" in s or bool(s & sector_set)
+        return "all" in e.sectors or bool(set(e.sectors) & sector_set)
 
     found: dict[str, Influencer] = {}
-
-    for t in targets:
-        if t not in g:
+    edges = [e for t in targets for e in measured_edges(t)] + [e for e in (extra or []) if e.target in target_set]
+    for e in edges:
+        if e.source in target_set or not relevant(e):
             continue
-        for src, _, data in g.in_edges(t, data=True):
-            if src in target_set or not relevant(data):
-                continue
-            inf = found.setdefault(
-                src,
-                Influencer(code=src, name=node_name(src), kind=g.nodes[src]["kind"], total_strength=0.0),
-            )
-            inf.edges.append(InfluenceEdge.model_validate(data))
-            inf.total_strength += data["strength"]
-
-    # Second order: X -> I -> T where I is a direct influencer.
-    direct = list(found.keys())
-    for mid in direct:
-        mid_strength = max(e.strength for e in found[mid].edges)
-        for src, _, data in g.in_edges(mid, data=True):
-            if src in target_set or src in found or not relevant(data):
-                continue
-            eff = data["strength"] * mid_strength * SECOND_ORDER_DECAY
-            if eff < threshold * 0.6:
-                continue
-            inf = Influencer(
-                code=src,
-                name=node_name(src),
-                kind=g.nodes[src]["kind"],
-                total_strength=eff,
-                edges=[InfluenceEdge.model_validate({**data, "strength": round(eff, 3)})],
-                via=[mid],
-                order=2,
-            )
-            prev = found.get(src)
-            if prev is None or prev.total_strength < eff:
-                found[src] = inf
-
-    result = [i for i in found.values() if max(e.strength for e in i.edges) >= threshold or i.order == 2]
-    for i in result:
-        i.total_strength = round(i.total_strength, 3)
-        i.edges.sort(key=lambda e: -e.strength)
-    result.sort(key=lambda i: -i.total_strength)
-    return result
+        kind = "bloc" if e.source in blocs() else "country"
+        inf = found.setdefault(e.source, Influencer(code=e.source, name=node_name(e.source), kind=kind, total_strength=0.0))
+        inf.edges.append(e)
+    for inf in found.values():
+        inf.edges.sort(key=lambda e: -e.strength)
+        inf.total_strength = round(max(e.strength for e in inf.edges), 4)  # for ordering only
+    return sorted(found.values(), key=lambda i: (-len({e.target for e in i.edges}), -i.total_strength))
 
 
 def anchor(code: str) -> list[float] | None:

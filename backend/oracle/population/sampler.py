@@ -17,6 +17,7 @@ import numpy as np
 
 from ..scenario.models import Force, ScenarioSpec, Segment
 from ..world.countries import Country, Occupation, blocs, company_types, countries, occupations
+from ..world import ties as ties_mod
 from ..world.influence import Influencer
 from . import realdata, views
 from .headcount import _POP_AGES, occupation_headcount, seg_headcount
@@ -94,10 +95,6 @@ class PopulationBuilder:
         self.vrng = np.random.default_rng(None if seed is None else [seed, 7])
         self.occ = occupations()
         self.ctypes = company_types()
-        self._direct_targets: dict[str, set[str]] = {}
-        for inf in influencers:
-            if inf.order == 1:
-                self._direct_targets[inf.code] = {e.target for e in inf.edges}
 
     # ---------- occupation choice ----------
 
@@ -255,32 +252,17 @@ class PopulationBuilder:
         return out
 
     def _exposures(self, iso: str, sector: str, o: _Occ, ctype: str) -> list[Exposure]:
+        """The measured ties of their country that touch their work (who buys what their industry
+        sells, where its inputs come from) or everyone (EU law for EU members). Same for everyone in
+        that line of work: no odds. Friendships and diaspora are country facts on the card instead."""
         out: list[Exposure] = []
         for inf in self.influencers:
             for e in inf.edges:
-                if e.origin == "scenario":
+                if e.origin == "scenario" or e.target != iso or e.channel in ("friends", "diaspora"):
                     continue  # scenario forces are applied below, once, with their direction
-                if inf.order == 1:
-                    hits_me = e.target == iso
-                else:
-                    # X -> mid -> me: only if the intermediate actually reaches my country.
-                    hits_me = any(iso in self._direct_targets.get(v, set()) for v in inf.via)
-                if not hits_me:
+                if not ("all" in e.sectors or sector in e.sectors or any(s_ in e.sectors for s_ in o.sectors)):
                     continue
-                specific = sector in e.sectors or any(s in e.sectors for s in o.sectors)
-                general = "all" in e.sectors
-                if not (specific or general):
-                    continue
-                # Big companies feel cross-border forces more (they have foreign clients).
-                scale = 1.0 if ctype in ("enterprise", "midmarket", "scaleup") else 0.65
-                p = _clip(e.strength * (1.25 if specific else 0.55) * scale)
-                if self.rng.random() < p:
-                    out.append(
-                        Exposure(
-                            source=e.source, source_name=inf.name, channel=e.channel,
-                            strength=e.strength, note=e.note, origin=e.origin,
-                        )
-                    )
+                out.append(Exposure(source=e.source, source_name=inf.name, channel=e.channel, strength=e.strength, note=e.note, origin=e.origin))
         # Factors the user stated as true reach everyone they apply to: no odds, no guessed strength.
         for f in self.spec.forces:
             if not self._force_applies(f, iso, sector, o):
@@ -427,36 +409,28 @@ class PopulationBuilder:
 
     def _voices(self, n: int, segs: list[Segment], start: int) -> list[Persona]:
         """A few people from influencer countries, to hear the outside view."""
-        if n <= 0 or not self.influencers:
+        if n <= 0:
             return []
+        # Outside voices come from where the targets' friends abroad actually live (Meta SCI),
+        # each target counted equally.
         candidates: dict[str, float] = {}
-        for inf in self.influencers[:6]:
-            if inf.code in countries():
-                candidates[inf.code] = candidates.get(inf.code, 0) + inf.total_strength
-            elif inf.code in blocs():
-                members = [m for m in blocs()[inf.code].members if m in countries() and m not in self.spec.targets]
-                big = sorted(members, key=lambda m: -countries()[m].workforce_m * countries()[m].gdp_pc_usd)[:3]
-                for m in big:
-                    candidates[m] = candidates.get(m, 0) + inf.total_strength / len(big)
         for t in self.spec.targets:
-            candidates.pop(t, None)
+            f = ties_mod.of(t).get("friendships") or {}
+            abroad = f.get("abroad_share") or 0
+            for code, share in (f.get("abroad") or {}).items():
+                if code in countries() and code not in self.spec.targets and abroad:
+                    candidates[code] = candidates.get(code, 0.0) + share / abroad / len(self.spec.targets)
         if not candidates:
             return []
         buyer_segs = [i for i, s in enumerate(segs) if s.is_buyer] or list(range(len(segs)))
         alloc = _allocate(n, candidates)
         out = []
         counter = start
-        source_of = {}
-        for inf in self.influencers:
-            if inf.code in blocs():
-                for m in blocs()[inf.code].members:
-                    source_of.setdefault(m, inf.code)
-            source_of.setdefault(inf.code, inf.code)
         for iso, k in alloc.items():
             for _ in range(k):
                 counter += 1
                 si = buyer_segs[int(self.rng.integers(len(buyer_segs)))]
-                p = self._person(f"v{counter:05d}", iso, segs[si], si, voice=source_of.get(iso, iso))
+                p = self._person(f"v{counter:05d}", iso, segs[si], si, voice=iso)
                 p.weight = 0.0
                 out.append(p)
         return out

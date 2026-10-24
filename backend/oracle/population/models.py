@@ -38,6 +38,23 @@ FACT_TEXT = {
 SENIORITY_TEXT = {"executive": "executive", "senior": "manager", "staff": "", "none": ""}
 
 
+def _ties_abroad(iso: str) -> str:
+    """Where people of this country have friends and family abroad (Meta SCI, UN migrant stock)."""
+    from ..world.countries import countries
+    from ..world.ties import partners
+
+    def names(ch: str) -> list[str]:
+        return [countries()[k].name for k, _, _ in partners(iso, ch)[:3] if k in countries()]
+
+    friends, moved = names("friends"), names("diaspora")
+    bits = []
+    if friends:
+        bits.append(f"most friendships abroad are with people in {', '.join(friends)}")
+    if moved:
+        bits.append(f"most people who moved abroad live in {', '.join(moved)}")
+    return f"People in their country: {'; '.join(bits)}" if bits else ""
+
+
 class Persona(BaseModel):
     id: str
     country: str
@@ -114,6 +131,9 @@ class Persona(BaseModel):
         known = [FACT_TEXT[k][0 if v else 1] for k, v in self.facts.items() if k in FACT_TEXT]
         if known:
             lines.append("Facts: " + "; ".join(known))
+        abroad = _ties_abroad(self.country)
+        if abroad:
+            lines.append(abroad)
         if self.views:
             from .views import lines as view_lines
 

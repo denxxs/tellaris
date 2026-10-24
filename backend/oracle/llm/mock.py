@@ -356,8 +356,8 @@ def _base_probability(p: dict[str, Any], spec: dict[str, Any]) -> float:
             x -= 0.7 * e["strength"]
         elif e["channel"] == "regulation":
             x -= 0.25 * e["strength"]
-        elif e["channel"] in ("capital", "technology", "outsourcing"):
-            x += 0.15 * e["strength"]
+        elif e["channel"] in ("exports", "tech_exports", "finance_exports", "business_exports", "tourism"):
+            x += 0.15 * e["strength"]  # demo: firms selling abroad lean a little more open
     return _clip(1 / (1 + math.exp(-x)))
 
 

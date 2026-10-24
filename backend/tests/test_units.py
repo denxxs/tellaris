@@ -43,12 +43,24 @@ def test_country_resolution():
     assert "DEU" in expand_codes(["EU"])
 
 
-def test_eu_influences_india_for_it_services():
+def test_ties_are_measured_and_sourced():
+    # Indian IT services: the biggest buyers abroad, from OECD-WTO services trade data.
     infl = expand(["IND"], sectors=["it_services"])
-    codes = [i.code for i in infl]
-    assert "EU" in codes and "USA" in codes
-    eu = next(i for i in infl if i.code == "EU")
-    assert any(e.channel == "regulation" for e in eu.edges)
+    tech = {i.code: e for i in infl for e in i.edges if e.channel == "tech_exports"}
+    assert "USA" in tech and "EU" in tech
+    assert all(0 < e.strength <= 1 and "Source:" in e.note for i in infl for e in i.edges)
+    # EU law applies to members as a fact; non-members get no invented "regulation" strength.
+    assert any(e.channel == "regulation" and e.strength == 1.0 for i in expand(["DEU"]) for e in i.edges)
+    assert not any(e.channel == "regulation" for i in expand(["IND"]) for e in i.edges)
+
+
+def test_contacts_abroad_follow_friendship_data():
+    from oracle.simulate.diffusion import country_mix
+
+    ind = country_mix("IND", ["IND", "USA"])
+    mex = country_mix("MEX", ["MEX", "USA"])
+    assert ind["IND"] > 0.95 and mex["USA"] > ind["USA"] * 5  # Mexico is far more tied to the US
+    assert country_mix("CHN", ["CHN", "USA"]) == {"CHN": 1.0}  # no data (Facebook is blocked): no guessed ties
 
 
 def test_allocate_exact_and_covering():
@@ -67,9 +79,12 @@ def test_population_structure_and_exposure():
     assert abs(sum(p.weight for p in buyers) - 1.0) < 1e-6
     assert all(p.weight == 0 for p in voices)
     analysts = [p for p in core if p.country == "IND" and p.occupation_id == "it_services_analyst"]
-    exposed = [p for p in analysts if any(e.source == "EU" for e in p.exposures)]
-    # A good share of Indian IT-services analysts should feel EU regulation/outsourcing.
-    assert len(exposed) / max(len(analysts), 1) > 0.3
+    # Every Indian IT-services analyst works in an industry that sells to the EU: no odds involved.
+    assert analysts and all(any(e.source == "EU" and e.channel == "tech_exports" for e in p.exposures) for p in analysts)
+    # Outside voices come from where the targets' friends abroad live.
+    from oracle.world.ties import partners
+    abroad = {c for t in spec.targets for c, _, _ in partners(t, "friends")}
+    assert {p.country for p in voices} <= abroad
     founders = [p for p in core if p.occupation_id == "founder_b2b_saas"]
     assert all(p.seniority == "executive" for p in founders)
 

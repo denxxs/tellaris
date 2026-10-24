@@ -375,7 +375,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
 
               {p.exposures.length > 0 && (
                 <Card>
-                  <CardHead title="Pressure from outside">Forces from other countries and blocs that reach this person through their work.</CardHead>
+                  <CardHead title="Ties abroad through their work">Measured trade ties of their country that touch their line of work, plus anything you said is true.</CardHead>
                   <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {p.exposures.map((e, i) => (
                       <li key={i} className="border-l-2 border-flow pl-3 text-[14px] leading-5">
