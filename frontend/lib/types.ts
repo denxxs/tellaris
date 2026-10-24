@@ -226,7 +226,7 @@ export type Results = {
   by_country_segment: Summary[];
   influence_effects: InfluenceEffect[];
   influencer_voices: { source: string; n: number; value: number; countries: string[]; quotes: Quote[] }[];
-  drivers: { trait: string; correlation: number }[];
+  drivers: { trait: string; correlation: number; label?: string }[];
   wtp: {
     currency: string;
     period: string;
@@ -466,6 +466,8 @@ export type Persona = {
   income_band: string;
   traits: Record<string, number | null>;
   facts?: Record<string, boolean>;
+  views_text?: { views?: string[]; news?: string[] };
+  views_from?: { year?: number; matched_on?: string[] };
   exposures: Exposure[];
   is_buyer: boolean;
   weight: number;

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class Exposure(BaseModel):
@@ -58,6 +58,8 @@ class Persona(BaseModel):
     income_band: str = ""
     traits: Traits = Field(default_factory=Traits)
     facts: dict[str, bool] = Field(default_factory=dict)  # digital and money facts, drawn from Global Findex
+    views: dict[str, int] = Field(default_factory=dict)  # answers of a matched real WVS respondent (see views.py)
+    views_from: dict = Field(default_factory=dict)  # {"year": survey year, "matched_on": [...]}
     exposures: list[Exposure] = Field(default_factory=list)
     is_buyer: bool = True
     weight: float = 1.0
@@ -78,6 +80,15 @@ class Persona(BaseModel):
     typical_day: str = ""
     tools_today: list[str] = Field(default_factory=list)
     household: str = ""
+
+    @computed_field
+    @property
+    def views_text(self) -> dict[str, list[str]]:
+        if not self.views:
+            return {}
+        from .views import lines as view_lines
+
+        return {"views": view_lines(self.views, "views"), "news": view_lines(self.views, "news")}
 
     def card(self) -> str:
         """Compact description for prompts."""
@@ -103,6 +114,15 @@ class Persona(BaseModel):
         known = [FACT_TEXT[k][0 if v else 1] for k, v in self.facts.items() if k in FACT_TEXT]
         if known:
             lines.append("Facts: " + "; ".join(known))
+        if self.views:
+            from .views import lines as view_lines
+
+            said = view_lines(self.views, "views")
+            if said:
+                lines.append(f"Views (answers of a real survey respondent like them, WVS {self.views_from.get('year', '')}): " + "; ".join(said))
+            news = view_lines(self.views, "news")
+            if news:
+                lines.append("How often they get news from: " + "; ".join(news))
         measured = {
             "tech affinity": t.tech_affinity, "scepticism": t.skepticism, "risk appetite": t.risk_appetite,
             "price sensitivity": t.price_sensitivity, "follows peers": t.conformity, "openness": t.openness,

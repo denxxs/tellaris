@@ -361,6 +361,7 @@ class Runner:
         results["themes"] = themes.model_dump()
         results["seed"] = self.cfg.seed
         results["sizes"] = getattr(self, "sizes", {"unknown": [], "weighting": self.cfg.weighting})
+        results["views"] = getattr(self, "views_cover", None)
         results["as_of"] = as_of.isoformat()
         results["news_status"] = "ok" if news else news_status
         if news:
@@ -417,6 +418,17 @@ class Runner:
         builder = PopulationBuilder(spec, influencers, seed=self.cfg.seed, weighting=self.cfg.weighting)
         people = builder.build(self.cfg.agents, self.cfg.influencer_voices)
         self.sizes = {"unknown": sorted(builder.unknown_sizes), "weighting": builder.weighting}
+        core = [p for p in people if p.influencer_voice is None]
+        with_views = [p for p in core if p.views]
+        missing = sorted({p.country_name for p in core if not p.views})
+        self.views_cover = {
+            "share": round(len(with_views) / max(len(core), 1), 3),
+            "years": sorted({p.views_from.get("year") for p in with_views if p.views_from.get("year")}),
+            "countries_without": missing,
+            "source": "World Values Survey wave 7" if with_views else None,
+        }
+        if with_views:
+            await self.log(f"Matched {len(with_views)} of {len(core)} people to real World Values Survey respondents" + (f"; no survey for {', '.join(missing)}" if missing else ""))
         if builder.unknown_sizes:
             await self.log(f"No published size for: {', '.join(sorted(builder.unknown_sizes))}. Groups are weighted equally.", "warn")
         await self.log(f"Sampled {len(people)} people across {len(spec.targets)} countries and {len(spec.segments)} segments")

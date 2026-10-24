@@ -324,6 +324,35 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                     </ul>
                   </Card>
                 )}
+                {(p.views_text?.views?.length ?? 0) > 0 && (
+                  <Card>
+                    <CardHead title="Their views">
+                      Answers of a real {p.country_name} respondent to the World Values Survey ({p.views_from?.year}), matched on{" "}
+                      {(p.views_from?.matched_on ?? []).join(", ") || "country"}.
+                    </CardHead>
+                    <ul className="flex flex-col gap-1.5 text-[14px] leading-5">
+                      {p.views_text!.views!.map((t) => (
+                        <li key={t}>{t}</li>
+                      ))}
+                    </ul>
+                    {(p.views_text?.news?.length ?? 0) > 0 && (
+                      <>
+                        <h3 className="mt-4 text-[13px] text-muted">How often they get news from</h3>
+                        <dl className="mt-1.5 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[14px] leading-5">
+                          {p.views_text!.news!.map((t) => {
+                            const [k, v] = t.split(": ");
+                            return (
+                              <div key={k} className="contents">
+                                <dt className="text-muted">{k}</dt>
+                                <dd className="text-text">{v}</dd>
+                              </div>
+                            );
+                          })}
+                        </dl>
+                      </>
+                    )}
+                  </Card>
+                )}
                 {Object.values(p.traits).some((v) => v != null) && (
                 <Card>
                   <CardHead title="How they think">Personality measures from survey data, from 0 to 100.</CardHead>

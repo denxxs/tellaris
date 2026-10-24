@@ -204,6 +204,12 @@ class Aggregator:
         for fact in sorted({k for p in self.focus for k in p.facts}):
             candidates[fact] = [(1.0 if p.facts[fact] else 0.0) if fact in p.facts else None for p in self.focus]
         candidates["age"] = [float(p.age) for p in self.focus]
+        # Answers of the matched real survey respondents (higher = more of the label).
+        from ..population.views import BY_KEY, scores
+
+        sc = [scores(p.views) for p in self.focus]
+        for key in sorted({k for s_ in sc for k in s_}):
+            candidates[key] = [s_.get(key) for s_ in sc]
         for trait, vals in candidates.items():
             if sum(v is not None for v in vals) < 0.8 * len(vals):
                 continue  # too few people have it to compare
@@ -215,7 +221,10 @@ class Aggregator:
             sx = np.sqrt(_wmean((x - mx) ** 2, ww))
             sy = np.sqrt(_wmean((yy - my) ** 2, ww))
             r = cov / (sx * sy) if sx > 0 and sy > 0 else 0.0
-            out.append({"trait": trait, "correlation": round(float(r), 3)})
+            row = {"trait": trait, "correlation": round(float(r), 3)}
+            if trait in BY_KEY:
+                row["label"] = BY_KEY[trait].label
+            out.append(row)
         out.sort(key=lambda d: -abs(d["correlation"]))
         return out
 

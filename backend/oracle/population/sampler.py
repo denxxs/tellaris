@@ -18,7 +18,7 @@ import numpy as np
 from ..scenario.models import Force, ScenarioSpec, Segment
 from ..world.countries import Country, Occupation, blocs, company_types, countries, occupations
 from ..world.influence import Influencer
-from . import realdata
+from . import realdata, views
 from .headcount import _POP_AGES, occupation_headcount, seg_headcount
 from .models import Exposure, Persona, Traits
 
@@ -90,6 +90,8 @@ class PopulationBuilder:
         self.weighting = weighting
         self.influencers = influencers
         self.rng = np.random.default_rng(seed)
+        # Own stream for survey matching, so people are the same with or without the survey pool.
+        self.vrng = np.random.default_rng(None if seed is None else [seed, 7])
         self.occ = occupations()
         self.ctypes = company_types()
         self._direct_targets: dict[str, set[str]] = {}
@@ -319,11 +321,16 @@ class PopulationBuilder:
         working = o.id not in NON_WORKERS or o.id == "unemployed"
         facts = self._facts(iso, sex, age, pct, working)
         exposures = self._exposures(iso, sector, o, ctype) if voice is None else []
+        m = views.match(
+            iso, self.vrng, sex=sex, age=age, population=o.population, isco_major=o.major,
+            self_employed=o.id in OWNER_OCCUPATIONS or o.population in ("employers", "own_account"), income_pct=pct,
+        )
         return Persona(
             id=idx, country=iso, country_name=c.name, segment=seg.name, segment_index=seg_index,
             occupation_id=o.id, occupation=o.title, isco=o.isco, sector=sector, company_type=ctype,
             company_size=size, seniority=seniority, buyer_role=o.buyer_role, age=age, gender=sex,
             income_usd=income, income_band=band, traits=Traits(), facts=facts, exposures=exposures,
+            views=m.answers if m else {}, views_from={"year": m.year, "matched_on": m.matched_on} if m else {},
             is_buyer=seg.is_buyer if voice is None else False, influencer_voice=voice,
             group_trait=seg.trait if voice is None else None,
         )

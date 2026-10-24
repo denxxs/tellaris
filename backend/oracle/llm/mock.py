@@ -78,6 +78,9 @@ def _traits(p: dict[str, Any]) -> dict[str, float]:
         "openness": r.uniform(0.25, 0.8),
         "budget_authority": 0.9 if p.get("seniority") == "executive" else 0.5 if p.get("seniority") == "senior" else 0.15,
     }
+    v = p.get("views") or {}  # a matched real survey respondent's answers
+    t["tech_affinity"] = _clip(t["tech_affinity"] + {1: 0.1, 2: 0.0, 3: -0.15}.get(v.get("more_technology"), 0.0))
+    t["skepticism"] = _clip(t["skepticism"] + {1: -0.15, 2: 0.05}.get(v.get("trust_people"), 0.0))
     t.update(measured)
     return t
 

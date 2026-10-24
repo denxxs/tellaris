@@ -114,7 +114,7 @@ export function GroupsTab({ r }: { r: Results }) {
       </Card>
       <Card className="lg:col-span-2">
         <CardHead title="What predicts a yes">How strongly each personal trait moves with the answer. Right of centre pushes towards yes.</CardHead>
-        <Diverging rows={r.drivers.map((d) => ({ label: DRIVER_LABEL[d.trait] ?? titleCase(d.trait), value: d.correlation }))} />
+        <Diverging rows={r.drivers.map((d) => ({ label: DRIVER_LABEL[d.trait] ?? d.label ?? titleCase(d.trait), value: d.correlation }))} />
       </Card>
     </div>
   );
