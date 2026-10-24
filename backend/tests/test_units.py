@@ -71,7 +71,7 @@ def test_population_structure_and_exposure():
     # A good share of Indian IT-services analysts should feel EU regulation/outsourcing.
     assert len(exposed) / max(len(analysts), 1) > 0.3
     founders = [p for p in core if p.occupation_id == "founder_b2b_saas"]
-    assert all(p.traits.budget_authority > 0.8 for p in founders)
+    assert all(p.seniority == "executive" for p in founders)
 
 
 def test_segments_tied_to_countries():
@@ -85,11 +85,24 @@ def test_segments_tied_to_countries():
     assert all(p.country == "IND" for p in people if p.segment == "IT analysts")
     buyers = [p for p in people if p.is_buyer]
     assert abs(sum(p.weight for p in buyers) - 1) < 1e-6
-    # Population weighting: India's IT analysts far outnumber US SaaS founders.
-    founders = sum(p.weight for p in buyers if p.segment == "Founders")
-    analysts = sum(p.weight for p in buyers if p.segment == "IT analysts")
-    assert analysts > founders * 5
-    assert all(p.represents > 0 for p in people)
+    # No published count of SaaS founders: groups are weighted equally and their size is left unknown.
+    b = PopulationBuilder(spec, [], seed=4)
+    people = b.build(200)
+    assert "Founders" in b.unknown_sizes
+    assert all(p.represents == 0 for p in people if p.segment == "Founders")
+    assert all(p.represents > 0 for p in people if p.segment == "IT analysts")
+
+
+def test_population_weighting_uses_real_sizes():
+    spec = make_spec(segments=[
+        Segment(name="US engineers", occupations=["software_engineer"], countries=["USA"]),
+        Segment(name="Indian farmers", occupations=["farmer"], countries=["India"]),
+    ], general_population_share=0)
+    people = PopulationBuilder(spec, [], seed=4).build(200)
+    assert abs(sum(p.weight for p in people) - 1) < 1e-6
+    engineers = sum(p.weight for p in people if p.segment == "US engineers")
+    farmers = sum(p.weight for p in people if p.segment == "Indian farmers")
+    assert farmers > engineers * 5
 
 
 def test_equal_weighting_respects_group_weights():
@@ -115,9 +128,10 @@ def test_every_country_is_covered():
 
 def test_headcounts_are_plausible():
     from oracle.population.headcount import occupation_headcount as h
-    assert 1e6 < h("USA", "software_engineer") < 4e6
-    assert 1e4 < h("USA", "founder_b2b_saas") < 2e5
-    assert h("IND", "it_services_analyst") > h("USA", "it_services_analyst")
+    # ILOSTAT's US count for ISCO 25 split by BLS OEWS: software, web and systems-analyst jobs.
+    assert 2e6 < h("USA", "software_engineer") < 6e6
+    assert h("USA", "founder_b2b_saas") is None  # no published count
+    assert h("IND", "software_engineer") > 1e6
     assert h("IND", "farmer") > 5e7
 
 

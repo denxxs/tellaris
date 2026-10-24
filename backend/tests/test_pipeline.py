@@ -67,10 +67,11 @@ def test_full_run_and_whatif(client):
     assert len(res["diffusion"]["rounds"]) == 3
     assert res["wtp"]["curve"]
     assert run["report"]["headline"]
-    # Nobody said how many will hear about it, so Oracle doesn't guess a total: it states scale per 1% who hear.
-    rev = h["revenue"]
-    assert h["awareness"] is None and h["adopters"] is None and rev["monthly"] is None
-    assert h["per_point_adopters"] > 0 and rev["per_point_monthly"] == round(h["value"] * h["people"] / 100 * 49, 2)
+    # There is no published count of SaaS founders, so Oracle weights the groups equally and
+    # leaves the audience size, customers and revenue blank rather than guessing them.
+    assert "B2B SaaS founders" in " ".join(res["sizes"]["unknown"]) or res["sizes"]["unknown"]
+    assert res["sizes"]["weighting"] == "equal"
+    assert h["awareness"] is None and h["people"] is None and h["adopters"] is None and h["revenue"] is None
     assert "say yes" in h["label"] or "adopt" in h["label"]
 
     events = client.get(f"/api/runs/{run_id}/events").text
@@ -92,12 +93,18 @@ def test_full_run_and_whatif(client):
     assert crun["spec"]["price"]["amount"] == 19
 
     # When the user gives awareness, totals appear and the headline itself is unchanged by it.
-    spec = {**run["spec"], "assumed_reach": 0.05}
-    arun = wait(client, client.post("/api/runs", json={"prompt": PROMPT, "config": cfg, "spec": spec}).json()["id"])
+    # Groups with published sizes only (no founders), so totals can be stated.
+    known = [s for s in run["spec"]["segments"] if not any(o.startswith("founder") for o in s.get("occupations") or [])]
+    spec = {**run["spec"], "segments": known}
+    base = wait(client, client.post("/api/runs", json={"prompt": PROMPT, "config": cfg, "spec": spec}).json()["id"])
+    bh = base["results"]["headline"]
+    assert bh["people"] and bh["adopters"] is None and bh["per_point_adopters"] > 0
+    assert bh["revenue"]["per_point_monthly"] == round(bh["value"] * bh["people"] / 100 * 49, 2)
+    arun = wait(client, client.post("/api/runs", json={"prompt": PROMPT, "config": cfg, "spec": {**spec, "assumed_reach": 0.05}}).json()["id"])
     ah = arun["results"]["headline"]
-    assert ah["awareness"] == 0.05 and ah["value"] == h["value"]
-    assert ah["with_awareness"]["value"] == round(h["value"] * 0.05, 4)
-    assert abs(ah["adopters"] - h["value"] * h["people"] * 0.05) < h["people"] * 0.0001 and ah["revenue"]["monthly"] == round(ah["adopters"] * 49, 2)
+    assert ah["awareness"] == 0.05 and ah["value"] == bh["value"]
+    assert ah["with_awareness"]["value"] == round(bh["value"] * 0.05, 4)
+    assert abs(ah["adopters"] - bh["value"] * bh["people"] * 0.05) < bh["people"] * 0.0001 and ah["revenue"]["monthly"] == round(ah["adopters"] * 49, 2)
     assert crun["results"]["comparison"]["parent_id"] == run_id
     child_people = {p["id"] for p in client.get(f"/api/runs/{child}/personas").json()}
     assert child_people == {p["id"] for p in people}

@@ -407,7 +407,13 @@ class PopulationBuilder:
                 cw = country_w[p.country] / cw_total
                 local = segs_in(p.country)
                 sw = segs[p.segment_index].weight / (sum(local.values()) or 1)
-                p.weight = round(cw * sw / cells[(p.country, p.segment_index)], 8)
+                p.weight = cw * sw / cells[(p.country, p.segment_index)]
+            # Buyers and everyone else each sum to 1, as with population weighting.
+            for group in (True, False):
+                members = [p for p in people if p.is_buyer == group]
+                total = sum(p.weight for p in members) or 1
+                for p in members:
+                    p.weight = round(p.weight / total, 10)
 
         people.extend(self._voices(influencer_voices, segs, counter))
         return people

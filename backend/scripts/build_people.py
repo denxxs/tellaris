@@ -277,6 +277,7 @@ def main() -> None:
 
 OES_GLOB = "oesm*nat*.zip"
 CROSSWALK = "ISCO_SOC_Crosswalk.xls"
+SOC_2010_2018 = "soc_2010_to_2018_crosswalk.xlsx"
 WITHIN_OUT = ROOT / "oracle" / "data" / "isco_within.json"
 
 
@@ -313,10 +314,27 @@ def build_within() -> None:
             soc = next((x for x in row if re.fullmatch(r"\d{2}-\d{4}", x)), None)
             if isco and soc:
                 links.setdefault(soc, set()).add(isco[:4])
+    # The crosswalk uses 2010 SOC codes; OEWS uses 2018 ones. Carry each link over to the new codes.
+    soc18 = folder / SOC_2010_2018
+    if soc18.exists():
+        import openpyxl
+
+        moved: dict[str, set[str]] = {}
+        for ws in openpyxl.load_workbook(soc18, read_only=True).worksheets[:1]:
+            for r in ws.iter_rows(values_only=True):
+                old, new = (str(r[0] or "").strip(), str(r[2] or "").strip()) if len(r) > 2 else ("", "")
+                if re.fullmatch(r"\d{2}-\d{4}", old) and re.fullmatch(r"\d{2}-\d{4}", new) and old in links:
+                    moved.setdefault(new, set()).update(links[old])
+        links = moved
+    else:
+        print(f"warning: {SOC_2010_2018} missing, renumbered jobs will not match")
     by4: dict[str, float] = {}
     matched = 0.0
     for soc, n in emp.items():
         targets = links.get(soc)
+        if not targets and soc.endswith("0"):
+            # OEWS sometimes reports a few detailed jobs as one combined row (e.g. 29-2010).
+            targets = set().union(*[v for k, v in links.items() if k[:6] == soc[:6]])
         if not targets:
             continue
         matched += n
@@ -329,7 +347,7 @@ def build_within() -> None:
     WITHIN_OUT.write_text(json.dumps({
         "_meta": {
             "built": date.today().isoformat(),
-            "source": f"BLS OEWS {oes[-1].name} (detailed occupations, national) mapped to ISCO-08 with the BLS ISCO-08/SOC crosswalk",
+            "source": f"BLS OEWS {oes[-1].name} (detailed occupations, national) mapped to ISCO-08 with the BLS ISCO-08/2010 SOC crosswalk and the BLS 2010-to-2018 SOC crosswalk",
             "coverage": round(matched / sum(emp.values()), 3),
             "note": "US within-group mix, applied to every country's real 2-digit counts. US wage-and-salary jobs only.",
         },
