@@ -88,7 +88,7 @@ def test_feed_styles_change_how_far_posts_travel(client):
 
 
 def test_feed_what_if_keeps_the_same_people(client):
-    cfg = {**CFG, "seed": None}  # no seed given: Oracle picks one and the what-if reuses it
+    cfg = {**CFG, "seed": None}  # no seed given: Tellaris picks one and the what-if reuses it
     rid, r = run(client, {"prompt": PROMPT, "targets": ["IND", "BRA"], "config": cfg})
     seed = r["results"]["seed"]
     assert isinstance(seed, int)

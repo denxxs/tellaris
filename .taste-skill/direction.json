@@ -5,7 +5,7 @@
  "seed": 2048537912,
  "input": {
   "kind": "analytics",
-  "brief": "Product Oracle: a world-simulation research tool where founders describe a product or question, pick countries, and thousands of simulated people across jobs and countries react; results show calibrated adoption, country and segment breakdowns, outside influence between countries, pricing curves, buying committees and persona chat",
+  "brief": "Project Tellaris: a world-simulation research tool where founders describe a product or question, pick countries, and thousands of simulated people across jobs and countries react; results show calibrated adoption, country and segment breakdowns, outside influence between countries, pricing curves, buying committees and persona chat",
   "theme": null,
   "screens": [
    "builder",

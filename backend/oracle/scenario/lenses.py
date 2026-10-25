@@ -1,8 +1,8 @@
 """Lenses: how a question is treated.
 
-Oracle picks a lens for every question and shows it, so the user can change it. A lens
+Tellaris picks a lens for every question and shows it, so the user can change it. A lens
 fixes which corrections apply and how simulated people are told to answer. The B2B lens
-is exactly the behaviour Oracle had before lenses existed (guarded by test_golden.py).
+is exactly the behaviour Tellaris had before lenses existed (guarded by test_golden.py).
 """
 
 from __future__ import annotations

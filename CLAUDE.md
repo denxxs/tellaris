@@ -1,4 +1,4 @@
-# Product Oracle
+# Project Tellaris
 
 Multi-agent world simulation for predicting how products (and any scenario described in a paragraph) will land across countries, jobs and segments. Works with any LLM provider.
 
