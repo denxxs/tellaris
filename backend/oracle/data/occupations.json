@@ -111,8 +111,7 @@
    ],
    "company_types": [
     "midmarket",
-    "enterprise",
-    "scaleup"
+    "enterprise"
    ],
    "income_mult": 4.5,
    "tech": 0.55,
@@ -133,8 +132,7 @@
     "finance"
    ],
    "company_types": [
-    "startup",
-    "scaleup",
+    "smb",
     "midmarket",
     "enterprise"
    ],
@@ -199,7 +197,6 @@
     "all"
    ],
    "company_types": [
-    "scaleup",
     "midmarket",
     "enterprise"
    ],
@@ -220,8 +217,7 @@
     "all"
    ],
    "company_types": [
-    "startup",
-    "scaleup",
+    "smb",
     "midmarket",
     "enterprise"
    ],
@@ -262,7 +258,6 @@
     "all"
    ],
    "company_types": [
-    "scaleup",
     "midmarket",
     "enterprise"
    ],
@@ -286,8 +281,7 @@
     "retail"
    ],
    "company_types": [
-    "startup",
-    "scaleup",
+    "smb",
     "midmarket",
     "enterprise"
    ],
@@ -372,8 +366,7 @@
     "finance"
    ],
    "company_types": [
-    "startup",
-    "scaleup",
+    "smb",
     "midmarket",
     "enterprise"
    ],
@@ -478,7 +471,8 @@
     "finance"
    ],
    "company_types": [
-    "scaleup"
+    "smb",
+    "midmarket"
    ],
    "income_mult": 4.5,
    "tech": 0.8,
@@ -519,8 +513,8 @@
     "it_services"
    ],
    "company_types": [
-    "startup",
-    "scaleup",
+    "smb",
+    "midmarket",
     "enterprise"
    ],
    "income_mult": 2.3,
@@ -541,8 +535,8 @@
     "media"
    ],
    "company_types": [
-    "startup",
-    "scaleup",
+    "smb",
+    "midmarket",
     "enterprise"
    ],
    "income_mult": 1.7,
@@ -711,7 +705,6 @@
     "all"
    ],
    "company_types": [
-    "startup",
     "smb",
     "midmarket",
     "enterprise"
@@ -795,8 +788,7 @@
     "all"
    ],
    "company_types": [
-    "startup",
-    "scaleup",
+    "smb",
     "midmarket",
     "enterprise"
    ],

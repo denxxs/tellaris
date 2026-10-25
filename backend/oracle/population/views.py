@@ -198,6 +198,41 @@ def match(iso: str, rng: np.random.Generator, *, sex: str, age: int, population:
     return None
 
 
+# Survey channel behind each news medium (Q201-Q208).
+MEDIUM_KEYS = {"newspaper": ["news_newspaper"], "tv": ["news_tv"], "radio": ["news_radio"],
+               "internet": ["news_internet", "news_phone", "news_email"], "social": ["news_social"], "friends": ["news_friends"]}
+# Days in a month each answer means at least (the answer's lower edge, so nothing is guessed in between).
+DAYS_AT_LEAST = {1: 30.0, 2: 4.0, 3: 1.0, 4: 0.0, 5: 0.0}
+
+
+def _days(answers: dict[str, int], media: tuple[str, ...]) -> float | None:
+    """Days a month, at least, they get news from the most-used of these media."""
+    keys = [k for m in media for k in MEDIUM_KEYS.get(m, [])]
+    vals = [DAYS_AT_LEAST[answers[k]] for k in keys if answers.get(k) in DAYS_AT_LEAST]
+    return max(vals) if vals else None
+
+
+@lru_cache(maxsize=4096)
+def _country_days(iso: str, media: tuple[str, ...]) -> float | None:
+    p = pool()
+    if not p or iso not in p:
+        return None
+    c = p[iso]
+    pairs = [(d, w) for a, w in zip(c["answers"], c["weight"]) if (d := _days(a, media)) is not None]
+    total = sum(w for _, w in pairs)
+    return sum(d * w for d, w in pairs) / total if total else None
+
+
+def news_attention(iso: str, answers: dict[str, int], media: list[str]) -> float:
+    """How often this person gets news from these media relative to their country's (weighted)
+    average: 1 = average, 0 = never. 1 when there is no survey data."""
+    mine = _days(answers or {}, tuple(media))
+    avg = _country_days(iso, tuple(media))
+    if mine is None or not avg:
+        return 1.0
+    return mine / avg
+
+
 def lines(views: dict[str, int], group: str | None = None) -> list[str]:
     out = []
     for k, v in views.items():

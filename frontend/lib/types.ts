@@ -49,7 +49,7 @@ export type NewsItem = {
   countries: string[];
   reach: Reach;
   audiences: string[];
-  age_skew: "young" | "old" | "all";
+  media: ("tv" | "newspaper" | "radio" | "internet" | "social" | "friends")[];
   stance: "helps" | "hurts" | "neutral";
   relevance: number;
   lasting: boolean;
@@ -457,7 +457,8 @@ export type Persona = {
   occupation_id: string;
   sector: string;
   company_type: string;
-  company_size: number;
+  company_size: [number, number | null] | null;
+  company_size_text: string;
   seniority: string;
   buyer_role: string;
   age: number;
@@ -510,7 +511,8 @@ export type Committee = {
   id: string;
   country: string;
   company_type: string;
-  company_size: number;
+  company_size: [number, number | null] | null;
+  company_size_text?: string;
   sector: string;
   members: { role: string; role_label: string; persona_id: string; name: string; occupation: string; seniority: string }[];
   transcript: { round: number; persona_id: string; name: string; role: string; stance: number; statement: string; conditions: string[]; concerns: string[] }[];
@@ -602,7 +604,8 @@ export type FeedItem = {
   origin?: string;
   direction?: string;
   company_type?: string;
-  company_size?: number;
+  company_size?: [number, number | null] | null;
+  company_size_text?: string;
   decision?: { decision: "buy" | "pilot" | "defer" | "reject"; probability_of_purchase: number; deal_cycle_months: number; decisive_factor: string; blockers: string[]; conditions: string[]; summary: string };
   transcript?: { round: number; persona_id: string; name: string; role: string; stance: number; statement: string; conditions: string[]; concerns: string[] }[];
   members?: { role: string; role_label: string; persona_id: string; name: string; occupation: string; seniority: string }[];

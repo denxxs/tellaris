@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..llm import LLMError, llm
 from ..population.models import Persona
@@ -53,11 +53,17 @@ class Committee(BaseModel):
     id: str
     country: str
     company_type: str
-    company_size: int
+    company_size: list[int | None] | None = None
+    company_size_text: str = ""
     sector: str
     members: list[dict[str, Any]]
     transcript: list[dict[str, Any]] = Field(default_factory=list)
     decision: Decision | None = None
+
+    @field_validator("company_size", mode="before")
+    @classmethod
+    def _old_size(cls, v):
+        return v if isinstance(v, list) or v is None else None  # runs saved before sizes became classes
 
 
 MEMBER_SYSTEM = """You are in a real internal buying meeting at your company, role-playing the person described.
@@ -112,6 +118,7 @@ def form_committees(spec: ScenarioSpec, people: list[Persona], n: int, seed: int
                 country=anchor.country,
                 company_type=anchor.company_type,
                 company_size=anchor.company_size,
+                company_size_text=anchor.company_size_text,
                 sector=anchor.sector,
                 members=[
                     {
@@ -128,7 +135,7 @@ def form_committees(spec: ScenarioSpec, people: list[Persona], n: int, seed: int
 def _company_line(c: Committee, people: dict[str, Persona]) -> str:
     anchor = people[c.members[0]["persona_id"]]
     return (
-        f"Company: a {c.company_type} in {anchor.country_name} with ~{c.company_size:,} people, sector {c.sector.replace('_', ' ')}."
+        f"Company: a {c.company_type.replace('_', ' ')} in {anchor.country_name}{f' ({c.company_size_text})' if c.company_size_text else ''}, sector {c.sector.replace('_', ' ')}."
     )
 
 

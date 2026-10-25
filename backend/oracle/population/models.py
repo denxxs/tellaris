@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
+
+from . import firms
 
 
 class Exposure(BaseModel):
@@ -25,6 +27,13 @@ class Traits(BaseModel):
     conformity: float | None = None
     openness: float | None = None
     budget_authority: float | None = None
+
+
+def _company_label(ctype: str) -> str:
+    from ..world.countries import company_types
+
+    label = company_types().get(ctype, {}).get("label", ctype.replace("_", " ")).lower()
+    return ("an " if label[:1] in "aeiou" else "a ") + label
 
 
 FACT_TEXT = {
@@ -66,7 +75,7 @@ class Persona(BaseModel):
     isco: int
     sector: str
     company_type: str
-    company_size: int
+    company_size: list[int | None] | None = None  # size class [lo, hi] in people (hi None = open-ended); None = not known
     seniority: str
     buyer_role: str
     age: int
@@ -98,6 +107,16 @@ class Persona(BaseModel):
     tools_today: list[str] = Field(default_factory=list)
     household: str = ""
 
+    @field_validator("company_size", mode="before")
+    @classmethod
+    def _old_size(cls, v):
+        return v if isinstance(v, list) or v is None else None  # runs saved before sizes became classes
+
+    @computed_field
+    @property
+    def company_size_text(self) -> str:
+        return firms.size_text(self.company_size)
+
     @computed_field
     @property
     def views_text(self) -> dict[str, list[str]]:
@@ -116,8 +135,8 @@ class Persona(BaseModel):
         if working:
             lines.append(
                 f"Job: {self.occupation}{f' ({level})' if level else ''}"
-                + (f" at a {self.company_type.replace('_', ' ')}" if self.company_type not in ("none", "") else "")
-                + (f" with ~{self.company_size:,} people" if self.company_size > 1 else "")
+                + (f" at {_company_label(self.company_type)}" if self.company_type not in ("none", "") else "")
+                + (f" ({firms.size_text(self.company_size)})" if self.company_size and self.company_size != [1, 1] else "")
                 + (f", sector: {self.sector.replace('_', ' ')}" if self.sector not in ("none", "") else "")
             )
         else:

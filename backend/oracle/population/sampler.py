@@ -19,7 +19,7 @@ from ..scenario.models import Force, ScenarioSpec, Segment
 from ..world.countries import Country, Occupation, blocs, company_types, countries, occupations
 from ..world import ties as ties_mod
 from ..world.influence import Influencer
-from . import realdata, views
+from . import firms, realdata, views
 from .headcount import _POP_AGES, occupation_headcount, seg_headcount
 from .models import Exposure, Persona, Traits
 
@@ -173,16 +173,33 @@ class PopulationBuilder:
             return "senior"
         return "staff"
 
-    def _company(self, o: _Occ, seg: Segment) -> tuple[str, int]:
+    def _company(self, iso: str, o: _Occ, seg: Segment) -> tuple[str, list[int | None] | None]:
+        """Company type and size class. Which types are possible comes from the job and the group
+        (definitions); how likely each size is comes from data: the public-sector share of the job
+        (ILOSTAT) and the share of its workers at each size of workplace or enterprise."""
         options = [c for c in (seg.company_types or []) if c in o.company_types] or o.company_types or ["smb"]
         if seg.company_types and not any(c in o.company_types for c in seg.company_types):
             options = seg.company_types
-        ctype = options[int(self.rng.integers(len(options)))]
-        lo, hi = self.ctypes.get(ctype, {"employees": [1, 100]})["employees"]
-        if hi <= 1:
-            return ctype, int(hi)
-        size = int(round(math.exp(self.rng.uniform(math.log(max(lo, 1)), math.log(hi)))))
-        return ctype, size
+        fixed = [c for c in options if self.ctypes.get(c, {}).get("employees", [1, 1])[1] <= 1]
+        if fixed and len(fixed) == len(options):  # not employed, or working alone: nothing to draw
+            lo, hi = self.ctypes.get(fixed[0], {"employees": [0, 0]})["employees"]
+            return fixed[0], ([1, 1] if hi == 1 else None)
+        if "government" in options:
+            others = [c for c in options if c != "government"]
+            if not others:
+                return "government", None
+            share = firms.public_share(iso, o.isco08, realdata.oc2_employed(iso))  # None: job has no ISCO code
+            if share is not None and self.rng.random() < share:
+                return "government", None
+            options = others
+        types = {c: tuple(self.ctypes[c]["employees"]) for c in options if c in self.ctypes}
+        cls = firms.classes_for(iso, o.major, types)
+        total = sum(p for *_, p, _ in cls)
+        if not cls or total <= 0:
+            return options[0], None
+        i = int(self.rng.choice(len(cls), p=np.array([c[2] for c in cls]) / total))
+        lo, hi, _, t = cls[i]
+        return t, [lo, hi]
 
     def _sector(self, o: _Occ) -> str:
         relevant = [s for s in o.sectors if s in self.spec.sectors]
@@ -295,7 +312,7 @@ class PopulationBuilder:
         pool = [(o, w) for o, w in self._segment_pool(seg, c) if self._age_ok(o, seg)] or self._segment_pool(seg, c)
         o = self._pick(pool)
         seniority = self._seniority(o)
-        ctype, size = self._company(o, seg)
+        ctype, size = self._company(iso, o, seg)
         sector = self._sector(o)
         sex = self._sex(iso, o, seg, seg.age_min or 15, seg.age_max or 99)
         age = self._age(iso, o, sex, seg)
@@ -366,9 +383,11 @@ class PopulationBuilder:
                     counter += 1
                     people.append(self._person(f"p{counter:05d}", iso, segs[int(si)], int(si)))
         else:
+            # Equal: every country, and every group within it, counts the same.
+            country_w = {iso: 1.0 for iso in country_w}
             country_alloc = _allocate(n, country_w)
             for iso, count in country_alloc.items():
-                seg_alloc = _allocate(count, segs_in(iso))
+                seg_alloc = _allocate(count, segs_in(iso))  # how many to simulate; weights below are equal
                 for si, k in seg_alloc.items():
                     seg = segs[int(si)]
                     for _ in range(k):
@@ -394,8 +413,7 @@ class PopulationBuilder:
             cw_total = sum(country_w.values()) or 1
             for p in people:
                 cw = country_w[p.country] / cw_total
-                local = segs_in(p.country)
-                sw = segs[p.segment_index].weight / (sum(local.values()) or 1)
+                sw = 1 / (len(segs_in(p.country)) or 1)
                 p.weight = cw * sw / cells[(p.country, p.segment_index)]
             # Buyers and everyone else each sum to 1, as with population weighting.
             for group in (True, False):

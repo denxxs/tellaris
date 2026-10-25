@@ -8,8 +8,10 @@ Sources (fetched at build time, no keys):
 
 Where a country has no ILO occupation survey, its occupation mix is predicted from a
 least-squares model fitted on the countries that have one (sector shares and income).
-Judgement indices (digital maturity, regulation, SaaS spend...) are derived from the
-data with simple formulas; hand-tuned values in the curated file override them.
+Where a source has no figure for a country, the field is left empty (None); nothing is
+guessed. Territories without labour-force data stay in the file (for names and ties) but
+cannot be simulated. The curated file supplies only display names, aliases and the name
+pools used by the offline mock model.
 
 Run:  python scripts/build_world.py
 """
@@ -69,14 +71,6 @@ OECD = ["AUS", "AUT", "BEL", "CAN", "CHL", "COL", "CRI", "CZE", "DNK", "EST", "F
         "ITA", "JPN", "KOR", "LVA", "LTU", "LUX", "MEX", "NLD", "NZL", "NOR", "POL", "PRT", "SVK", "SVN", "ESP", "SWE", "CHE", "TUR",
         "GBR", "USA"]
 G7 = ["CAN", "FRA", "DEU", "ITA", "JPN", "GBR", "USA"]
-
-# Rough share of adults who can work in English (judgement; default 0.12).
-ENGLISH = {
-    "USA": .95, "GBR": .98, "IRL": .99, "AUS": .97, "NZL": .98, "CAN": .86, "SGP": .85, "PHL": .6, "IND": .12, "PAK": .1, "NGA": .55,
-    "KEN": .5, "GHA": .5, "UGA": .35, "ZAF": .6, "ZWE": .45, "ZMB": .4, "BWA": .5, "NAM": .45, "MYS": .6, "NLD": .9, "SWE": .89,
-    "NOR": .9, "DNK": .86, "FIN": .75, "ISR": .85, "ARE": .8, "MLT": .88, "CYP": .75, "JAM": .95, "TTO": .95, "BHS": .97, "BRB": .97,
-    "LKA": .25, "BGD": .08, "RWA": .3, "TZA": .2, "DEU": .56, "AUT": .73, "BEL": .6, "CHE": .65, "LUX": .7, "PRT": .45, "POL": .37,
-}
 
 # Which curated country's name pool suits a country without its own (mock mode only;
 # real models invent culturally fitting names themselves).
@@ -202,10 +196,6 @@ def ilo_occupations() -> dict[str, dict]:
     return best
 
 
-def clip(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
-    return max(lo, min(hi, x))
-
-
 def main() -> None:
     print("World Bank: countries")
     meta = wb_countries()
@@ -239,30 +229,21 @@ def main() -> None:
     coef, *_ = np.linalg.lstsq(X, Y, rcond=None)
     print(f"  occupation model fitted on {len(X)} countries")
 
-    # Median age from the age structure, fitted on the curated countries.
-    ma_x, ma_y = [], []
-    for iso, c in curated.items():
-        p65, p014 = val("pop65", iso), val("pop014", iso)
-        if p65 is not None and p014 is not None:
-            ma_x.append([1, p65, p014])
-            ma_y.append(c["median_age"])
-    age_coef, *_ = np.linalg.lstsq(np.array(ma_x), np.array(ma_y), rcond=None)
-
     bloc_members = {k: set(v[1]) for k, v in BLOCS.items()}
     africa = {iso for iso, m in meta.items() if m["region"] == "Sub-Saharan Africa"} | {"EGY", "LBY", "TUN", "DZA", "MAR"}
     bloc_members["AU"] = africa
 
     countries = []
     years = {}
+    no_labour: list[str] = []
     for iso, m in sorted(meta.items(), key=lambda kv: kv[1]["name"]):
         pop = val("population", iso)
         gdp = val("gdp_pc", iso)
         if pop is None or gdp is None or pop < 50_000:
             continue
-        lf = val("labor_force", iso)
-        unemp = val("unemployment", iso, 6.0)
-        workforce = (lf * (1 - unemp / 100)) if lf else pop * 0.42
-        internet = val("internet", iso, 50.0) / 100
+        lf, unemp = val("labor_force", iso), val("unemployment", iso)
+        workforce = lf * (1 - unemp / 100) if lf is not None and unemp is not None else None
+        internet = val("internet", iso)
         agri, indus, serv = val("agri", iso), val("industry", iso), val("services", iso)
         if iso in occ:
             isco = occ[iso]["shares"]
@@ -273,21 +254,10 @@ def main() -> None:
             isco = list(pred / pred.sum())
             isco_source = "modelled from sector employment and income"
         else:
-            isco = [0.05, 0.12, 0.1, 0.07, 0.2, 0.1, 0.13, 0.09, 0.14]
-            isco_source = "regional default"
+            isco, isco_source = None, ""
+        if workforce is None:
+            no_labour.append(iso)
         p65, p014 = val("pop65", iso), val("pop014", iso)
-        median_age = float(np.array([1, p65, p014]) @ age_coef) if p65 is not None and p014 is not None else 30.0
-
-        f = clip((math.log(max(gdp, 300)) - math.log(800)) / (math.log(80000) - math.log(800)))
-        is_eu = iso in bloc_members["EU"]
-        derived = {
-            "digital": round(clip(0.1 + 0.6 * internet + 0.3 * f), 2),
-            "regulation": round(0.88 if is_eu else clip(0.3 + 0.35 * f + (0.15 if iso in OECD else 0)), 2),
-            "saas": round(clip(f ** 1.25), 2),
-            "startups": round(clip(0.25 + 0.45 * f + 0.15 * internet), 2),
-            "price_sensitivity": round(clip(0.95 - 0.65 * f), 2),
-            "tech_trust": round(clip(0.8 - 0.25 * f + 0.05 * internet), 2),
-        }
         blocs = [b for b, mem in bloc_members.items() if iso in mem]
         if iso in OECD:
             blocs.append("OECD")
@@ -311,24 +281,18 @@ def main() -> None:
             "capital": m["capital"],
             "anchor": [m["lon"], m["lat"]] if m["lon"] is not None else None,
             "blocs": sorted(set(blocs)),
-            "currency": cur.get("currency", ""),
-            "languages": cur.get("languages", []),
             "population_m": round(pop / 1e6, 3),
-            "workforce_m": round(workforce / 1e6, 3),
+            "workforce_m": round(workforce / 1e6, 3) if workforce is not None else None,
             "gdp_pc_usd": round(gdp),
-            "internet_pct": round(internet, 3),
-            "english": cur.get("english", ENGLISH.get(iso, 0.12)),
-            "median_age": round(cur.get("median_age", median_age), 1),
+            "internet_pct": round(internet / 100, 3) if internet is not None else None,
             "pop65": round(p65 / 100, 3) if p65 is not None else None,
             "pop014": round(p014 / 100, 3) if p014 is not None else None,
             "sector_shares": [round(x / 100, 3) if x is not None else None for x in (agri, indus, serv)],
-            "isco": [round(x, 4) for x in isco],
+            "isco": [round(x, 4) for x in isco] if isco else None,
             "isco_source": isco_source,
             "names": names,
             "curated": bool(cur),
         }
-        for k, v in derived.items():
-            country[k] = cur.get(k, v)
         countries.append(country)
         years[iso] = {k: ind[k][iso][1] for k in INDICATORS if iso in ind[k]}
 
@@ -339,7 +303,7 @@ def main() -> None:
                 "World Bank Open Data (api.worldbank.org): SP.POP.TOTL, SL.TLF.TOTL.IN, SL.UEM.TOTL.ZS, NY.GDP.PCAP.CD, IT.NET.USER.ZS, SL.AGR/IND/SRV.EMPL.ZS, SP.POP.65UP.TO.ZS, SP.POP.0014.TO.ZS",
                 "ILOSTAT (sdmx.ilo.org): DF_EMP_TEMP_SEX_OCU_NB, employment by occupation, both sexes, latest year since 2012",
             ],
-            "note": "Each figure is the most recent value the source has. Occupation shares come from ILO surveys where they exist and from a model fitted on those surveys elsewhere (see isco_source). Indices (digital, regulation, saas, startups, price_sensitivity, tech_trust) are judgements derived from the data, with hand-tuned values for 39 major markets.",
+            "note": "Each figure is the most recent value the source has. Occupation shares come from ILO surveys where they exist and from a model fitted on those surveys elsewhere (see isco_source). Missing figures are left empty; territories without labour-force data cannot be simulated.",
             "isco_order": ["managers", "professionals", "technicians", "clerical", "service_sales", "skilled_agri", "craft", "operators", "elementary"],
             "count": len(countries),
         },
@@ -348,6 +312,7 @@ def main() -> None:
     }
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"Wrote {len(countries)} countries to {OUT}")
+    print(f"  no labour-force data (kept for names and ties, not simulated): {', '.join(no_labour)}")
     print(f"  occupations from surveys: {sum(1 for c in countries if c['isco_source'].startswith('ILOSTAT'))}")
 
 

@@ -863,7 +863,7 @@ def news_items(ctx: dict[str, Any]) -> dict[str, Any]:
             "hit": i + 1, "headline": h["title"][:90], "summary": (h["snippet"] or h["title"])[:200],
             "countries": countries, "reach": "mass" if n == 0 else "broad" if n < 4 else "niche",
             "audiences": ([sectors[0]] if sectors else []) + (["finance"] if any(w in text for w in ("bank", "rbi", "payment", "finance")) else []),
-            "age_skew": "young" if any(w in text for w in ("gen z", "student", "young")) else "all",
+            "media": ["social", "internet"] if any(w in text for w in ("gen z", "student", "young", "tiktok", "instagram")) else [],
             "stance": "hurts" if hurts else "helps" if n % 3 == 1 else "neutral",
             "relevance": round(max(0.3, (0.9 if on_topic else 0.55) - 0.04 * n), 2), "lasting": n % 3 == 0, "upcoming": m.group(1) if m else None,
         })

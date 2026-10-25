@@ -369,7 +369,7 @@ export function CommitteesTab({ id, r }: { id: string; r: Results }) {
                     <span className="text-[14px] text-text">
                       {companyLabel(cm.company_type)} in {countryName(cm.country)}
                     </span>
-                    <span className="text-[13px] text-muted">, {int(cm.company_size)} staff, {cm.members.length} people in the room</span>
+                    <span className="text-[13px] text-muted">{cm.company_size_text ? `, ${cm.company_size_text}` : ""}, {cm.members.length} people in the room</span>
                   </span>
                   {cm.decision && (
                     <span className="flex items-center gap-2">

@@ -132,7 +132,7 @@ function Meeting({ it, onSelect }: { it: FeedItem; onSelect: (id: string) => voi
             <div className="text-[12px] text-muted">Buying meeting</div>
             <h3 className="text-[15px] font-medium">
               {companyLabel(it.company_type ?? "")} in {countryName(it.country ?? "")}
-              <span className="font-normal text-muted">, {int(it.company_size)} staff</span>
+              {it.company_size_text && <span className="font-normal text-muted">, {it.company_size_text}</span>}
             </h3>
           </div>
           <span className="flex items-center gap-2">

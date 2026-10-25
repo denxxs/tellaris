@@ -406,7 +406,7 @@ def meeting_items(committees: list[Any], start: int = 0) -> list[dict[str, Any]]
         out.append(
             _item(
                 id=f"m{start + i + 1:04d}", round=0, kind="meeting", text=c.decision.summary, country=c.country,
-                company_type=c.company_type, company_size=c.company_size, decision=c.decision.model_dump(),
+                company_type=c.company_type, company_size=c.company_size, company_size_text=c.company_size_text, decision=c.decision.model_dump(),
                 transcript=c.transcript, members=c.members, committee_id=c.id,
             )
         )

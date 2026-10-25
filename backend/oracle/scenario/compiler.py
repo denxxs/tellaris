@@ -71,15 +71,10 @@ def _catalogue() -> str:
     )
 
 
-def default_weights(targets: list[str], b2b: bool) -> dict[str, float]:
-    cs = countries()
-    raw: dict[str, float] = {}
-    for t in targets:
-        c = cs[t]
-        # Business scenarios weight by economic weight of the market; consumer ones by people.
-        raw[t] = math.sqrt(c.workforce_m * (c.gdp_pc_usd / 10000)) if b2b else math.sqrt(c.population_m)
-    total = sum(raw.values()) or 1
-    return {k: round(v / total, 4) for k, v in raw.items()}
+def default_weights(targets: list[str]) -> dict[str, float]:
+    """Each country counts the same. Real sizes are applied by the sampler's population
+    weighting; this only matters when sizes are unknown or the user picks equal weighting."""
+    return {t: round(1 / len(targets), 4) for t in targets} if targets else {}
 
 
 def normalize(spec: ScenarioSpec, prompt: str, overrides: list[str] | None = None, global_depth: str = "quick") -> ScenarioSpec:
@@ -97,13 +92,15 @@ def normalize(spec: ScenarioSpec, prompt: str, overrides: list[str] | None = Non
         targets = expand_codes([resolve(t) or t for t in spec.targets])
     if not targets:
         targets = expand_codes(find_mentions(prompt))
+    # Territories with no labour-force data can't be simulated.
+    targets = [t for t in targets if cs[t].simulatable]
     if not targets:
         targets = ["USA"]
     spec.targets = targets[: 40 if spec.scope == "global" else 12]
 
     weights = {k: v for k, v in (spec.target_weights or {}).items() if k in spec.targets and v > 0}
     if overrides or len(weights) != len(spec.targets):
-        weights = default_weights(spec.targets, spec.b2b)
+        weights = default_weights(spec.targets)
     total = sum(weights.values()) or 1
     spec.target_weights = {k: round(v / total, 4) for k, v in weights.items()}
 

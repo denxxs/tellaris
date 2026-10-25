@@ -25,12 +25,15 @@ import httpx
 from pydantic import BaseModel, Field, field_validator
 
 from ..llm import llm
+from ..population import views
 from ..population.models import Persona
 from ..scenario.models import ScenarioSpec
 
 log = logging.getLogger("oracle.news")
 
 Reach = Literal["mass", "broad", "niche"]
+Medium = Literal["tv", "newspaper", "radio", "internet", "social", "friends"]
+MEDIA = ["tv", "newspaper", "radio", "internet", "social", "friends"]
 
 REACH_LABEL = {"mass": "Everyone's talking about it", "broad": "Widely covered", "niche": "Specialist news"}
 # Chance a person in the country hears an item of this reach, before anything about them.
@@ -60,7 +63,7 @@ class NewsDraft(BaseModel):
     countries: list[str] = Field(default_factory=list, description="ISO3 codes where this is news; empty if global")
     reach: Reach = Field(description="mass: most people in those countries hear of it; broad: widely covered; niche: only people it concerns follow it")
     audiences: list[str] = Field(default_factory=list, description="Kinds of people who follow it closely even if niche: sectors, jobs or interests, e.g. finance, retail, students, gamers")
-    age_skew: Literal["young", "old", "all"] = "all"
+    media: list[Medium] = Field(default_factory=list, description="Where people come across this story: tv, newspaper, radio, internet, social (social media), friends (word of mouth). Empty if everywhere.")
     stance: Literal["helps", "hurts", "neutral"] = "neutral"
     relevance: float = Field(ge=0, le=1, description="How much it bears on the question, 0-1")
     lasting: bool = Field(default=False, description="True if it is still in effect and shaping things (a law, a price change, a market shift), not a one-day story")
@@ -86,7 +89,7 @@ class NewsItem(BaseModel):
     countries: list[str] = Field(default_factory=list)
     reach: Reach = "broad"
     audiences: list[str] = Field(default_factory=list)
-    age_skew: Literal["young", "old", "all"] = "all"
+    media: list[Medium] = Field(default_factory=list)
     stance: Literal["helps", "hurts", "neutral"] = "neutral"
     relevance: float = 0.5
     lasting: bool = False
@@ -246,7 +249,7 @@ async def gather_news(spec: ScenarioSpec, provider: str, model: str, as_of: date
             NewsItem(
                 id=f"n{len(items) + 1:02d}", headline=d.headline or h.title[:90], summary=d.summary, published=h.published.isoformat(),
                 source=h.source, url=h.url, countries=[c.upper()[:3] for c in d.countries],
-                reach=d.reach, audiences=[a.strip().lower() for a in d.audiences if a.strip()][:6], age_skew=d.age_skew, stance=d.stance,
+                reach=d.reach, audiences=[a.strip().lower() for a in d.audiences if a.strip()][:6], media=list(dict.fromkeys(d.media)), stance=d.stance,
                 relevance=d.relevance, lasting=d.lasting, upcoming=up.isoformat() if up and up > as_of else None,
                 score=score(d.relevance, h.published, d.lasting, as_of),
             )
@@ -278,7 +281,7 @@ def concerns(p: Persona, audiences: list[str]) -> bool:
     return False
 
 
-def know_chance(p: Persona, countries: list[str], reach: str, audiences: list[str], age_skew: str = "all") -> float:
+def know_chance(p: Persona, countries: list[str], reach: str, audiences: list[str], media: list[str] | None = None) -> float:
     """How likely this person is to have come across an item."""
     base = REACH_BASE.get(reach, 0.3)
     if countries and p.country not in countries:
@@ -287,10 +290,9 @@ def know_chance(p: Persona, countries: list[str], reach: str, audiences: list[st
         base *= 0.8
     if concerns(p, audiences):
         base = max(base, 0.8 if (not countries or p.country in countries) else 0.35)
-    if age_skew == "young":
-        base *= 1.3 if p.age < 30 else 0.6 if p.age >= 45 else 1.0
-    elif age_skew == "old":
-        base *= 1.3 if p.age >= 50 else 0.6 if p.age < 30 else 1.0
+    # How often they get news where this story runs, against their country's average (their own
+    # survey answers, World Values Survey). Without survey views nothing is adjusted.
+    base *= views.news_attention(p.country, p.views, media or MEDIA)
     return max(0.0, min(0.97, base))
 
 
@@ -304,7 +306,7 @@ def assign(people: list[Persona], items: list[NewsItem], seed: Any) -> dict[str,
     """Each person's news: the items they came across, most important first."""
     out: dict[str, list[NewsItem]] = {}
     for p in people:
-        known = [it for it in items if draw(seed, p.id, it.id) < know_chance(p, it.countries, it.reach, it.audiences, it.age_skew)]
+        known = [it for it in items if draw(seed, p.id, it.id) < know_chance(p, it.countries, it.reach, it.audiences, it.media)]
         known.sort(key=lambda it: -it.score)
         out[p.id] = known[:PER_PERSON]
     weights = {p.id: max(p.weight, 1e-9) for p in people if p.influencer_voice is None}

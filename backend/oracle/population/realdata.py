@@ -96,6 +96,12 @@ def _within_major() -> dict[str, dict[str, float]]:
     return by_major
 
 
+def oc2_employed(iso: str) -> dict[str, float]:
+    """Employed people per 2-digit ISCO group as published (empty when not published)."""
+    oc2 = get(iso).get("oc2")
+    return {g: float(n) for g, n in oc2["employed"].items()} if oc2 else {}
+
+
 def employed_2digit(iso: str, workforce: float, isco_major_shares: dict[int, float]) -> tuple[dict[str, float], str]:
     """Employed people per 2-digit ISCO group, and where the numbers come from."""
     oc2 = get(iso).get("oc2")

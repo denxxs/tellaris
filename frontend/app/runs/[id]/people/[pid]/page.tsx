@@ -9,7 +9,7 @@ import { REACH_LABEL, fmtDay } from "@/components/run/NewsTimeline";
 import { Card, CardHead, Chip, ErrorNote, Pill, Skeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
-import { companyLabel, cx, int, money, people, pctSmart, shortJob, stanceFill, stanceText, titleCase } from "@/lib/format";
+import { companyLabel, cx, money, people, pctSmart, shortJob, stanceFill, stanceText, titleCase } from "@/lib/format";
 import type { FeedItem, Profile, Run } from "@/lib/types";
 
 const FACT_TEXT: Record<string, [string, string]> = {
@@ -277,7 +277,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                     <Fact label="Seniority">{titleCase(p.seniority)}</Fact>
                     <Fact label="Company">
                       {companyLabel(p.company_type)}
-                      {p.company_size > 1 && <span className="text-muted">, {int(p.company_size)} staff</span>}
+                      {p.company_size_text && p.company_size_text !== "1 person" && <span className="text-muted">, {p.company_size_text}</span>}
                     </Fact>
                     <Fact label="Sector">{titleCase(p.sector)}</Fact>
                     <Fact label="Earnings">
@@ -392,7 +392,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
               {data.meeting?.decision && (
                 <Card>
                   <CardHead title="The buying meeting they were in" aside={<Pill tone={data.meeting.decision.decision === "reject" ? "no" : data.meeting.decision.decision === "defer" ? "neutral" : "yes"}>{titleCase(data.meeting.decision.decision)}</Pill>}>
-                    {companyLabel(data.meeting.company_type ?? "")} in {countryName(data.meeting.country ?? "")}, {int(data.meeting.company_size)} staff.
+                    {companyLabel(data.meeting.company_type ?? "")} in {countryName(data.meeting.country ?? "")}{data.meeting.company_size_text ? `, ${data.meeting.company_size_text}` : ""}.
                   </CardHead>
                   <ul className="flex flex-col gap-3">
                     {(data.meeting.transcript ?? []).map((t, i) => (

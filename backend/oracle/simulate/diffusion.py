@@ -1,18 +1,45 @@
 """Who knows whom: the contact network the society talks over.
 
-How often a contact lives in another country comes from Meta's Social Connectedness Index: the
-share of a country's friendships that are with each country, itself included. Within a country,
-contacts are picked evenly (no data says who befriends whom by job). k, the number of contacts
-each person starts from, is a simulation setting, not a claim about the world.
+How many people someone talks to, of what ages and where (home, work, school, elsewhere) comes
+from the contact surveys extended to 177 countries by Prem et al. (2021): a person aged 30 in
+India has about 11 daily contacts with other adults. Which country a contact lives in comes from
+Meta's Social Connectedness Index (the share of a country's friendships with each country, itself
+included). Work contacts are people who also work, in the same sector where there are any; the
+rest are picked evenly among people of the right age in that country.
 """
 
 from __future__ import annotations
 
+from functools import lru_cache
+from typing import Any
+
 import networkx as nx
 import numpy as np
 
+from ..config import load_json
 from ..population.models import Persona
 from ..world.ties import friend_share
+
+
+@lru_cache(maxsize=1)
+def _contacts() -> dict[str, Any]:
+    try:
+        return load_json("contacts.json")
+    except FileNotFoundError:
+        return {"_meta": {"bands": [], "settings": []}, "countries": {}}
+
+
+def band(age: int) -> int:
+    return max(0, min(12, (age - 15) // 5))
+
+
+def daily_contacts(iso: str, age: int) -> dict[str, list[float]] | None:
+    """Mean daily contacts by setting with each adult age band (None = no data)."""
+    rec = _contacts()["countries"].get(iso)
+    if not rec:
+        return None
+    r = band(age)
+    return {s: rec[s][r] for s in _contacts()["_meta"]["settings"]}
 
 
 def country_mix(home: str, present: list[str]) -> dict[str, float]:
@@ -26,7 +53,11 @@ def country_mix(home: str, present: list[str]) -> dict[str, float]:
     return {c: v / total for c, v in shares.items()} if total else {home: 1.0}
 
 
-def build_network(people: list[Persona], k: int = 6, seed: int | None = None) -> nx.Graph:
+def _working(p: Persona) -> bool:
+    return p.seniority != "none"
+
+
+def build_network(people: list[Persona], seed: int | None = None) -> nx.Graph:
     rng = np.random.default_rng(seed)
     g = nx.Graph()
     for p in people:
@@ -36,22 +67,46 @@ def build_network(people: list[Persona], k: int = 6, seed: int | None = None) ->
         by_country.setdefault(p.country, []).append(p)
     present = sorted(by_country)
     mix = {c: country_mix(c, present) for c in present}
+    # People per (country, age band), and per (country, age band, sector) for work contacts.
+    by_band: dict[tuple[str, int], list[Persona]] = {}
+    by_work: dict[tuple[str, int], list[Persona]] = {}
+    by_sector: dict[tuple[str, int, str], list[Persona]] = {}
     for p in people:
-        countries_, probs = zip(*mix[p.country].items())
-        for _ in range(k // 2):
-            c = countries_[int(rng.choice(len(countries_), p=np.array(probs) / sum(probs)))]
-            pool = [q for q in by_country[c] if q.id != p.id]
-            if pool:
-                g.add_edge(p.id, pool[int(rng.integers(len(pool)))].id)
-    # Nobody is a hermit: everyone knows at least three people, drawn the same way.
-    ids = [p.id for p in people]
+        k = (p.country, band(p.age))
+        by_band.setdefault(k, []).append(p)
+        if _working(p):
+            by_work.setdefault(k, []).append(p)
+            by_sector.setdefault((*k, p.sector), []).append(p)
+
+    def nearest(pools: dict, country: str, b: int, *extra: str) -> list[Persona]:
+        for d in range(13):  # the closest age band that has anyone
+            for bb in (b - d, b + d):
+                pool = pools.get((country, bb, *extra))
+                if pool:
+                    return pool
+        return []
+
     for p in people:
-        countries_, probs = zip(*mix[p.country].items())
-        tries = 0
-        while g.degree(p.id) < min(3, len(ids) - 1) and tries < 20:
-            tries += 1
-            c = countries_[int(rng.choice(len(countries_), p=np.array(probs) / sum(probs)))]
-            pool = [q for q in by_country[c] if q.id != p.id]
+        rows = daily_contacts(p.country, p.age)
+        if rows is None:
+            continue
+        cells = [(s, b, m) for s, row in rows.items() for b, m in enumerate(row) if m > 0]
+        total = sum(m for *_, m in cells)
+        # Each tie has two ends, so each person starts half their contacts; the other half come
+        # from the people who pick them. Rounded at random so the average stays right.
+        n = int(total / 2 + rng.random())
+        if not n or not cells:
+            continue
+        probs = np.array([m for *_, m in cells]) / total
+        countries_, cprobs = zip(*mix[p.country].items())
+        cprobs = np.array(cprobs) / sum(cprobs)
+        for _ in range(n):
+            s, b, _m = cells[int(rng.choice(len(cells), p=probs))]
+            c = countries_[int(rng.choice(len(countries_), p=cprobs))]
+            pool: list[Persona] = []
+            if s == "work" and _working(p):
+                pool = nearest(by_sector, c, b, p.sector) or nearest(by_work, c, b)
+            pool = [q for q in (pool or nearest(by_band, c, b)) if q.id != p.id]
             if pool:
                 g.add_edge(p.id, pool[int(rng.integers(len(pool)))].id)
     return g

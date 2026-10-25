@@ -29,7 +29,7 @@ def occupation_headcount(iso: str, occupation_id: str) -> float | None:
     """People doing this job in this country, or None when no source exists."""
     c = countries()[iso]
     o = occupations().get(occupation_id)
-    if o is None:
+    if o is None or not c.simulatable:
         return UNKNOWN
     workforce = c.workforce_m * 1e6
     kind = getattr(o, "population", None)
@@ -55,7 +55,7 @@ def occupation_headcount(iso: str, occupation_id: str) -> float | None:
 def occupation_source(iso: str, occupation_id: str) -> str:
     c = countries()[iso]
     o = occupations().get(occupation_id)
-    if o is None:
+    if o is None or not c.simulatable:
         return "no data"
     kind = getattr(o, "population", None)
     if kind:
@@ -119,7 +119,10 @@ def segment_headcount(
         return UNKNOWN
     if not occupation_ids:
         adults = realdata.people_aged(iso, age_min or 15, age_max or 99, gender if gender in ("woman", "man") else "any")
-        return adults if adults is not None else countries()[iso].adults_m * 1e6
+        if adults is not None:
+            return adults
+        a = countries()[iso].adults_m
+        return a * 1e6 if a is not None else UNKNOWN
     total = 0.0
     for oid in occupation_ids:
         n = occupation_headcount(iso, oid)

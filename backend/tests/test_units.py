@@ -120,14 +120,39 @@ def test_population_weighting_uses_real_sizes():
     assert farmers > engineers * 5
 
 
-def test_equal_weighting_respects_group_weights():
+def test_company_sizes_come_from_data():
+    from oracle.population import firms
+    # Shares across all size classes add up for every job group.
+    for iso in ("USA", "IND", "NGA", "BRA"):
+        assert abs(sum(p for *_, p in firms.ladder(iso, 2)) - 1) < 0.01, iso
+    # Indian elementary workers mostly work in tiny workplaces; Brazilian professionals far less so.
+    small = lambda iso, g: sum(p for lo, hi, p in firms.ladder(iso, g) if hi is not None and hi <= 9)  # noqa: E731
+    assert small("NGA", 9) > 0.8 and small("BRA", 2) < 0.5
+    spec = make_spec(segments=[Segment(name="Engineers", occupations=["software_engineer"], countries=["USA"])], general_population_share=0)
+    people = PopulationBuilder(spec, [], seed=3).build(150)
+    assert all(p.company_size and p.company_size_text for p in people)
+    assert not any(p.company_type in ("startup", "scaleup") for p in people)  # age of firm isn't size: never assumed
+    assert len({tuple(p.company_size) for p in people}) >= 5
+
+
+def test_public_sector_share_comes_from_data():
+    spec = make_spec(segments=[Segment(name="Teachers", occupations=["teacher"], countries=["FRA"])], targets=["FRA"], general_population_share=0)
+    people = PopulationBuilder(spec, [], seed=3).build(200)
+    gov = sum(p.company_type == "government" for p in people) / len(people)
+    from oracle.population import firms
+    from oracle.world.countries import occupations
+    expected = firms.public_share("FRA", occupations()["teacher"].isco08)
+    assert 0.4 < expected < 0.95 and abs(gov - expected) < 0.1
+
+
+def test_equal_weighting_counts_every_group_the_same():
     spec = make_spec(segments=[
         Segment(name="Founders", occupations=["founder_b2b_saas"], countries=["USA"]),
         Segment(name="IT analysts", occupations=["it_services_analyst"], countries=["India"]),
-    ], target_weights={"USA": 0.5, "IND": 0.5}, general_population_share=0)
+    ], general_population_share=0)
     people = PopulationBuilder(spec, [], seed=4, weighting="equal").build(200)
     founders = sum(p.weight for p in people if p.segment == "Founders")
-    assert 0.3 < founders < 0.7
+    assert abs(founders - 0.5) < 1e-6
 
 
 def test_every_country_is_covered():
@@ -138,7 +163,17 @@ def test_every_country_is_covered():
     for iso in ["PER", "KAZ", "KEN", "TWN", "ETH", "URY", "FJI", "MNG"]:
         assert iso in cs, iso
         assert expand([iso]), f"no influencers for {iso}"
-    assert all(abs(sum(c.isco) - 1) < 0.02 for c in cs.values())
+    sim = [c for c in cs.values() if c.simulatable]
+    assert len(sim) >= 185
+    assert all(abs(sum(c.isco) - 1) < 0.02 for c in sim)
+    # No guessed figures: territories without labour-force data are left empty, not filled in.
+    assert cs["AND"].workforce_m is None and not cs["AND"].simulatable
+
+
+def test_territories_without_labour_data_are_not_simulated():
+    spec = make_spec(targets=["AND", "FRA"])
+    assert spec.targets == ["FRA"]
+    assert spec.target_weights == {"FRA": 1.0}
 
 
 def test_headcounts_are_plausible():
@@ -162,6 +197,19 @@ def test_population_is_seeded():
     a = PopulationBuilder(spec, infl, seed=7).build(50)
     b = PopulationBuilder(spec, infl, seed=7).build(50)
     assert [p.model_dump() for p in a] == [p.model_dump() for p in b]
+
+
+def test_contacts_follow_contact_surveys():
+    from oracle.simulate.diffusion import build_network, daily_contacts
+    spec = make_spec(segments=[Segment(name="Everyone", occupations=[])], targets=["IND"], general_population_share=0)
+    people = PopulationBuilder(spec, [], seed=2).build(400)
+    g = build_network(people, seed=2)
+    mean_deg = sum(d for _, d in g.degree()) / len(people)
+    expected = sum(sum(sum(row) for row in daily_contacts("IND", p.age).values()) for p in people) / len(people)
+    assert abs(mean_deg - expected) / expected < 0.15  # a few draws land on someone already known
+    young = [g.degree(p.id) for p in people if p.age < 25]
+    old = [g.degree(p.id) for p in people if p.age >= 65]
+    assert sum(young) / len(young) > sum(old) / len(old)  # the surveys: the young talk to more people
 
 
 def test_general_population_uses_country_mix():

@@ -34,35 +34,32 @@ class Country(BaseModel):
     capital: str = ""
     anchor: list[float] | None = None
     blocs: list[str]
-    currency: str = ""
-    languages: list[str] = Field(default_factory=list)
     population_m: float
-    workforce_m: float
+    workforce_m: float | None = None  # None: no labour-force data, so the country can't be simulated
     gdp_pc_usd: float
-    internet_pct: float
-    english: float
-    median_age: float
+    internet_pct: float | None = None
     pop65: float | None = None
     pop014: float | None = None
     sector_shares: list[float | None] = Field(default_factory=list)
-    isco: list[float]
+    isco: list[float] | None = None
     isco_source: str = ""
-    digital: float
-    regulation: float
-    saas: float
-    startups: float
-    price_sensitivity: float
-    tech_trust: float
     names: dict[str, list[str]]
     curated: bool = False
 
+    @property
+    def simulatable(self) -> bool:
+        return self.workforce_m is not None and self.isco is not None
+
     def isco_shares(self) -> dict[int, float]:
+        if not self.isco:
+            return {}
         total = sum(self.isco) or 1.0
         return {i + 1: v / total for i, v in enumerate(self.isco)}
 
     @property
-    def adults_m(self) -> float:
-        return self.population_m * (1 - (self.pop014 if self.pop014 is not None else 0.25))
+    def adults_m(self) -> float | None:
+        """People aged 15+, in millions (None when the age structure isn't published)."""
+        return self.population_m * (1 - self.pop014) if self.pop014 is not None else None
 
     def summary(self) -> dict[str, Any]:
         return self.model_dump(exclude={"names", "aliases"})
@@ -228,7 +225,7 @@ def country_blocs(iso: str) -> list[str]:
 def global_sample(depth: str = "quick") -> list[str]:
     """Countries for a whole-world run: every region represented, then the largest by adults
     until most of the world's adults are covered. quick = 16 countries, deep = 32."""
-    cs = sorted(countries().values(), key=lambda c: -c.adults_m)
+    cs = sorted((c for c in countries().values() if c.simulatable and c.adults_m), key=lambda c: -c.adults_m)
     limit = 32 if depth == "deep" else 20
     per_region = 3 if depth == "deep" else 1
     eu_west = set(blocs()["EU"].members) | {"GBR", "CHE", "NOR"} if "EU" in blocs() else {"GBR"}
@@ -254,5 +251,5 @@ def global_sample(depth: str = "quick") -> list[str]:
 def world_coverage(isos: list[str]) -> float:
     """Share of the world's adults living in these countries."""
     cs = countries()
-    total = sum(c.adults_m for c in cs.values()) or 1
-    return sum(cs[i].adults_m for i in isos if i in cs) / total
+    total = sum(c.adults_m or 0 for c in cs.values()) or 1
+    return sum(cs[i].adults_m or 0 for i in isos if i in cs) / total

@@ -19,7 +19,7 @@ TODAY = date.today()
 def person(pid, country="IND", sector="finance", occupation="Financial Analyst", age=35, openness=0.5):
     return Persona(
         id=pid, country=country, country_name=country, segment="adults", segment_index=0, occupation_id="x", occupation=occupation,
-        isco=2411, sector=sector, company_type="enterprise", company_size=500, seniority="mid", buyer_role="user", age=age, gender="female",
+        isco=2411, sector=sector, company_type="enterprise", company_size=[250, 499], seniority="mid", buyer_role="user", age=age, gender="female",
         income_usd=20000, income_band="middle",
         traits=Traits(tech_affinity=0.5, skepticism=0.5, risk_appetite=0.5, price_sensitivity=0.5, conformity=0.5, openness=openness, budget_authority=0.2),
     )
@@ -42,7 +42,6 @@ def test_niche_news_reaches_the_people_it_concerns():
     assert know_chance(brazilian, *rbi) < 0.4
     fuel = (["IND"], "mass", [])
     assert know_chance(student, *fuel) > 0.6 and know_chance(brazilian, *fuel) < 0.25
-    assert know_chance(student, ["IND"], "broad", [], "young") > know_chance(person("o", sector="retail", occupation="Shopkeeper", age=60), ["IND"], "broad", [], "young")
 
 
 def test_assign_is_reproducible_and_counts_who_knows():

@@ -46,10 +46,35 @@ def test_views_reach_the_prompt_and_drivers(tmp_path, monkeypatch):
     from oracle.population.models import Persona
 
     p = Persona(id="p1", country="KEN", country_name="Kenya", segment="s", segment_index=0, occupation_id="teacher",
-                occupation="Teacher", isco=2, sector="education", company_type="public", company_size=1, seniority="staff",
+                occupation="Teacher", isco=2, sector="education", company_type="public", seniority="staff",
                 buyer_role="none", age=31, gender="woman", views={"trust_people": 1, "news_social": 1}, views_from={"year": 2021})
     card = p.card()
     assert "Thinks most people can be trusted" in card and "WVS 2021" in card and "Social media: daily" in card
     assert p.model_dump()["views_text"]["news"] == ["Social media: daily"]
     assert views.scores(p.views) == {"trust_people": 1.0, "news_social": 4.0}
     views.pool.cache_clear()
+
+
+def test_news_reach_follows_their_own_news_habits(tmp_path, monkeypatch):
+    _pool(tmp_path, monkeypatch)
+    views._country_days.cache_clear()
+    from oracle.research.news import know_chance
+
+    from oracle.population.models import Persona
+
+    def kenyan(pid, answers):
+        return Persona(id=pid, country="KEN", country_name="Kenya", segment="s", segment_index=0, occupation_id="x",
+                       occupation="Teacher", isco=2, sector="education", company_type="smb", seniority="staff",
+                       buyer_role="none", age=40, gender="woman", views=answers)
+
+    daily = kenyan("a", {"news_social": 1})
+    never = kenyan("b", {"news_social": 5})
+    unknown = kenyan("c", {})
+    # Everyone in the pool who answered gets news from social media daily, so daily is the average.
+    assert views.news_attention("KEN", daily.views, ["social"]) == 1.0
+    assert views.news_attention("KEN", never.views, ["social"]) == 0.0
+    assert views.news_attention("FRA", daily.views, ["social"]) == 1.0  # country not surveyed: no adjustment
+    k = lambda p: know_chance(p, ["KEN"], "broad", [], ["social"])  # noqa: E731
+    assert k(daily) == k(unknown) > k(never) == 0
+    views.pool.cache_clear()
+    views._country_days.cache_clear()
