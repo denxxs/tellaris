@@ -18,6 +18,10 @@ Optional: the joint EVS/WVS 2017-2022 file (v5.0, CSV) from
 https://www.worldvaluessurvey.org/WVSEVSjoint2017.jsp in backend/var/datasets/wvs_evs/ adds the
 European Values Study countries that WVS7 doesn't cover (same licence terms). Only the questions
 both surveys share are in it, so those respondents leave the others empty.
+
+Optional: regional barometers (Afrobarometer, Latinobarometro, Arab Barometer, Asian Barometer) in
+backend/var/datasets/<name>/, read by scripts/barometers.py, add countries neither WVS nor EVS
+covers, with only the questions that pass a comparison with WVS (docs/views_harmonisation.json).
 """
 
 from __future__ import annotations
@@ -36,6 +40,7 @@ from oracle.population.views import MATCH_COLUMNS, POOL_PATH, QUESTIONS  # noqa:
 from oracle.world.countries import countries  # noqa: E402
 
 FOLDER = ROOT / "var" / "datasets"
+REPORT_PATH = ROOT.parent / "docs" / "views_harmonisation.json"  # aggregate test results only (no microdata)
 
 
 # Joint EVS/WVS 2017-2022 (v5.0): adds the European Values Study countries WVS7 doesn't cover.
@@ -100,7 +105,9 @@ def main() -> None:
     for iso, g in df.groupby("B_COUNTRY_ALPHA"):
         if iso not in known:
             continue  # Northern Ireland: the UK has its own sample
-        out[iso] = {"year": int(g["A_YEAR"].max()), "source": "WVS7", "rows": _rows(g.rename(columns={"W_WEIGHT": "W"}), answer_cols)}
+        rows = _rows(g.rename(columns={"W_WEIGHT": "W"}), answer_cols)
+        out[iso] = {"year": int(g["A_YEAR"].max()), "source": "World Values Survey", "rows": rows,
+                    "sources": [{"name": "World Values Survey", "year": int(g["A_YEAR"].max())}], "row_src": [0] * len(rows)}
     sources = [f"World Values Survey wave 7, {zips[-1].name}"]
 
     joint = sorted(FOLDER.glob(JOINT_GLOB))
@@ -119,10 +126,52 @@ def main() -> None:
                 continue  # WVS7 has the fuller questionnaire for countries in both
             g = g.where(g >= 0)  # negative codes are missing answers
             g["Q279"] = g["Q279"].fillna(0)
-            out[iso] = {"year": int(g["year"].max()), "source": "EVS 2017 (joint EVS/WVS)", "rows": _rows(g, answer_cols)}
+            rows = _rows(g, answer_cols)
+            out[iso] = {"year": int(g["year"].max()), "source": "European Values Study", "rows": rows,
+                        "sources": [{"name": "European Values Study", "year": int(g["year"].max())}], "row_src": [0] * len(rows)}
             added.append(iso)
         sources.append(f"Joint EVS/WVS 2017-2022 v5.0 (EVS countries not in WVS7: {len(added)})")
         print(f"EVS: added {len(added)} countries: {', '.join(sorted(added))}")
+
+    # Regional barometers, for countries WVS and EVS don't cover. Only questions that came out close
+    # to WVS in countries both surveyed are kept (barometers.validate); the test is saved for the paper.
+    report = {}
+    try:
+        import barometers
+    except ImportError:
+        barometers = None
+    if barometers is not None:
+        report = barometers.validate(df)
+        base = set(out)
+        added: dict[str, list[str]] = {}
+        series_done: set[tuple[str, str]] = set()  # (survey series, country): newest wave only
+        for src in barometers.SOURCES:  # listed newest first within each series
+            d = barometers.load(src.name)
+            if d.empty:
+                continue
+            series = src.name.split(" Wave")[0].split(" Round")[0].split(" 20")[0]
+            kept = [c for c, r in report.get(src.name, {}).items() if r["kept"]]
+            for iso, g in d.groupby("iso"):
+                if iso in base or iso not in known or (series, iso) in series_done:
+                    continue
+                series_done.add((series, iso))
+                rows = _rows(g[["W", "Q260", "Q262", "Q279", *kept]], answer_cols)
+                rec = out.setdefault(iso, {"year": 0, "source": "", "rows": [], "sources": [], "row_src": []})
+                rec["row_src"] += [len(rec["sources"])] * len(rows)
+                rec["sources"].append({"name": src.label, "year": int(g["year"].max())})
+                rec["rows"] += rows
+                rec["year"] = max(rec["year"], int(g["year"].max()))
+                rec["source"] = " + ".join(x for x in (rec["source"], src.label) if x)
+                added.setdefault(src.name, []).append(iso)
+        for name, isos in added.items():
+            sources.append(f"{name} ({len(isos)} countries not in WVS/EVS)")
+            print(f"{name}: added {', '.join(sorted(isos))}")
+        REPORT_PATH.write_text(json.dumps({
+            "note": "Gap between a barometer's and WVS7's average answer (0-1 scale) in countries both surveyed. "
+                    "A question is used for a barometer only when the median gap is at most 0.10 over 3+ countries.",
+            "sources": {s.name: s.citation for s in barometers.SOURCES},
+            "questions": {name: {q: {k: v for k, v in r.items()} for q, r in items.items()} for name, items in report.items()},
+        }, indent=1), encoding="utf-8")
 
     POOL_PATH.parent.mkdir(parents=True, exist_ok=True)
     POOL_PATH.write_text(json.dumps({

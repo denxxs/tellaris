@@ -84,8 +84,8 @@ class Persona(BaseModel):
     income_band: str = ""
     traits: Traits = Field(default_factory=Traits)
     facts: dict[str, bool] = Field(default_factory=dict)  # digital and money facts, drawn from Global Findex
-    views: dict[str, int] = Field(default_factory=dict)  # answers of a matched real WVS respondent (see views.py)
-    views_from: dict = Field(default_factory=dict)  # {"year": survey year, "matched_on": [...]}
+    views: dict[str, int] = Field(default_factory=dict)  # answers of a matched real survey respondent (see views.py)
+    views_from: dict = Field(default_factory=dict)  # {"year", "source": survey name, "matched_on": [...]}
     exposures: list[Exposure] = Field(default_factory=list)
     is_buyer: bool = True
     weight: float = 1.0
@@ -158,7 +158,7 @@ class Persona(BaseModel):
 
             said = view_lines(self.views, "views")
             if said:
-                lines.append(f"Views (answers of a real survey respondent like them, WVS {self.views_from.get('year', '')}): " + "; ".join(said))
+                lines.append(f"Views (answers of a real survey respondent like them, {self.views_from.get('source') or 'World Values Survey'} {self.views_from.get('year', '')}): " + "; ".join(said))
             news = view_lines(self.views, "news")
             if news:
                 lines.append("How often they get news from: " + "; ".join(news))

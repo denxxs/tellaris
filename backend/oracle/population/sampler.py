@@ -329,7 +329,7 @@ class PopulationBuilder:
             occupation_id=o.id, occupation=o.title, isco=o.isco, sector=sector, company_type=ctype,
             company_size=size, seniority=seniority, buyer_role=o.buyer_role, age=age, gender=sex,
             income_usd=income, income_band=band, traits=Traits(), facts=facts, exposures=exposures,
-            views=m.answers if m else {}, views_from={"year": m.year, "matched_on": m.matched_on} if m else {},
+            views=m.answers if m else {}, views_from={"year": m.year, "source": m.source, "matched_on": m.matched_on} if m else {},
             is_buyer=seg.is_buyer if voice is None else False, influencer_voice=voice,
             group_trait=seg.trait if voice is None else None,
         )

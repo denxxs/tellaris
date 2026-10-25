@@ -1,0 +1,361 @@
+{
+ "note": "Gap between a barometer's and WVS7's average answer (0-1 scale) in countries both surveyed. A question is used for a barometer only when the median gap is at most 0.10 over 3+ countries.",
+ "sources": {
+  "Afrobarometer Round 10 (2024-25)": "Afrobarometer Data, Round 10 merged dataset (38 countries), 2026. www.afrobarometer.org",
+  "Latinobarometro 2024": "Latinobarometer Study 2024. Latinobarometer Corporation, v2024.1 (v20250817).",
+  "Arab Barometer Wave VIII (2023-24)": "Arab Barometer Wave VIII (2023-2024), English release v3. www.arabbarometer.org",
+  "Arab Barometer Wave VII (2021-22)": "Arab Barometer Wave VII (2021-2022), English release v6. www.arabbarometer.org",
+  "Arab Barometer Wave V (2018-19)": "Arab Barometer Wave V (2018-2019), English release v2. www.arabbarometer.org",
+  "Arab Barometer Wave IV (2016-17)": "Arab Barometer Wave IV (2016-2017), English. www.arabbarometer.org",
+  "Asian Barometer Wave 6 (2020-25)": "Asian Barometer Survey Wave 6, country releases 2023-2026. www.asianbarometer.org"
+ },
+ "questions": {
+  "Afrobarometer Round 10 (2024-25)": {
+   "Q203": {
+    "countries": 5,
+    "median_gap": 0.076,
+    "max_gap": 0.237,
+    "gaps": {
+     "KEN": 0.076,
+     "MAR": 0.02,
+     "NGA": 0.138,
+     "TUN": 0.237,
+     "ZWE": 0.035
+    },
+    "kept": true
+   },
+   "Q202": {
+    "countries": 5,
+    "median_gap": 0.216,
+    "max_gap": 0.261,
+    "gaps": {
+     "KEN": 0.216,
+     "MAR": 0.234,
+     "NGA": 0.261,
+     "TUN": 0.031,
+     "ZWE": 0.093
+    },
+    "kept": false
+   },
+   "Q201": {
+    "countries": 5,
+    "median_gap": 0.173,
+    "max_gap": 0.299,
+    "gaps": {
+     "KEN": 0.299,
+     "MAR": 0.153,
+     "NGA": 0.221,
+     "TUN": 0.173,
+     "ZWE": 0.165
+    },
+    "kept": false
+   },
+   "Q207": {
+    "countries": 5,
+    "median_gap": 0.061,
+    "max_gap": 0.194,
+    "gaps": {
+     "KEN": 0.194,
+     "MAR": 0.061,
+     "NGA": 0.015,
+     "TUN": 0.008,
+     "ZWE": 0.075
+    },
+    "kept": true
+   },
+   "Q206": {
+    "countries": 5,
+    "median_gap": 0.066,
+    "max_gap": 0.275,
+    "gaps": {
+     "KEN": 0.275,
+     "MAR": 0.021,
+     "NGA": 0.066,
+     "TUN": 0.07,
+     "ZWE": 0.002
+    },
+    "kept": true
+   }
+  },
+  "Latinobarometro 2024": {
+   "Q57": {
+    "countries": 11,
+    "median_gap": 0.043,
+    "max_gap": 0.156,
+    "gaps": {
+     "ARG": 0.043,
+     "BOL": 0.04,
+     "BRA": 0.016,
+     "CHL": 0.078,
+     "COL": 0.108,
+     "ECU": 0.022,
+     "GTM": 0.023,
+     "MEX": 0.156,
+     "PER": 0.058,
+     "URY": 0.054,
+     "VEN": 0.005
+    },
+    "kept": true
+   },
+   "Q71": {
+    "countries": 11,
+    "median_gap": 0.037,
+    "max_gap": 0.272,
+    "gaps": {
+     "ARG": 0.014,
+     "BOL": 0.174,
+     "BRA": 0.132,
+     "CHL": 0.006,
+     "COL": 0.018,
+     "ECU": 0.037,
+     "GTM": 0.064,
+     "MEX": 0.272,
+     "PER": 0.033,
+     "URY": 0.048,
+     "VEN": 0.004
+    },
+    "kept": true
+   },
+   "Q67": {
+    "countries": 11,
+    "median_gap": 0.046,
+    "max_gap": 0.129,
+    "gaps": {
+     "ARG": 0.046,
+     "BOL": 0.032,
+     "BRA": 0.072,
+     "CHL": 0.091,
+     "COL": 0.058,
+     "ECU": 0.02,
+     "GTM": 0.078,
+     "MEX": 0.027,
+     "PER": 0.045,
+     "URY": 0.129,
+     "VEN": 0.02
+    },
+    "kept": true
+   },
+   "Q66": {
+    "countries": 11,
+    "median_gap": 0.057,
+    "max_gap": 0.11,
+    "gaps": {
+     "ARG": 0.06,
+     "BOL": 0.06,
+     "BRA": 0.11,
+     "CHL": 0.006,
+     "COL": 0.057,
+     "ECU": 0.008,
+     "GTM": 0.056,
+     "MEX": 0.026,
+     "PER": 0.075,
+     "URY": 0.108,
+     "VEN": 0.017
+    },
+    "kept": true
+   },
+   "Q240": {
+    "countries": 11,
+    "median_gap": 0.033,
+    "max_gap": 0.089,
+    "gaps": {
+     "ARG": 0.005,
+     "BOL": 0.034,
+     "BRA": 0.089,
+     "CHL": 0.053,
+     "COL": 0.016,
+     "ECU": 0.033,
+     "GTM": 0.026,
+     "MEX": 0.051,
+     "PER": 0.003,
+     "URY": 0.026,
+     "VEN": 0.069
+    },
+    "kept": true
+   }
+  },
+  "Arab Barometer Wave VIII (2023-24)": {
+   "Q57": {
+    "countries": 5,
+    "median_gap": 0.049,
+    "max_gap": 0.146,
+    "gaps": {
+     "IRQ": 0.049,
+     "JOR": 0.032,
+     "LBN": 0.035,
+     "MAR": 0.146,
+     "TUN": 0.079
+    },
+    "kept": true
+   },
+   "Q71": {
+    "countries": 5,
+    "median_gap": 0.076,
+    "max_gap": 0.197,
+    "gaps": {
+     "IRQ": 0.076,
+     "JOR": 0.029,
+     "LBN": 0.197,
+     "MAR": 0.041,
+     "TUN": 0.141
+    },
+    "kept": true
+   }
+  },
+  "Arab Barometer Wave VII (2021-22)": {
+   "Q57": {
+    "countries": 7,
+    "median_gap": 0.057,
+    "max_gap": 0.098,
+    "gaps": {
+     "EGY": 0.056,
+     "IRQ": 0.032,
+     "JOR": 0.079,
+     "LBN": 0.057,
+     "LBY": 0.098,
+     "MAR": 0.055,
+     "TUN": 0.076
+    },
+    "kept": true
+   },
+   "Q71": {
+    "countries": 6,
+    "median_gap": 0.082,
+    "max_gap": 0.199,
+    "gaps": {
+     "IRQ": 0.001,
+     "JOR": 0.096,
+     "LBN": 0.199,
+     "LBY": 0.022,
+     "MAR": 0.067,
+     "TUN": 0.195
+    },
+    "kept": true
+   }
+  },
+  "Arab Barometer Wave V (2018-19)": {
+   "Q57": {
+    "countries": 7,
+    "median_gap": 0.063,
+    "max_gap": 0.263,
+    "gaps": {
+     "EGY": 0.263,
+     "IRQ": 0.026,
+     "JOR": 0.063,
+     "LBN": 0.061,
+     "LBY": 0.024,
+     "MAR": 0.063,
+     "TUN": 0.063
+    },
+    "kept": true
+   },
+   "Q71": {
+    "countries": 6,
+    "median_gap": 0.036,
+    "max_gap": 0.205,
+    "gaps": {
+     "IRQ": 0.041,
+     "JOR": 0.031,
+     "LBN": 0.057,
+     "LBY": 0.205,
+     "MAR": 0.003,
+     "TUN": 0.013
+    },
+    "kept": true
+   }
+  },
+  "Arab Barometer Wave IV (2016-17)": {
+   "Q57": {
+    "countries": 5,
+    "median_gap": 0.041,
+    "max_gap": 0.212,
+    "gaps": {
+     "EGY": 0.212,
+     "JOR": 0.018,
+     "LBN": 0.016,
+     "MAR": 0.041,
+     "TUN": 0.057
+    },
+    "kept": true
+   },
+   "Q71": {
+    "countries": 4,
+    "median_gap": 0.133,
+    "max_gap": 0.17,
+    "gaps": {
+     "JOR": 0.076,
+     "LBN": 0.17,
+     "MAR": 0.107,
+     "TUN": 0.158
+    },
+    "kept": false
+   },
+   "Q202": {
+    "countries": 5,
+    "median_gap": 0.092,
+    "max_gap": 0.185,
+    "gaps": {
+     "EGY": 0.185,
+     "JOR": 0.042,
+     "LBN": 0.018,
+     "MAR": 0.1,
+     "TUN": 0.092
+    },
+    "kept": true
+   },
+   "Q201": {
+    "countries": 5,
+    "median_gap": 0.019,
+    "max_gap": 0.088,
+    "gaps": {
+     "EGY": 0.001,
+     "JOR": 0.019,
+     "LBN": 0.014,
+     "MAR": 0.065,
+     "TUN": 0.088
+    },
+    "kept": true
+   }
+  },
+  "Asian Barometer Wave 6 (2020-25)": {
+   "Q57": {
+    "countries": 11,
+    "median_gap": 0.072,
+    "max_gap": 0.389,
+    "gaps": {
+     "AUS": 0.043,
+     "IDN": 0.389,
+     "JPN": 0.036,
+     "KOR": 0.006,
+     "MNG": 0.149,
+     "MYS": 0.145,
+     "PHL": 0.023,
+     "SGP": 0.111,
+     "THA": 0.072,
+     "TWN": 0.101,
+     "VNM": 0.062
+    },
+    "kept": true
+   },
+   "Q71": {
+    "countries": 11,
+    "median_gap": 0.058,
+    "max_gap": 0.235,
+    "gaps": {
+     "AUS": 0.058,
+     "IDN": 0.127,
+     "JPN": 0.128,
+     "KOR": 0.072,
+     "MNG": 0.055,
+     "MYS": 0.029,
+     "PHL": 0.136,
+     "SGP": 0.036,
+     "THA": 0.235,
+     "TWN": 0.006,
+     "VNM": 0.034
+    },
+    "kept": true
+   }
+  }
+ }
+}

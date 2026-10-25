@@ -115,6 +115,7 @@ class Match:
     answers: dict[str, int]
     year: int
     matched_on: list[str] = field(default_factory=list)
+    source: str = "World Values Survey"  # which survey the respondent answered
 
 
 @lru_cache(maxsize=1)
@@ -126,8 +127,11 @@ def pool() -> dict | None:
     out = {}
     for iso, c in data["countries"].items():
         rows = c["rows"]
+        sources = c.get("sources") or [{"name": "World Values Survey", "year": c["year"]}]
         out[iso] = {
             "year": c["year"],
+            "sources": sources,
+            "row_src": np.array(c.get("row_src") or [0] * len(rows), dtype=int),
             "sex": np.array([r[0] for r in rows]),
             "age": np.array([r[1] for r in rows]),
             "work": np.array([r[2] for r in rows]),
@@ -196,7 +200,8 @@ def match(iso: str, rng: np.random.Generator, *, sex: str, age: int, population:
             pick = int(idx[rng.choice(len(idx), p=w / w.sum())])
             if population in WORK_OF or not bool((c["occ"] >= 0).any()):
                 on = [x for x in on if x != "occupation"]
-            return Match(answers=dict(c["answers"][pick]), year=c["year"], matched_on=on)
+            src = c["sources"][int(c["row_src"][pick])]
+            return Match(answers=dict(c["answers"][pick]), year=int(src["year"]), matched_on=on, source=src["name"])
     return None
 
 

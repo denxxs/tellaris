@@ -39,7 +39,7 @@ settings with a sensitivity test. Status: done, open, or setting.
 | Public sector share | ~105 | Same, plus a tested model | ILOSTAT | open |
 | Detailed jobs inside ISCO groups | US mix everywhere | ~15 own, rest borrowed and tested | UK ONS, Canada and Australia censuses, Brazil PNAD, Mexico ENOE, Chile, Peru, Colombia | open |
 | Earnings by job | ~130 | All, labelled | ILOSTAT, ILO modelled | open |
-| Survey views | 91 (WVS7 65 + EVS 26 from the joint file; EVS respondents lack news habits, occupation and some attitudes) | ~150 own, rest borrowed from the most similar surveyed country (flagged, tested) | Next: Afrobarometer, Arab Barometer (downloaded), Latinobarometro (downloaded), Asian Barometer (downloaded) | open |
+| Survey views | 137: WVS7 65, EVS 26, Afrobarometer R10 33, Latinobarómetro 2024 6, Arab Barometer 7, Asian Barometer 1. Barometer questions kept only if they match WVS in shared countries (median gap <= 0.10; docs/views_harmonisation.json); others stay empty | Remaining ~50 countries: borrow from the most similar surveyed country (flagged, tested), or stay empty | Joint EVS/WVS, Afrobarometer, Latinobarómetro, Arab Barometer, Asian Barometer (research use, user downloads) | open |
 | Daily contacts | Prem projections for 176 (means); spread from 10 diary surveys, median elsewhere | Means from real surveys where they exist | socialcontactdata.org (CC BY only) | open |
 | Friendships | 178 measured, 24 estimated | Better estimates (target: 65% within 2x) | UNESCO students abroad, UN Tourism arrivals, national migrant counts | open |
 | Services trade | 786 lists estimated | Partner-reported figures | Eurostat, OECD | open |
