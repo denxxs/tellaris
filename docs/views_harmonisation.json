@@ -2,6 +2,7 @@
  "note": "Gap between a barometer's and WVS7's average answer (0-1 scale) in countries both surveyed. A question is used for a barometer only when the median gap is at most 0.10 over 3+ countries.",
  "sources": {
   "Afrobarometer Round 10 (2024-25)": "Afrobarometer Data, Round 10 merged dataset (38 countries), 2026. www.afrobarometer.org",
+  "Afrobarometer Round 9 (2021-23)": "Afrobarometer Data, Round 9 merged dataset (39 countries), 2023 (updated 2025). www.afrobarometer.org",
   "Latinobarometro 2024": "Latinobarometer Study 2024. Latinobarometer Corporation, v2024.1 (v20250817).",
   "Arab Barometer Wave VIII (2023-24)": "Arab Barometer Wave VIII (2023-2024), English release v3. www.arabbarometer.org",
   "Arab Barometer Wave VII (2021-22)": "Arab Barometer Wave VII (2021-2022), English release v6. www.arabbarometer.org",
@@ -73,6 +74,78 @@
      "NGA": 0.066,
      "TUN": 0.07,
      "ZWE": 0.002
+    },
+    "kept": true
+   }
+  },
+  "Afrobarometer Round 9 (2021-23)": {
+   "Q203": {
+    "countries": 6,
+    "median_gap": 0.085,
+    "max_gap": 0.207,
+    "gaps": {
+     "ETH": 0.198,
+     "KEN": 0.019,
+     "MAR": 0.057,
+     "NGA": 0.113,
+     "TUN": 0.207,
+     "ZWE": 0.035
+    },
+    "kept": true
+   },
+   "Q202": {
+    "countries": 6,
+    "median_gap": 0.189,
+    "max_gap": 0.264,
+    "gaps": {
+     "ETH": 0.264,
+     "KEN": 0.224,
+     "MAR": 0.166,
+     "NGA": 0.212,
+     "TUN": 0.07,
+     "ZWE": 0.127
+    },
+    "kept": false
+   },
+   "Q201": {
+    "countries": 6,
+    "median_gap": 0.146,
+    "max_gap": 0.265,
+    "gaps": {
+     "ETH": 0.078,
+     "KEN": 0.265,
+     "MAR": 0.099,
+     "NGA": 0.205,
+     "TUN": 0.158,
+     "ZWE": 0.134
+    },
+    "kept": false
+   },
+   "Q206": {
+    "countries": 6,
+    "median_gap": 0.084,
+    "max_gap": 0.273,
+    "gaps": {
+     "ETH": 0.088,
+     "KEN": 0.273,
+     "MAR": 0.012,
+     "NGA": 0.082,
+     "TUN": 0.085,
+     "ZWE": 0.002
+    },
+    "kept": true
+   },
+   "Q207": {
+    "countries": 6,
+    "median_gap": 0.088,
+    "max_gap": 0.276,
+    "gaps": {
+     "ETH": 0.13,
+     "KEN": 0.276,
+     "MAR": 0.096,
+     "NGA": 0.081,
+     "TUN": 0.001,
+     "ZWE": 0.066
     },
     "kept": true
    }
@@ -357,5 +430,14 @@
     "kept": true
    }
   }
+ },
+ "countries_without_a_survey": {
+  "rule": "3 closest WVS7 countries by income per person in the same World Bank region (anywhere if those differ by more than e^1.0 in income)",
+  "tested_on": 65,
+  "median_gap": 0.077,
+  "mean_gap": 0.082,
+  "p90_gap": 0.117,
+  "baseline_random_same_region_median_gap": 0.109,
+  "note": "Gap = mean over questions of |average answer of the stand-ins - real average answer| on a 0-1 scale, each WVS7 country hidden in turn. Also tried: 1, 2 or 5 stand-ins; closest income anywhere; strongest Meta friendship tie (all worse or no better). Checked again on 72 barometer-only countries (their own questions): median gap 0.088 with this rule vs 0.091 staying in the region; Qatar 0.18 vs 0.23, so rich Gulf states take high-income stand-ins rather than poorer Arab neighbours."
  }
 }

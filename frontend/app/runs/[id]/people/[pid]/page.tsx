@@ -327,7 +327,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                 {(p.views_text?.views?.length ?? 0) > 0 && (
                   <Card>
                     <CardHead title="Their views">
-                      Answers of a real {p.country_name} respondent to the {p.views_from?.source ?? "World Values Survey"} ({p.views_from?.year}), matched on{" "}
+                      {p.views_from?.borrowed_from_name
+                        ? `No survey covers ${p.country_name}, so these are the answers of a real respondent in ${p.views_from.borrowed_from_name}, the most similar surveyed country, to the ${p.views_from?.source ?? "World Values Survey"} (${p.views_from?.year}), matched on `
+                        : `Answers of a real ${p.country_name} respondent to the ${p.views_from?.source ?? "World Values Survey"} (${p.views_from?.year}), matched on `}
                       {(p.views_from?.matched_on ?? []).join(", ") || "country"}.
                     </CardHead>
                     <ul className="flex flex-col gap-1.5 text-[14px] leading-5">

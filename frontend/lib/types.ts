@@ -468,7 +468,7 @@ export type Persona = {
   traits: Record<string, number | null>;
   facts?: Record<string, boolean>;
   views_text?: { views?: string[]; news?: string[] };
-  views_from?: { year?: number; source?: string; matched_on?: string[] };
+  views_from?: { year?: number; source?: string; matched_on?: string[]; borrowed_from?: string | null; borrowed_from_name?: string | null };
   exposures: Exposure[];
   is_buyer: boolean;
   weight: number;

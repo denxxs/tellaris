@@ -116,6 +116,7 @@ class Match:
     year: int
     matched_on: list[str] = field(default_factory=list)
     source: str = "World Values Survey"  # which survey the respondent answered
+    borrowed_from: str | None = None  # set when no survey covers the country: the respondent's own country
 
 
 @lru_cache(maxsize=1)
@@ -201,7 +202,8 @@ def match(iso: str, rng: np.random.Generator, *, sex: str, age: int, population:
             if population in WORK_OF or not bool((c["occ"] >= 0).any()):
                 on = [x for x in on if x != "occupation"]
             src = c["sources"][int(c["row_src"][pick])]
-            return Match(answers=dict(c["answers"][pick]), year=int(src["year"]), matched_on=on, source=src["name"])
+            return Match(answers=dict(c["answers"][pick]), year=int(src["year"]), matched_on=on, source=src["name"],
+                         borrowed_from=src.get("borrowed_from"))
     return None
 
 

@@ -158,7 +158,14 @@ class Persona(BaseModel):
 
             said = view_lines(self.views, "views")
             if said:
-                lines.append(f"Views (answers of a real survey respondent like them, {self.views_from.get('source') or 'World Values Survey'} {self.views_from.get('year', '')}): " + "; ".join(said))
+                src = f"{self.views_from.get('source') or 'World Values Survey'} {self.views_from.get('year', '')}".strip()
+                donor = self.views_from.get("borrowed_from")
+                if donor:
+                    from ..world.countries import countries as _cs
+
+                    dname = _cs()[donor].name if donor in _cs() else donor
+                    src = f"no survey covers {self.country_name}, so these are a real respondent's in {dname}, the most similar surveyed country: {src}"
+                lines.append(f"Views (answers of a real survey respondent like them, {src}): " + "; ".join(said))
             news = view_lines(self.views, "news")
             if news:
                 lines.append("How often they get news from: " + "; ".join(news))

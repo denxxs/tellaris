@@ -92,10 +92,10 @@ def _code(v) -> float:
 # WVS Q279: 1 full time, 2 part time, 3 self employed, 4 retired, 5 homemaker, 6 student, 7 unemployed, 8 other.
 
 
-def _work_afro(df: pd.DataFrame, vl: dict) -> pd.Series:
-    status = _code(df["Q94A"])
-    occ = _code(df["Q94B"])
-    occ_lbl = {k: str(v).lower() for k, v in vl.get("Q94B", {}).items()}
+def _work_afro(df: pd.DataFrame, vl: dict, status_col: str = "Q94A", occ_col: str = "Q94B") -> pd.Series:
+    status = _code(df[status_col])
+    occ = _code(df[occ_col])
+    occ_lbl = {k: str(v).lower() for k, v in vl.get(occ_col, {}).items()}
     retired = {k for k, v in occ_lbl.items() if "retired" in v}
     out = pd.Series(8.0, index=df.index)
     out[status == 3] = 1
@@ -155,6 +155,14 @@ SOURCES = [
         weight="withinwt_hh", sex="Q101", age="Q1", work=_work_afro,
         items={"Q203": ("Q65A", NEWS5), "Q202": ("Q65B", NEWS5), "Q201": ("Q65C", NEWS5),
                "Q207": ("Q65D", NEWS5), "Q206": ("Q65E", NEWS5)},
+    ),
+    Source(
+        name="Afrobarometer Round 9 (2021-23)", label="Afrobarometer",
+        citation="Afrobarometer Data, Round 9 merged dataset (39 countries), 2023 (updated 2025). www.afrobarometer.org",
+        files=["afrobarometer/R9.Merge_39ctry*.sav"], pick=".sav",
+        weight="withinwt_hh", sex="Q100", age="Q1", work=lambda df, vl: _work_afro(df, vl, "Q93A", "Q93B"),
+        items={"Q203": ("Q74A", NEWS5), "Q202": ("Q74B", NEWS5), "Q201": ("Q74C", NEWS5),
+               "Q206": ("Q74D", NEWS5), "Q207": ("Q74E", NEWS5)},
     ),
     Source(
         name="Latinobarometro 2024", label="Latinobarómetro",

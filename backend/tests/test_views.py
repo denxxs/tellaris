@@ -98,3 +98,27 @@ def test_survey_without_occupation_still_matches_and_names_its_source(tmp_path, 
     assert m.answers == {"news_radio": 1} and m.source == "Afrobarometer" and m.year == 2024
     assert "occupation" not in m.matched_on and m.matched_on[:2] == ["sex", "age"]
     views.pool.cache_clear()
+
+
+def test_borrowed_views_say_where_they_come_from(tmp_path, monkeypatch):
+    """A country no survey covers borrows a real respondent from a similar country, and says so."""
+    keys = [q.key for q in views.QUESTIONS]
+    a = [None] * len(keys)
+    a[keys.index("trust_people")] = 1
+    rows = [[2, 30, 1, 1, 0.0, 1.0, 1.0, *a] for _ in range(20)]
+    path = tmp_path / "wvs_pool.json"
+    path.write_text(json.dumps({"_meta": {"row": ["sex", "age", "work", "occupation", "income_lo", "income_hi", "weight", *keys]},
+                                "countries": {"BEL": {"year": 2018, "rows": rows, "borrowed_from": ["DEU"],
+                                                      "sources": [{"name": "World Values Survey", "year": 2018, "borrowed_from": "DEU"}],
+                                                      "row_src": [0] * len(rows)}}}))
+    monkeypatch.setattr(views, "POOL_PATH", path)
+    views.pool.cache_clear()
+    m = views.match("BEL", np.random.default_rng(0), sex="woman", age=31, population=None, isco_major=2, self_employed=False, income_pct=0.5)
+    assert m.borrowed_from == "DEU" and m.answers == {"trust_people": 1}
+    from oracle.population.models import Persona
+
+    p = Persona(id="p1", country="BEL", country_name="Belgium", segment="s", segment_index=0, occupation_id="teacher",
+                occupation="Teacher", isco=2, sector="education", company_type="public", seniority="staff", buyer_role="none",
+                age=31, gender="woman", views=m.answers, views_from={"year": 2018, "source": m.source, "borrowed_from": "DEU"})
+    assert "no survey covers Belgium" in p.card() and "Germany" in p.card()
+    views.pool.cache_clear()

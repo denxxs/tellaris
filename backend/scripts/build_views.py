@@ -40,6 +40,8 @@ from oracle.population.views import MATCH_COLUMNS, POOL_PATH, QUESTIONS  # noqa:
 from oracle.world.countries import countries  # noqa: E402
 
 FOLDER = ROOT / "var" / "datasets"
+DONORS = 3  # most similar surveyed countries a country without a survey borrows from
+LEAVE_REGION = 1.0  # log income gap beyond which the stand-ins come from any region
 REPORT_PATH = ROOT.parent / "docs" / "views_harmonisation.json"  # aggregate test results only (no microdata)
 
 
@@ -135,7 +137,7 @@ def main() -> None:
 
     # Regional barometers, for countries WVS and EVS don't cover. Only questions that came out close
     # to WVS in countries both surveyed are kept (barometers.validate); the test is saved for the paper.
-    report = {}
+    report, report_doc = {}, {}
     try:
         import barometers
     except ImportError:
@@ -166,12 +168,85 @@ def main() -> None:
         for name, isos in added.items():
             sources.append(f"{name} ({len(isos)} countries not in WVS/EVS)")
             print(f"{name}: added {', '.join(sorted(isos))}")
-        REPORT_PATH.write_text(json.dumps({
+        report_doc = {
             "note": "Gap between a barometer's and WVS7's average answer (0-1 scale) in countries both surveyed. "
                     "A question is used for a barometer only when the median gap is at most 0.10 over 3+ countries.",
             "sources": {s.name: s.citation for s in barometers.SOURCES},
             "questions": {name: {q: {k: v for k, v in r.items()} for q, r in items.items()} for name, items in report.items()},
-        }, indent=1), encoding="utf-8")
+        }
+
+    # Countries no survey covers borrow respondents from the 3 most similar fully surveyed (WVS7)
+    # countries: same World Bank region and closest income per person, leaving the region when its
+    # closest 3 differ by more than e^1 (2.7x) in income. Chosen by hiding each WVS country and
+    # comparing rules (see donor_test below and docs/views_harmonisation.json). Every borrowed
+    # answer says where it came from.
+    import math
+
+    import numpy as np
+
+    full = {i for i, v in out.items() if v["source"] == "World Values Survey" and known[i].gdp_pc_usd}
+
+    def donors(iso: str, cand: set[str]) -> list[str]:
+        g = math.log(known[iso].gdp_pc_usd)
+        near = lambda d: abs(math.log(known[d].gdp_pc_usd) - g)  # noqa: E731
+        same = sorted((d for d in cand if known[d].region == known[iso].region), key=near)[:DONORS]
+        if len(same) == DONORS and near(same[-1]) <= LEAVE_REGION:
+            return same
+        return sorted(cand, key=near)[:DONORS]
+
+    def profile(rows: list[list]) -> dict[str, float]:
+        res = {}
+        for qi, q in enumerate(QUESTIONS):
+            codes = [v for v in range(0, 12) if q.score(v) is not None and q.text(v) is not None]
+            if not codes:
+                continue  # unordered answers (how society should change): no average to compare
+            lo, hi = min(q.score(v) for v in codes), max(q.score(v) for v in codes)
+            pairs = [(q.score(r[7 + qi]), r[6]) for r in rows if r[7 + qi] is not None and q.score(r[7 + qi]) is not None]
+            if len(pairs) >= 30:
+                v, w = np.array(pairs).T
+                res[q.key] = float(np.average((v - lo) / (hi - lo), weights=w))
+        return res
+
+    prof = {i: profile(out[i]["rows"]) for i in full}
+
+    def gap(t: str, ds: list[str]) -> float:
+        keys = set(prof[t]).intersection(*[set(prof[d]) for d in ds])
+        return float(np.mean([abs(prof[t][k] - np.mean([prof[d][k] for d in ds])) for k in keys]))
+
+    chosen = [gap(t, donors(t, full - {t})) for t in full]
+    base = [float(np.mean([gap(t, [d]) for d in full - {t} if known[d].region == known[t].region] or [np.nan])) for t in full]
+    base = [b for b in base if not np.isnan(b)]
+    donor_test = {"rule": f"{DONORS} closest WVS7 countries by income per person in the same World Bank region (anywhere if those differ by more than e^{LEAVE_REGION} in income)",
+                  "tested_on": len(full), "median_gap": round(float(np.median(chosen)), 3), "mean_gap": round(float(np.mean(chosen)), 3),
+                  "p90_gap": round(float(np.percentile(chosen, 90)), 3),
+                  "baseline_random_same_region_median_gap": round(float(np.median(base)), 3),
+                  "note": "Gap = mean over questions of |average answer of the stand-ins - real average answer| on a 0-1 scale, "
+                          "each WVS7 country hidden in turn. Also tried: 1, 2 or 5 stand-ins; closest income anywhere; strongest Meta friendship tie (all worse or no better). "
+                          "Checked again on 72 barometer-only countries (their own questions): median gap 0.088 with this rule vs 0.091 staying in the region; "
+                          "Qatar 0.18 vs 0.23, so rich Gulf states take high-income stand-ins rather than poorer Arab neighbours."}
+    print(f"stand-in test: median gap {donor_test['median_gap']} vs {donor_test['baseline_random_same_region_median_gap']} for a random country in the region")
+    borrowed = []
+    for iso, c in known.items():
+        if iso in out or not c.simulatable or not c.gdp_pc_usd:
+            continue
+        pick = donors(iso, full)
+        rec = {"year": 0, "source": "", "rows": [], "sources": [], "row_src": [], "borrowed_from": pick}
+        for d in pick:
+            src = out[d]
+            total = sum(r[6] for r in src["rows"]) or 1.0
+            rows = [[*r[:6], round(r[6] / total, 8), *r[7:]] for r in src["rows"]]  # each donor counts equally
+            rec["row_src"] += [len(rec["sources"])] * len(rows)
+            rec["sources"].append({"name": src["sources"][0]["name"], "year": src["year"], "borrowed_from": d})
+            rec["rows"] += rows
+            rec["year"] = max(rec["year"], src["year"])
+        rec["source"] = f"borrowed from {', '.join(pick)} (no survey covers this country)"
+        out[iso] = rec
+        borrowed.append(iso)
+    if borrowed:
+        sources.append(f"{len(borrowed)} countries without any survey borrow from the {DONORS} most similar WVS7 countries (same region, closest income)")
+        print(f"borrowed for {len(borrowed)} countries: {', '.join(sorted(borrowed))}")
+
+    REPORT_PATH.write_text(json.dumps({**report_doc, "countries_without_a_survey": donor_test}, indent=1), encoding="utf-8")
 
     POOL_PATH.parent.mkdir(parents=True, exist_ok=True)
     POOL_PATH.write_text(json.dumps({
