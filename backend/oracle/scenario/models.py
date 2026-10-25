@@ -156,4 +156,4 @@ class RunRequest(BaseModel):
     lens: Literal["b2b", "consumer", "personal", "opinion", "forecast"] | None = Field(default=None, description="Override the detected lens")
     scope: Literal["countries", "global"] | None = Field(default=None, description="Override: simulate the whole world")
     global_depth: Literal["quick", "deep"] = "quick"
-    clarifications: list[dict[str, str]] = Field(default_factory=list, description="Answers to Oracle's clarifying questions")
+    clarifications: list[dict[str, str]] = Field(default_factory=list, description="Answers to Tellaris's clarifying questions")

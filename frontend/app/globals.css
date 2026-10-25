@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------
-   Oracle: framed-sheet app style.
+   Tellaris: framed-sheet app style.
    A tinted L-frame (sidebar + top bar) holds a white sheet. Colour lives
    on data only: teal = yes / the main series, amber = no, blue = outside
    influence. The frame takes a faint sea-grey tint: the product's face.

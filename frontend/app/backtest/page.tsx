@@ -64,7 +64,7 @@ export default function AccuracyPage() {
   return (
     <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
       <PageHead title="Accuracy">
-        Run Oracle on questions whose real answers are known, see how far off it is, and let it learn a correction from the gap.
+        Run Tellaris on questions whose real answers are known, see how far off it is, and let it learn a correction from the gap.
       </PageHead>
       <div className="mb-6">
         <Notice>Models may already know these famous outcomes, so scores here are optimistic. The honest test is your own cases from after your models were trained.</Notice>

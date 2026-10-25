@@ -1,8 +1,10 @@
-# Product Oracle
+<p><img src="docs/logo.svg" alt="Project Tellaris" width="320"></p>
+
+# Project Tellaris
 
 Simulate a world of people to see how a product, price, policy or any idea will land.
 
-Describe what you want to know in plain words. Oracle builds a population across any of 202 countries you pick (founders, CFOs, analysts at Indian IT firms, teachers, farmers, any job), works out which outside countries and blocs shape those markets (for example, EU rules reaching Indian IT firms with EU clients), lets every person decide for themselves, and tells you what is likely to happen, why, and what would change it.
+Describe what you want to know in plain words. Tellaris builds a population across any of 202 countries you pick (founders, CFOs, analysts at Indian IT firms, teachers, farmers, any job), works out which outside countries and blocs shape those markets (for example, EU rules reaching Indian IT firms with EU clients), lets every person decide for themselves, and tells you what is likely to happen, why, and what would change it.
 
 ## Run it
 
@@ -28,10 +30,10 @@ cd frontend && npm run dev              # app on :3000
 
 ## Any question, not just products
 
-Ask about a B2B launch, a price rise, a policy vote, a habit, an opinion or something silly ("is pineapple on pizza OK?"). Before a run, Oracle reads the question and shows how it understood it:
+Ask about a B2B launch, a price rise, a policy vote, a habit, an opinion or something silly ("is pineapple on pizza OK?"). Before a run, Tellaris reads the question and shows how it understood it:
 
-- **Lens**: how people are asked and how answers become the headline. *B2B launch* (buying committees, say-do correction, revenue), *Consumer product* (awareness, say-do gap, price), *Personal choice*, *Opinion and culture* (no awareness or revenue, just what people think) and *Forecast*. Oracle picks one and you can change it before the run or re-run a finished one with another lens. The B2B lens is locked by a golden test so it stays exactly as accurate as before.
-- **Questions**: if something important is missing (price, where, time frame), Oracle asks up to four short questions: multiple choice, yes/no, number or free text. Every one can be skipped or left to Oracle.
+- **Lens**: how people are asked and how answers become the headline. *B2B launch* (buying committees, say-do correction, revenue), *Consumer product* (awareness, say-do gap, price), *Personal choice*, *Opinion and culture* (no awareness or revenue, just what people think) and *Forecast*. Tellaris picks one and you can change it before the run or re-run a finished one with another lens. The B2B lens is locked by a golden test so it stays exactly as accurate as before.
+- **Questions**: if something important is missing (price, where, time frame), Tellaris asks up to four short questions: multiple choice, yes/no, number or free text. Every one can be skipped or left to Tellaris.
 - **Groups by anything**: jobs, age range, gender, or a shared trait such as "owns a dog" with its share of adults, sized from real data.
 - **Whole world**: instead of picking countries, simulate the largest countries in every region (Quick: 20 countries, about 71% of the world's adults; Deep: 32 countries, about 79%). The **Where it works** tab then shows the groups that are clearly above or below the overall answer, a map shaded by country, and every breakdown by country, region, age, gender, income, type of work and company. Only differences whose likely ranges don't overlap are called out.
 
@@ -67,7 +69,7 @@ Keys are saved in `backend/var/settings.json` on your machine and never committe
 
 ## Accuracy
 
-The **Accuracy** page runs Oracle on questions with known outcomes, scores the error, and fits the say/do correction from the results. Built-in cases are famous votes and adoption numbers that models may already know, so their scores are optimistic. Add cases from after your models' training cutoff for an honest test.
+The **Accuracy** page runs Tellaris on questions with known outcomes, scores the error, and fits the say/do correction from the results. Built-in cases are famous votes and adoption numbers that models may already know, so their scores are optimistic. Add cases from after your models' training cutoff for an honest test.
 
 Simulations are not ground truth. Treat results as a well-structured, explainable estimate, and check them against real-world tests.
 

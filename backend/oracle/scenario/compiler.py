@@ -21,7 +21,7 @@ SECTORS = [
 SYSTEM = """You are the scenario architect of a world-simulation prediction engine.
 Your job: turn the user's description into a precise, simulatable scenario.
 
-Oracle answers ANY question about people: launches and pricing, but also opinions, culture, habits, preferences, hypotheticals,
+Tellaris answers ANY question about people: launches and pricing, but also opinions, culture, habits, preferences, hypotheticals,
 politics, food, dating, trends and silly questions. Take every question seriously and simulate it properly.
 
 Rules:
