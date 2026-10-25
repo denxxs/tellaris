@@ -19,7 +19,7 @@ settings with a sensitivity test. Status: done, open, or setting.
 | Memory fade (0.85 per round), items recalled (6, and 8 in one place), importance formula and per-kind weights | `simulate/memory.py`, `simulate/society.py` | Hand-set | Forgetting-curve research; sensitivity test | open |
 | Opinion update (new view = halfway to the answer) and "changed mind" threshold (8 points) | `simulate/memory.py`, `simulate/society.py` | Hand-set | Panel surveys measuring how much people move; fit | open |
 | Say vs do correction (buying 0.85 / -0.55, beliefs 0.9 / 0) | `simulate/calibrate.py` | Hand-set | Purchase intent vs purchase research, then backtests | open |
-| Contacts per person (half the daily total plus a random amount) | `simulate/diffusion.py` | Hand-set | POLYMOD: measured spread of contacts per person | open |
+| Contacts per person (was: half the daily total plus a random amount) | `simulate/diffusion.py` | Measured spread: negative binomial dispersion from 10 CC BY diary surveys (BEL, CHN, GMB, ITA, NLD, RUS, THA, TWN, ZAF, ZMB); others use the median (k = 2.35). POLYMOD is CC BY-NC, so not used | socialcontactdata.org | done |
 | Personality traits referenced in prompts, always empty | `population/models.py`, `scenario/lenses.py` | Empty | WVS items, Global Preferences Survey (risk, trust, patience; 76 countries); otherwise remove from prompts | open |
 | Income spread within a job | `population/realdata.py` | Lognormal with the country's household-income Gini; median Gini where missing | No global source of pay spread within jobs. Keep as a labelled model; use World Bank PIP for missing Ginis | open |
 | Earnings where there is no earnings survey | `population/realdata.py` | GDP per person / 12 x typical job ratio | ILO modelled wages; labelled | open |
@@ -40,7 +40,7 @@ settings with a sensitivity test. Status: done, open, or setting.
 | Detailed jobs inside ISCO groups | US mix everywhere | ~15 own, rest borrowed and tested | UK ONS, Canada and Australia censuses, Brazil PNAD, Mexico ENOE, Chile, Peru, Colombia | open |
 | Earnings by job | ~130 | All, labelled | ILOSTAT, ILO modelled | open |
 | Survey views | 65 | ~150 own, rest borrowed from the most similar surveyed country (flagged, tested) | Joint WVS/EVS, Afrobarometer, Arab Barometer, Latinobarometro (registration), Asian Barometer (registration) | open |
-| Daily contacts | ~15 real surveys + Prem projections | Same, real surveys where they exist | socialcontactdata.org | open |
+| Daily contacts | Prem projections for 176 (means); spread from 10 diary surveys, median elsewhere | Means from real surveys where they exist | socialcontactdata.org (CC BY only) | open |
 | Friendships | 178 measured, 24 estimated | Better estimates (target: 65% within 2x) | UNESCO students abroad, UN Tourism arrivals, national migrant counts | open |
 | Services trade | 786 lists estimated | Partner-reported figures | Eurostat, OECD | open |
 

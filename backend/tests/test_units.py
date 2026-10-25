@@ -338,3 +338,16 @@ async def test_bedrock_call_without_credentials_fails_cleanly():
 
     with pytest.raises(LLMError, match="Bedrock has no keys"):
         await llm.text(task="t", model="bedrock/amazon.nova-lite-v1:0", messages=[{"role": "user", "content": "hi"}])
+
+
+def test_contacts_spread_follows_diary_surveys():
+    """Contacts per person are as unequal as in the diary surveys, not the same for everyone."""
+    from oracle.simulate.diffusion import _ties_to_start, dispersion
+
+    assert dispersion("BEL") < dispersion("GMB")  # Belgium's contacts are far more unequal
+    assert dispersion("IND") == dispersion("USA")  # no survey: both use the median of surveyed countries
+    rng = np.random.default_rng(1)
+    mu, k = 12.0, dispersion("BEL")
+    total = np.array([_ties_to_start(mu, k, rng) for _ in range(50000)]) + rng.poisson(mu / 2, 50000)
+    assert abs(total.mean() - mu) < 0.3
+    assert abs(total.var() / (mu + mu**2 / k) - 1) < 0.1

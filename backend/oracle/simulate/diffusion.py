@@ -2,7 +2,9 @@
 
 How many people someone talks to, of what ages and where (home, work, school, elsewhere) comes
 from the contact surveys extended to 177 countries by Prem et al. (2021): a person aged 30 in
-India has about 11 daily contacts with other adults. Which country a contact lives in comes from
+India has about 11 daily contacts with other adults. How unequal that is between people (some meet
+3 people a day, some 40) comes from diary surveys in ten countries (negative binomial dispersion;
+countries without a survey use the median). Which country a contact lives in comes from
 Meta's Social Connectedness Index (the share of a country's friendships with each country, itself
 included). Work contacts are people who also work, in the same sector where there are any; the
 rest are picked evenly among people of the right age in that country.
@@ -40,6 +42,25 @@ def daily_contacts(iso: str, age: int) -> dict[str, list[float]] | None:
         return None
     r = band(age)
     return {s: rec[s][r] for s in _contacts()["_meta"]["settings"]}
+
+
+def dispersion(iso: str) -> float | None:
+    """Negative binomial dispersion k of contacts per person (variance = mean + mean^2/k), from the
+    country's own diary survey, else the median of surveyed countries. None = no survey data at all."""
+    d = _contacts().get("dispersion") or {}
+    own = (d.get("countries") or {}).get(iso)
+    return own["k"] if own else d.get("median_k")
+
+
+def _ties_to_start(mean: float, k: float | None, rng: np.random.Generator) -> int:
+    """How many ties a person starts. Each tie has two ends: a person starts about half their
+    contacts and gets the rest from people who pick them (roughly Poisson). For the total to have the
+    measured spread (variance mean + mean^2/k), the half they start needs dispersion k/4."""
+    half = mean / 2
+    if not k or half <= 0:
+        return int(half + rng.random())  # no survey data: same expected number for everyone
+    k_out = k / 4
+    return int(rng.negative_binomial(k_out, k_out / (k_out + half)))
 
 
 def country_mix(home: str, present: list[str]) -> dict[str, float]:
@@ -92,9 +113,7 @@ def build_network(people: list[Persona], seed: int | None = None) -> nx.Graph:
             continue
         cells = [(s, b, m) for s, row in rows.items() for b, m in enumerate(row) if m > 0]
         total = sum(m for *_, m in cells)
-        # Each tie has two ends, so each person starts half their contacts; the other half come
-        # from the people who pick them. Rounded at random so the average stays right.
-        n = int(total / 2 + rng.random())
+        n = _ties_to_start(total, dispersion(p.country), rng)
         if not n or not cells:
             continue
         probs = np.array([m for *_, m in cells]) / total
