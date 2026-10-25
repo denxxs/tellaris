@@ -29,7 +29,13 @@ def test_recent_news_outranks_old_unless_still_in_effect():
     fresh = score(0.8, TODAY - timedelta(days=5), False, TODAY)
     old = score(0.8, TODAY - timedelta(days=240), False, TODAY)
     old_law = score(0.8, TODAY - timedelta(days=240), True, TODAY)
-    assert fresh > old_law > old
+    assert old_law >= fresh > old
+    # Memory for news (Meeter, Murre & Janssen 2005): most of a story is still remembered a month on,
+    # about half a year on; attention (pageviews) is mostly gone within days.
+    from oracle.research.news import attention, remembered
+
+    assert 0.75 < remembered(30) < 0.9 and 0.45 < remembered(365) < 0.65
+    assert attention(7) < 0.1 < attention(1)
 
 
 def test_niche_news_reaches_the_people_it_concerns():

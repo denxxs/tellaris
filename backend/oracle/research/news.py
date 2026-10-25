@@ -15,15 +15,18 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import math
 import os
 import re
 from datetime import date, datetime
+from functools import lru_cache
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel, Field, field_validator
 
+from ..config import load_json
 from ..llm import llm
 from ..population import views
 from ..population.models import Persona
@@ -40,7 +43,39 @@ REACH_LABEL = {"mass": "Everyone's talking about it", "broad": "Widely covered",
 REACH_BASE = {"mass": 0.85, "broad": 0.45, "niche": 0.07}
 MAX_ITEMS = 14
 PER_PERSON = 4
-HALF_LIFE_DAYS = 60
+
+
+@lru_cache(maxsize=1)
+def _decay() -> dict:
+    try:
+        return load_json("news_decay.json")
+    except FileNotFoundError:
+        return {}
+
+
+def remembered(age_days: float) -> float:
+    """Share of people who knew a story that still remember it after this many days: the memory
+    chain model fitted to ~14,000 people's recall of news events (Meeter, Murre & Janssen 2005),
+    averaged over their three samples. 1.0 without the data file."""
+    params = (_decay().get("memory") or {}).get("params")
+    if not params or age_days <= 0:
+        return 1.0
+
+    def p(t: float, m1: float, a1: float, m2: float, a2: float) -> float:
+        r = m1 * (math.exp(-a1 * t) + m2 / (a2 - a1) * (math.exp(-a1 * t) - math.exp(-a2 * t)))
+        return 1 - math.exp(-r)
+
+    return sum(p(age_days, *k) / p(0, *k) for k in params.values()) / len(params)
+
+
+def attention(age_days: float) -> float:
+    """Share of a story's peak attention left after this many days (Wikipedia pageviews of news
+    stories, scripts/fit_news_decay.py). 1.0 without the data file."""
+    f = _decay().get("fit")
+    if not f or age_days <= 0:
+        return 1.0
+    return min(1.0, f["fast_share"] * 0.5 ** (age_days / f["fast_half_life_days"])
+               + f["slow_share"] * 0.5 ** (age_days / f["slow_half_life_days"]) + f["floor"])
 
 
 class NewsHit(BaseModel):
@@ -95,6 +130,7 @@ class NewsItem(BaseModel):
     lasting: bool = False
     upcoming: str | None = None
     score: float = 0.0
+    age_days: int = 0  # days between publication and the run date
     known_share: float | None = None
     known_by_country: dict[str, float] = Field(default_factory=dict)
 
@@ -195,12 +231,10 @@ async def search_news(queries: list[str], provider: str, as_of: date, per_query:
 
 
 def score(relevance: float, published: date, lasting: bool, as_of: date) -> float:
-    """Relevance times recency. Old stories fade, unless they are still in effect."""
+    """Relevance times the share of people who still remember a story this old (news recall
+    data). A story still in effect (a law, a price) is met again every day, so it doesn't fade."""
     age = max((as_of - published).days, 0)
-    decay = 0.5 ** (age / HALF_LIFE_DAYS)
-    if lasting:
-        decay = max(decay, 0.6)
-    return round(relevance * decay, 4)
+    return round(relevance * (1.0 if lasting else remembered(age)), 4)
 
 
 def _context(spec: ScenarioSpec, as_of: date) -> str:
@@ -251,7 +285,7 @@ async def gather_news(spec: ScenarioSpec, provider: str, model: str, as_of: date
                 source=h.source, url=h.url, countries=[c.upper()[:3] for c in d.countries],
                 reach=d.reach, audiences=[a.strip().lower() for a in d.audiences if a.strip()][:6], media=list(dict.fromkeys(d.media)), stance=d.stance,
                 relevance=d.relevance, lasting=d.lasting, upcoming=up.isoformat() if up and up > as_of else None,
-                score=score(d.relevance, h.published, d.lasting, as_of),
+                score=score(d.relevance, h.published, d.lasting, as_of), age_days=max((as_of - h.published).days, 0),
             )
         )
     items = [it for it in items if it.score >= 0.15]
@@ -281,8 +315,9 @@ def concerns(p: Persona, audiences: list[str]) -> bool:
     return False
 
 
-def know_chance(p: Persona, countries: list[str], reach: str, audiences: list[str], media: list[str] | None = None) -> float:
-    """How likely this person is to have come across an item."""
+def know_chance(p: Persona, countries: list[str], reach: str, audiences: list[str], media: list[str] | None = None,
+                age_days: int = 0, lasting: bool = False) -> float:
+    """How likely this person is to have come across an item and still remember it."""
     base = REACH_BASE.get(reach, 0.3)
     if countries and p.country not in countries:
         base *= 0.2 if reach == "mass" else 0.06  # foreign news rarely travels unless it's huge
@@ -293,6 +328,8 @@ def know_chance(p: Persona, countries: list[str], reach: str, audiences: list[st
     # How often they get news where this story runs, against their country's average (their own
     # survey answers, World Values Survey). Without survey views nothing is adjusted.
     base *= views.news_attention(p.country, p.views, media or MEDIA)
+    if not lasting:
+        base *= remembered(age_days)  # people forget old news (recall data); what's still in effect they keep meeting
     return max(0.0, min(0.97, base))
 
 
@@ -306,7 +343,8 @@ def assign(people: list[Persona], items: list[NewsItem], seed: Any) -> dict[str,
     """Each person's news: the items they came across, most important first."""
     out: dict[str, list[NewsItem]] = {}
     for p in people:
-        known = [it for it in items if draw(seed, p.id, it.id) < know_chance(p, it.countries, it.reach, it.audiences, it.media)]
+        known = [it for it in items
+                 if draw(seed, p.id, it.id) < know_chance(p, it.countries, it.reach, it.audiences, it.media, it.age_days, it.lasting)]
         known.sort(key=lambda it: -it.score)
         out[p.id] = known[:PER_PERSON]
     weights = {p.id: max(p.weight, 1e-9) for p in people if p.influencer_voice is None}
