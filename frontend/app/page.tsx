@@ -199,7 +199,7 @@ export default function NewSimulation() {
   return (
     <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
       <PageHead title="New simulation">
-        Ask anything about people: a launch, a price, a policy, a habit, an opinion or something silly. Attach documents if you have them. Oracle builds the people it depends on, lets each one decide, lets them talk it over, and tells you what is likely to happen and where.
+        Ask anything about people: a launch, a price, a policy, a habit, an opinion or something silly. Attach documents if you have them. Tellaris builds the people it depends on, lets each one decide, lets them talk it over, and tells you what is likely to happen and where.
       </PageHead>
       {meta?.mock && (
         <div className="mb-6">
@@ -216,7 +216,7 @@ export default function NewSimulation() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <div className="flex flex-col gap-6 lg:col-span-7">
           <Card>
-            <Field label="What do you want to know?" hint="Who, where and when help. For a product, include the price. Oracle asks if anything important is missing.">
+            <Field label="What do you want to know?" hint="Who, where and when help. For a product, include the price. Tellaris asks if anything important is missing.">
               {(id) => (
                 <Textarea
                   id={id}
@@ -237,7 +237,7 @@ export default function NewSimulation() {
             <div className="mt-5">
               <div className="mb-2 text-[14px] font-medium">Context files</div>
               <FileDrop files={files} onChange={setFiles} />
-              <p className="mt-1.5 text-[12px] text-faint">Optional. Oracle reads them to get the product, price and audience right. People only see what a customer could see, never internal numbers.</p>
+              <p className="mt-1.5 text-[12px] text-faint">Optional. Tellaris reads them to get the product, price and audience right. People only see what a customer could see, never internal numbers.</p>
             </div>
             <div className="mt-5">
               <Toggle
@@ -247,7 +247,7 @@ export default function NewSimulation() {
                   editing();
                 }}
                 label="Whole world"
-                description={scope === "global" ? "Oracle simulates the largest countries in every region and shows where it works and where it doesn't." : "Simulate across every region instead of picking countries."}
+                description={scope === "global" ? "Tellaris simulates the largest countries in every region and shows where it works and where it doesn't." : "Simulate across every region instead of picking countries."}
               />
               {scope === "global" ? (
                 <div className="mt-3">
@@ -266,7 +266,7 @@ export default function NewSimulation() {
                 </div>
               ) : (
                 <div className="mt-4">
-                  <Field label="Target countries" hint="Optional. Leave empty and Oracle picks the markets that matter.">
+                  <Field label="Target countries" hint="Optional. Leave empty and Tellaris picks the markets that matter.">
                     {(id) => <CountryPicker id={id} value={spec?.targets ?? targets} onChange={(v) => (spec ? setSpec({ ...spec, targets: v, target_weights: {} }) : setTargets(v))} />}
                   </Field>
                 </div>
@@ -420,7 +420,7 @@ export default function NewSimulation() {
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-t border-border pt-8">
             <div>
               <h2 className="t-title">Check the setup</h2>
-              <p className="mt-1 max-w-2xl text-[14px] text-muted">This is how Oracle understood your question. Change anything, then run it.</p>
+              <p className="mt-1 max-w-2xl text-[14px] text-muted">This is how Tellaris understood your question. Change anything, then run it.</p>
             </div>
           </div>
           <ScenarioEditor spec={spec} onSpec={setSpec} config={config} onConfig={setConfig} />

@@ -76,7 +76,7 @@ export function TrackButton({ runId, horizonMonths, demo = false }: { runId: str
       {open && (
         <div role="dialog" aria-label="Track this prediction" className="absolute right-0 top-10 z-30 w-[min(340px,calc(100vw-32px))] rounded-lg border border-border bg-surface p-4 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
           <p className="text-[13px] leading-[18px] text-muted">
-            Oracle freezes today&apos;s answer. When the real result is known, enter it on the Accuracy page to score it.
+            Tellaris freezes today&apos;s answer. When the real result is known, enter it on the Accuracy page to score it.
           </p>
           {demo && <p className="mt-2 text-[13px] leading-[18px] text-[var(--pill-warning-ink)]">This run used the demo model, so tracking it only tries out the flow.</p>}
           <label className="mt-3 block text-[13px] font-medium" htmlFor="track-date">
