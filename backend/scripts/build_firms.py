@@ -166,6 +166,54 @@ def workplaces() -> dict[str, dict]:
     return out
 
 
+PLFS_ZIP = DATASETS / "plfs" / "Data_in_STATA.zip"
+PLFS_CLASSES = [[1, 5], [6, 9], [10, 19], [20, 49], [50, None]]
+
+
+def india_plfs(pool: dict | None) -> dict | None:
+    """India from its own labour force survey (PLFS calendar year 2025, MoSPI; research use, the
+    user's own download in var/datasets/plfs/): workers by job group (NCO 2015 division = ISCO-08
+    major group) and the number of workers in their enterprise (under 6, 6-9, 10-19, 20+), and the
+    share of each 2-digit job in government, public sector enterprises and autonomous bodies.
+    PLFS stops at "20 and above"; that class is split at 50 with the same job group's split in
+    `pool` (surveyed countries at India's income level), and the source says so."""
+    import tempfile
+    import zipfile
+
+    import pandas as pd
+
+    if not PLFS_ZIP.exists():
+        return None
+    z = zipfile.ZipFile(PLFS_ZIP)
+    name = next(n for n in z.namelist() if n.lower().endswith("cperv12025.dta") or ("cperv1" in n.lower() and n.endswith(".dta")))
+    path = z.extract(name, tempfile.mkdtemp())
+    d = pd.read_stata(path, columns=["pas", "ocu_pas", "etyp_pas", "wrkr_pas", "mult"], convert_categoricals=False)
+    d = d.apply(pd.to_numeric, errors="coerce")
+    w = d[d["pas"].between(11, 51) & d["ocu_pas"].notna()].copy()  # usual principal status: workers
+    w["major"] = (w["ocu_pas"] // 100).astype(int).astype(str)
+    w["two"] = (w["ocu_pas"] // 10).astype(int).map(lambda v: f"{v:02d}")
+    sized = w[w["wrkr_pas"].isin([1, 2, 3, 4])]
+    groups = {}
+    for g, part in [("all", sized), *sized.groupby("major")]:
+        t = part.groupby("wrkr_pas")["mult"].sum()
+        tot = t.sum()
+        if tot <= 0:
+            continue
+        sh = [float(t.get(k, 0.0) / tot) for k in (1, 2, 3, 4)]
+        ref = (pool or {}).get(g) or (pool or {}).get("all")
+        r = ref[4] / (ref[4] + ref[5]) if ref and ref[4] + ref[5] > 0 else 0.5
+        groups[g] = [round(x, 4) for x in sh[:3] + [sh[3] * r, sh[3] * (1 - r)]]
+    known = w[w["etyp_pas"].between(1, 19)]
+    known = known.assign(pub=known["etyp_pas"].isin([5, 6, 7]) * known["mult"])
+    by2 = (known.groupby("two")["pub"].sum() / known.groupby("two")["mult"].sum()).round(4).to_dict()
+    return {
+        "workplace": {"classes": PLFS_CLASSES, "groups": groups,
+                      "source": "India PLFS 2025 (MoSPI), number of workers in the enterprise; 20+ split at 50 with the lower-middle-income average (ILOSTAT)"},
+        "public": {"by2": {k: float(v) for k, v in by2.items()}, "source": "India PLFS 2025 (MoSPI): government, public sector enterprises and autonomous bodies"},
+        "workers": int(len(sized)),
+    }
+
+
 def public_shares() -> dict[str, dict]:
     """Per country: share of each 2-digit occupation working in the public sector."""
     pub = ilo("DF_EMP_PUBL_SEX_OC2_NB", ".A..SEX_T.", "publ_oc2")
@@ -252,13 +300,21 @@ def main() -> None:
                 acc_p[g] += n * pub[i]["by2"].get(g, 0.0)
         return {g: round(acc_p[g] / acc_t[g], 4) for g in acc_t if acc_t[g] > 0}, f"average of {len(isos)} countries at the same income level (ILOSTAT)"
 
+    national = {}
+    ind = india_plfs(pool_work.get(cs["IND"].income))
+    if ind:
+        national["IND"] = ind
+        print(f"India PLFS: {ind['workers']:,} workers with enterprise size")
+
     out: dict[str, dict] = {}
     for iso, c in cs.items():
         if not c.simulatable:
             continue
         rec: dict = {}
         w = work.get(iso)
-        if w:
+        if iso in national:
+            rec["workplace"] = national[iso]["workplace"]
+        elif w:
             rec["workplace"] = {"classes": w["classes"], "groups": w["groups"],
                                 "source": f"ILOSTAT workplace size by occupation, {w['year']}"}
         else:
@@ -271,7 +327,9 @@ def main() -> None:
             rec["enterprise_source"] = "US Census SUSB 2022" if iso == "USA" else f"OECD Structural Business Statistics {y}"
         else:
             rec["mid_share_of_50plus"], rec["enterprise_source"] = pool_mid(c.income)
-        if iso in pub:
+        if iso in national:
+            rec["public"] = national[iso]["public"]
+        elif iso in pub:
             rec["public"] = {"by2": pub[iso]["by2"], "source": f"ILOSTAT public-sector employment, {pub[iso]['year']}"}
         else:
             shares, src = pool_pub(c.income)
@@ -286,6 +344,7 @@ def main() -> None:
                 "ILOSTAT DF_EMP_PUBL_SEX_OC2_NB and DF_EMP_TEMP_SEX_OC2_NB: public-sector employment by 2-digit occupation (CC BY 4.0)",
                 "OECD Structural Business Statistics DF_SDBS_ISIC4, persons employed by enterprise size, BTNXK (CC BY 4.0)",
                 "US Census Bureau, Statistics of US Businesses 2022 (public domain)",
+                "India: Periodic Labour Force Survey, calendar year 2025, MoSPI (unit-level data, research use; aggregated shares only)",
             ],
             "note": "Workplace size below 50 people is the size of the workplace (household surveys), above 50 the size of the enterprise (business registers); people at small branches of large firms are counted as small. Classes inside 50-249 and 250+ use the US shape everywhere.",
             "mid_classes": MID,
@@ -295,7 +354,7 @@ def main() -> None:
         },
         "countries": out,
     }, separators=(",", ":")), encoding="utf-8")
-    own = sum(1 for r in out.values() if r["workplace"]["source"].startswith("ILOSTAT workplace"))
+    own = sum(1 for r in out.values() if not r["workplace"]["source"].startswith("average"))
     print(f"wrote {OUT}: {len(out)} countries, {own} with their own workplace survey, {sum(1 for i in out if i in mid)} with enterprise data")
 
 

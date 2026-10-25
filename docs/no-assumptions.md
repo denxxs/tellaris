@@ -33,10 +33,10 @@ settings with a sensitivity test. Status: done, open, or setting.
 | Data | Own data now | Target | Source | Status |
 |---|---|---|---|---|
 | Labour force (simulatable) | 187 | 202 | Territory statistics offices | open |
-| Workplace size by job | 98 (89 income-group average) | ~170, rest by a tested model | World Bank Enterprise Surveys (registration), India PLFS (registration), national registers | open |
+| Workplace size by job | 99: 98 from ILOSTAT + India from PLFS 2025 (455,930 workers; 20+ split at 50 with the income-group average); 88 use the income-group average | ~170, rest by a tested model | World Bank Enterprise Surveys (user waiting for approval; 79 of the 88 covered), national registers | open |
 | Enterprise size above 250 | US shape everywhere | Own data | Enterprise Surveys, national registers | open |
 | Workplace vs enterprise size | Mixed | Both, labelled | ILO, SUSB, Eurostat, OECD | open |
-| Public sector share | ~105 | Same, plus a tested model | ILOSTAT | open |
+| Public sector share | ~106 (ILOSTAT + India PLFS 2025) | Same, plus a tested model | ILOSTAT, PLFS | open |
 | Detailed jobs inside ISCO groups | US mix everywhere | ~15 own, rest borrowed and tested | UK ONS, Canada and Australia censuses, Brazil PNAD, Mexico ENOE, Chile, Peru, Colombia | open |
 | Earnings by job | ~130 | All, labelled | ILOSTAT, ILO modelled | open |
 | Survey views | 137: WVS7 65, EVS 26, Afrobarometer R10 33, Latinobarómetro 2024 6, Arab Barometer 7, Asian Barometer 1. Barometer questions kept only if they match WVS in shared countries (median gap <= 0.10; docs/views_harmonisation.json); others stay empty | Remaining ~50 countries: borrow from the most similar surveyed country (flagged, tested), or stay empty | Joint EVS/WVS, Afrobarometer, Latinobarómetro, Arab Barometer, Asian Barometer (research use, user downloads) | open |
