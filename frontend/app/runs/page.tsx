@@ -65,7 +65,7 @@ export default function RunsPage() {
           </div>
         ) : runs && runs.length === 0 ? (
           <Empty title="No simulations yet" action={<LinkButton href="/" variant="primary">Start one</LinkButton>}>
-            Describe what you want to predict and Oracle simulates it. Every run is saved here.
+            Describe what you want to predict and Tellaris simulates it. Every run is saved here.
           </Empty>
         ) : shown.length === 0 ? (
           <p className="text-[13px] text-muted">No simulation matches “{q}”.</p>

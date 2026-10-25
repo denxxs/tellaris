@@ -65,7 +65,7 @@ export default function AccuracyPage() {
   return (
     <div className="mx-auto max-w-[1312px] px-4 py-6 md:px-6">
       <PageHead title="Accuracy">
-        Score Oracle against what really happened, and let it learn a correction from the gap.
+        Score Tellaris against what really happened, and let it learn a correction from the gap.
       </PageHead>
       <div className="mb-6">
         <TrackRecord onCalibrated={refresh} />

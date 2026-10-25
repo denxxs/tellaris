@@ -18,11 +18,27 @@ const NAV = [
 export function Mark({ size = 22 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
-      <circle cx="12" cy="12" r="10.25" fill="none" stroke="var(--text)" strokeWidth="1.5" />
-      <circle cx="8.4" cy="10" r="2.3" fill="var(--yes)" />
-      <circle cx="15.2" cy="8.6" r="1.7" fill="var(--no)" />
-      <circle cx="13.6" cy="15.4" r="2" fill="var(--yes)" />
-      <circle cx="7.9" cy="16" r="1.2" fill="var(--mid)" />
+      <rect x="6.15" y="1.55" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
+      <rect x="10.57" y="1.37" width="2.86" height="2.86" rx="0.63" fill="var(--yes)" />
+      <rect x="15.35" y="1.55" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
+      <rect x="1.55" y="6.15" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
+      <rect x="5.73" y="5.73" width="3.34" height="3.34" rx="0.73" fill="var(--yes)" />
+      <rect x="10.23" y="5.63" width="3.53" height="3.53" rx="0.78" fill="var(--yes)" />
+      <rect x="14.93" y="5.73" width="3.34" height="3.34" rx="0.73" fill="var(--no)" />
+      <rect x="19.95" y="6.15" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
+      <rect x="1.37" y="10.57" width="2.86" height="2.86" rx="0.63" fill="var(--yes)" />
+      <rect x="5.63" y="10.23" width="3.53" height="3.53" rx="0.78" fill="var(--yes)" />
+      <rect x="10.15" y="10.15" width="3.7" height="3.7" rx="0.81" fill="var(--yes)" />
+      <rect x="14.83" y="10.23" width="3.53" height="3.53" rx="0.78" fill="var(--yes)" />
+      <rect x="19.77" y="10.57" width="2.86" height="2.86" rx="0.63" fill="var(--yes)" />
+      <rect x="1.55" y="15.35" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
+      <rect x="5.73" y="14.93" width="3.34" height="3.34" rx="0.73" fill="var(--yes)" />
+      <rect x="10.23" y="14.83" width="3.53" height="3.53" rx="0.78" fill="var(--yes)" />
+      <rect x="14.93" y="14.93" width="3.34" height="3.34" rx="0.73" fill="var(--yes)" />
+      <rect x="19.95" y="15.35" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
+      <rect x="6.15" y="19.95" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
+      <rect x="10.57" y="19.77" width="2.86" height="2.86" rx="0.63" fill="var(--yes)" />
+      <rect x="15.35" y="19.95" width="2.51" height="2.51" rx="0.55" fill="var(--yes)" />
     </svg>
   );
 }
@@ -215,7 +231,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const status = useHealth();
   const [menu, setMenu] = useState(false);
   const path = usePathname();
-  const current = NAV.find((n) => n.match(path))?.label ?? "Oracle";
+  const current = NAV.find((n) => n.match(path))?.label ?? "Project Tellaris";
 
   return (
     <div className="min-h-dvh bg-ground">
@@ -223,7 +239,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <aside className="fixed inset-y-0 left-0 hidden w-[228px] flex-col px-3 pb-3 pt-3 lg:flex">
         <Link href="/" className="flex h-9 items-center gap-2.5 px-2">
           <Mark />
-          <span className="text-[15px] font-semibold tracking-[-0.01em]">Oracle</span>
+          <span className="text-[15px] font-semibold tracking-[-0.01em]">Project Tellaris</span>
         </Link>
         <div className="mb-4 mt-0.5 px-2 text-[12px] text-faint">Local workspace</div>
         <NavLinks />
@@ -257,7 +273,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div className="mb-4 flex items-center justify-between">
             <span className="flex items-center gap-2.5">
               <Mark />
-              <span className="text-[15px] font-semibold">Oracle</span>
+              <span className="text-[15px] font-semibold">Project Tellaris</span>
             </span>
             <button onClick={() => setMenu(false)} className="h-9 rounded-md px-3 text-[14px] text-muted hover:bg-active" aria-label="Close menu">
               Close

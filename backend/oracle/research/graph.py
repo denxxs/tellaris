@@ -10,7 +10,7 @@ private: they are drawn for the user but never reach simulated people.
 The graph is used three ways:
 1. Each person is told the few links that touch them (their country, their kind
    of work, the product itself), not the whole graph.
-2. After the run, Oracle counts which entities people brought up in their answers
+2. After the run, Tellaris counts which entities people brought up in their answers
    and posts, and how those people leaned.
 3. The run page draws it as an interactive map.
 """

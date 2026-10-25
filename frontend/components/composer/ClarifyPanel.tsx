@@ -9,7 +9,7 @@ const DECIDE = "__oracle__";
 
 export type Answers = Record<string, string | string[]>;
 
-/** The answers worth sending: anything the user chose, minus "let Oracle decide". */
+/** The answers worth sending: anything the user chose, minus "let Tellaris decide". */
 export function toClarifications(c: Clarification | null, answers: Answers): { question: string; answer: string }[] {
   if (!c) return [];
   return c.questions
@@ -47,13 +47,13 @@ function QuestionInput({ q, value, onChange }: { q: ClarifyQuestion; value: stri
     return (
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={q.question}>
         {options.map((o) => (
-          <Choice key={o} active={value === o} onClick={() => onChange(o)} hint={o === q.default ? "Oracle's guess" : undefined}>
+          <Choice key={o} active={value === o} onClick={() => onChange(o)} hint={o === q.default ? "Tellaris's guess" : undefined}>
             {o}
             {o === q.default && <span className={cx("ml-1.5 text-[11px]", value === o ? "text-surface/70" : "text-faint")}>guess</span>}
           </Choice>
         ))}
         <Choice active={value === DECIDE} onClick={() => onChange(DECIDE)}>
-          Let Oracle decide
+          Let Tellaris decide
         </Choice>
       </div>
     );
@@ -74,15 +74,15 @@ function QuestionInput({ q, value, onChange }: { q: ClarifyQuestion; value: stri
   if (q.kind === "number") {
     return (
       <div className="flex max-w-xs items-center gap-2">
-        <Input type="number" step="any" aria-label={q.question} value={text} placeholder={q.default || "Let Oracle decide"} onChange={(e) => onChange(e.target.value || DECIDE)} />
+        <Input type="number" step="any" aria-label={q.question} value={text} placeholder={q.default || "Let Tellaris decide"} onChange={(e) => onChange(e.target.value || DECIDE)} />
         {q.unit && <span className="shrink-0 text-[13px] text-muted">{q.unit}</span>}
       </div>
     );
   }
   if (q.kind === "long") {
-    return <Textarea rows={3} aria-label={q.question} value={text} placeholder={q.default || "Let Oracle decide"} onChange={(e) => onChange(e.target.value || DECIDE)} />;
+    return <Textarea rows={3} aria-label={q.question} value={text} placeholder={q.default || "Let Tellaris decide"} onChange={(e) => onChange(e.target.value || DECIDE)} />;
   }
-  return <Input aria-label={q.question} value={text} placeholder={q.default || "Let Oracle decide"} onChange={(e) => onChange(e.target.value || DECIDE)} />;
+  return <Input aria-label={q.question} value={text} placeholder={q.default || "Let Tellaris decide"} onChange={(e) => onChange(e.target.value || DECIDE)} />;
 }
 
 /** "Here's how I read it" plus any questions worth asking, before a run. */
@@ -112,7 +112,7 @@ export function ClarifyPanel({
   const current = lenses.find((l) => l.id === lens);
   return (
     <Card className="border-text/20">
-      <CardHead title={c.questions.length ? "A few quick questions first" : "Here's how Oracle reads it"}>{c.reading}</CardHead>
+      <CardHead title={c.questions.length ? "A few quick questions first" : "Here's how Tellaris reads it"}>{c.reading}</CardHead>
       <div className="flex flex-col gap-6">
         <div>
           <div className="mb-2 text-[14px] font-medium">Reading this as</div>
