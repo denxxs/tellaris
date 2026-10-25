@@ -22,6 +22,7 @@ import numpy as np
 from pydantic import BaseModel, Field, field_validator
 
 from ..llm import LLMError, llm
+from ..research.news import remembered
 from ..population.models import Persona
 from ..scenario.models import ScenarioSpec
 
@@ -37,7 +38,6 @@ KIND_LABEL = {
 }
 
 RECALL = 6
-DECAY = 0.85  # per round
 
 
 class Memory(BaseModel):
@@ -66,8 +66,9 @@ class Mind:
         self.memories.append(Memory(n=len(self.memories) + 1, round=rnd, kind=kind, text=text, who=who, item=item, importance=round(min(1.0, max(0.0, importance)), 3)))
 
     def recall(self, now: int, k: int = RECALL) -> list[Memory]:
-        """The memories most likely to be on their mind now: important and recent."""
-        scored = sorted(self.memories, key=lambda m: -(m.importance * DECAY ** max(0, now - m.round)))
+        """The memories most likely to be on their mind now: important and still remembered. A round
+        is a day; how much fades per day follows recall of news events (research/news.remembered)."""
+        scored = sorted(self.memories, key=lambda m: -(m.importance * remembered(max(0, now - m.round))))
         return sorted(scored[:k], key=lambda m: m.n)
 
     def lines(self, now: int, k: int = RECALL) -> str:

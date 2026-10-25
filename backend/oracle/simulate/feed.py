@@ -20,6 +20,8 @@ from typing import Any, Literal
 import networkx as nx
 import numpy as np
 
+from ..research.news import attention
+
 FeedStyle = Literal["word_of_mouth", "ranked", "viral"]
 
 FEED_SIZE = 5
@@ -33,13 +35,11 @@ class Weights:
     stranger: float
     engagement: float  # how much each like/reshare/reply lifts a post
     power: float  # >1 makes popular posts pull away from the rest
-    freshness: float  # score kept per round of age
-    max_age: int  # rounds a post stays in the candidate pool
 
 
 STYLES: dict[str, Weights] = {
-    "ranked": Weights(contact=1.0, reshared=0.8, two_hop=0.25, stranger=0.03, engagement=0.3, power=1.0, freshness=0.55, max_age=3),
-    "viral": Weights(contact=1.0, reshared=0.9, two_hop=0.45, stranger=0.25, engagement=1.0, power=1.6, freshness=0.65, max_age=3),
+    "ranked": Weights(contact=1.0, reshared=0.8, two_hop=0.25, stranger=0.03, engagement=0.3, power=1.0),
+    "viral": Weights(contact=1.0, reshared=0.9, two_hop=0.45, stranger=0.25, engagement=1.0, power=1.6),
 }
 
 LABELS = {
@@ -100,7 +100,7 @@ def pick(
     scored: list[tuple[float, dict[str, Any]]] = []
     for it in talk:
         age = (rnd - 1) - it["round"]
-        if it["author"] == pid or age < 0 or age >= w.max_age:
+        if it["author"] == pid or age < 0:
             continue
         sharers = fs.resharers.get(it["id"], set()) & contacts
         if it["author"] in contacts:
@@ -112,7 +112,9 @@ def pick(
             kind, close, via = "two_hop", w.two_hop, None
         else:
             kind, close, via = "stranger", w.stranger, None
-        score = close * (w.freshness**age) * (1 + w.engagement * engagement(it)) ** w.power
+        # A round is a day (the network is daily contacts); a post keeps the share of attention a news
+        # story keeps after that many days (Wikipedia pageviews, research/news.attention).
+        score = close * attention(age) * (1 + w.engagement * engagement(it)) ** w.power
         if it["id"] in already:
             score *= 0.3  # feeds rarely show the same thing twice
         if rng is not None:
