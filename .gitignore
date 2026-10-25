@@ -1,16 +1,25 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 *.egg-info/
+build/
+dist/
+.venv/
+venv/
 
-# Local runtime data (database, API keys)
+# Local runtime data: database, API keys, tokens, downloaded datasets.
+# Some datasets (e.g. World Values Survey) may not be redistributed, so they stay here.
 backend/var/
 .env
 .env.*
 !.env.example
+*.pem
+*.key
 
 # Node
 node_modules/
@@ -19,13 +28,18 @@ frontend/.next-*/
 frontend/out/
 *.tsbuildinfo
 next-env.d.ts
+npm-debug.log*
 
-# OS / editors
-.DS_Store
-Thumbs.db
+# AI coding tools and personal editor settings
+.claude/
+.agents/
+.taste-skill/
+skills-lock.json
+CLAUDE.local.md
+.cursor/
 .vscode/
 .idea/
 
-# Design skill working files
-.taste-skill/*
-!.taste-skill/direction.json
+# OS
+.DS_Store
+Thumbs.db
