@@ -21,15 +21,15 @@ Ten features borrowed (as ideas only) from other simulation projects: MiroFish, 
 
 ### What it does
 
-Lets you prove (or disprove) that Oracle predicts well. You save a simulation's answer *before* the real outcome is known, then enter what really happened once it is. Oracle scores itself and can learn its say/do correction from your own results instead of built-in defaults.
+Lets you prove (or disprove) that Tellaris predicts well. You save a simulation's answer *before* the real outcome is known, then enter what really happened once it is. Tellaris scores itself and can learn its say/do correction from your own results instead of built-in defaults.
 
-The existing "Past events" check on the Accuracy page replays famous votes and launches that models may already know, so its scores flatter Oracle. A tracked prediction can't have been memorised: the outcome didn't exist when the prediction was made.
+The existing "Past events" check on the Accuracy page replays famous votes and launches that models may already know, so its scores flatter Tellaris. A tracked prediction can't have been memorised: the outcome didn't exist when the prediction was made.
 
 ### What was done
 
 - **Run page:** a **Track this prediction** button on finished runs (not shown for number questions). It opens a small panel to pick the date the real answer will be known and, optionally, where it will come from. Once saved, the button becomes "Tracked, resolves <date>" and links to the track record. On demo-model runs the panel warns that tracking only tries out the flow.
 - **Accuracy page:** a new **Track record** section at the top:
-  - totals: tracked, scored, average error in points, and the share of results that fell inside Oracle's likely range;
+  - totals: tracked, scored, average error in points, and the share of results that fell inside Tellaris's likely range;
   - every prediction with its status (Open, Result due, Scored), what was predicted, the range, the real result and how far off it was;
   - **Enter the real result**: type the real percentage and a source;
   - a predicted-vs-real chart (on the dashed line is a perfect call);
@@ -73,7 +73,7 @@ For a real test, track questions about things that will be known in weeks or mon
 
 ### Known limits
 
-- Oracle's likely range is narrow (often ±1–2 points). It only counts the randomness of the simulation, not how wrong the model can be, so real results rarely land inside it. Widening the range using the track record's own errors is a natural follow-up.
+- Tellaris's likely range is narrow (often ±1–2 points). It only counts the randomness of the simulation, not how wrong the model can be, so real results rarely land inside it. Widening the range using the track record's own errors is a natural follow-up.
 - Only answers given as a share can be tracked. Number answers (e.g. "how much would you pay") are not yet supported.
 - A run shows only its latest prediction on the run page. Tracking the same run again is possible through the API but not the UI.
 
@@ -214,7 +214,7 @@ Every simulation maps the world around the question:
 
 The map does three jobs:
 - **Grounding:** each simulated person is told the few links that touch *them*, such as the competitor popular in their country or the rule that applies to their kind of company, not the whole map.
-- **Counting:** after the run, Oracle counts which entities people brought up in their answers and posts, and how those people leaned.
+- **Counting:** after the run, Tellaris counts which entities people brought up in their answers and posts, and how those people leaned.
 - **Exploring:** a new **Knowledge graph** tab lets you explore it all.
 
 ### What was done

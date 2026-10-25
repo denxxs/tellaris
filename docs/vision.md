@@ -1,4 +1,4 @@
-# Product Oracle — Vision
+# Project Tellaris — Vision
 
 Saved from the planning chat on 2026-10-20.
 

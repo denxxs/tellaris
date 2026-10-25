@@ -78,7 +78,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
   }, [id, pid]);
 
   useEffect(() => {
-    if (data) document.title = `${data.persona.name} | Oracle`;
+    if (data) document.title = `${data.persona.name} | Tellaris`;
   }, [data]);
 
   const p = data?.persona;

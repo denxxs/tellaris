@@ -790,7 +790,7 @@ def clarify(ctx: dict[str, Any]) -> dict[str, Any]:
         qs.append({"id": "price", "question": "What will it cost a typical customer?", "why": "Price changes who says yes.", "kind": "single",
                    "options": ["Free", "Under $10 a month", "$10 to $50 a month", "Over $50 a month"], "default": "$10 to $50 a month"})
     if not ctx.get("targets") and not find_mentions(ctx["prompt"]) and spec["scope"] != "global" and ctx.get("scope") != "global":
-        qs.append({"id": "where", "question": "Where should Oracle simulate people?", "why": "Different countries answer very differently.", "kind": "single",
+        qs.append({"id": "where", "question": "Where should Tellaris simulate people?", "why": "Different countries answer very differently.", "kind": "single",
                    "options": ["United States", "India", "Europe", "Whole world"], "default": "United States"})
     if spec["lens"] in ("b2b", "consumer") and not re.search(r"\d+\s*(months?|years?)", low):
         qs.append({"id": "horizon", "question": "Over what time frame?", "why": "Adoption builds over time.", "kind": "single",

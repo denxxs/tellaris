@@ -43,7 +43,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   const title = live.spec?.title ?? live.run?.title ?? "Simulation";
 
   useEffect(() => {
-    document.title = `${title} | Oracle`;
+    document.title = `${title} | Tellaris`;
   }, [title]);
 
   const tabs = useMemo(() => {
@@ -174,7 +174,7 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
       {usedMock && (
         <div className="mb-4">
           <Notice>
-            This run uses the offline demo model, so the numbers show how Oracle works but are not predictions.{" "}
+            This run uses the offline demo model, so the numbers show how Tellaris works but are not predictions.{" "}
             <Link href="/settings" className="font-medium underline">
               Connect a model
             </Link>
