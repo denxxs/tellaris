@@ -76,14 +76,9 @@ class Occupation(BaseModel):
     id: str
     title: str
     isco: int
-    weight: float
     sectors: list[str]
     company_types: list[str]
-    income_mult: float
-    tech: float
     buyer_role: str
-    base_share: float | None = None
-    adult_share: float | None = None
     isco08: list[str] = Field(default_factory=list)  # official ISCO-08 unit groups
     population: str | None = None  # employers | own_account | students | retirees | unemployed | outside_labour_force | unknown
 
@@ -112,12 +107,6 @@ def blocs() -> dict[str, Bloc]:
 def occupations() -> dict[str, Occupation]:
     data = load_json("occupations.json")
     return {o["id"]: Occupation.model_validate(o) for o in data["occupations"]}
-
-
-@lru_cache
-def occupation_meta() -> dict[str, Any]:
-    d = load_json("occupations.json")
-    return {"reference_isco": d["_meta"]["reference_isco"], "it_services_hubs": d.get("it_services_hubs", {})}
 
 
 @lru_cache

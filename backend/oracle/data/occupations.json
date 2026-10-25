@@ -1,1438 +1,1144 @@
 {
- "_meta": {
-  "note": "Occupation catalogue used to build personas. isco = ISCO-08 major group (1-9). weight = relative share within its ISCO group in a typical economy. income_mult = income relative to the national average. buyer_role = typical part in a B2B purchase. tech = baseline technology affinity (0-1).",
-  "buyer_roles": [
-   "economic_buyer",
-   "champion",
-   "technical",
-   "security_legal",
-   "procurement",
-   "end_user",
-   "none"
+  "_meta": {
+    "note": "Occupation catalogue: each job's ISCO-08 codes (official unit groups), the sectors and kinds of company it can work in, and its usual part in a B2B purchase (buyer_role). How many people do each job, their age, sex, earnings and company size all come from data (people.json, isco_within.json, firms.json), not from this file.",
+    "buyer_roles": [
+      "economic_buyer",
+      "champion",
+      "technical",
+      "security_legal",
+      "procurement",
+      "end_user",
+      "none"
+    ],
+    "isco08": "isco08: official ISCO-08 unit groups for each job. population: jobs without an ISCO code are counted from another real source (ILO employers, own-account workers, students, retirees, unemployed) or marked unknown. A 2-digit code means the whole sub-major group."
+  },
+  "occupations": [
+    {
+      "id": "founder_b2b_saas",
+      "title": "Founder / CEO of a B2B SaaS startup",
+      "isco": 1,
+      "sectors": [
+        "software"
+      ],
+      "company_types": [
+        "startup",
+        "scaleup"
+      ],
+      "buyer_role": "economic_buyer",
+      "population": "unknown"
+    },
+    {
+      "id": "founder_d2c",
+      "title": "Founder of a consumer / D2C brand",
+      "isco": 1,
+      "sectors": [
+        "retail"
+      ],
+      "company_types": [
+        "startup",
+        "smb"
+      ],
+      "buyer_role": "economic_buyer",
+      "population": "unknown"
+    },
+    {
+      "id": "smb_owner",
+      "title": "Small business owner",
+      "isco": 1,
+      "sectors": [
+        "retail",
+        "services",
+        "hospitality",
+        "manufacturing"
+      ],
+      "company_types": [
+        "smb"
+      ],
+      "buyer_role": "economic_buyer",
+      "population": "employers"
+    },
+    {
+      "id": "ceo_enterprise",
+      "title": "CEO / Managing Director of a large company",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "enterprise"
+      ],
+      "buyer_role": "economic_buyer",
+      "isco08": [
+        "1120"
+      ]
+    },
+    {
+      "id": "cfo",
+      "title": "CFO / Finance Director",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "economic_buyer",
+      "isco08": [
+        "1211"
+      ]
+    },
+    {
+      "id": "cto",
+      "title": "CTO / VP Engineering",
+      "isco": 1,
+      "sectors": [
+        "software",
+        "it_services",
+        "finance"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "technical",
+      "isco08": [
+        "1330"
+      ]
+    },
+    {
+      "id": "cio",
+      "title": "CIO / Head of IT",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise",
+        "government"
+      ],
+      "buyer_role": "economic_buyer",
+      "isco08": [
+        "1330"
+      ]
+    },
+    {
+      "id": "ciso",
+      "title": "CISO / Head of Security",
+      "isco": 1,
+      "sectors": [
+        "finance",
+        "software",
+        "it_services",
+        "healthcare"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "security_legal",
+      "isco08": [
+        "1330"
+      ]
+    },
+    {
+      "id": "vp_sales",
+      "title": "VP / Head of Sales",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "champion",
+      "isco08": [
+        "1221"
+      ]
+    },
+    {
+      "id": "head_marketing",
+      "title": "Head of Marketing / CMO",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "champion",
+      "isco08": [
+        "1221"
+      ]
+    },
+    {
+      "id": "head_hr",
+      "title": "Head of HR / CHRO",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "champion",
+      "isco08": [
+        "1212"
+      ]
+    },
+    {
+      "id": "head_ops",
+      "title": "Head of Operations / COO",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "economic_buyer",
+      "isco08": [
+        "1219"
+      ]
+    },
+    {
+      "id": "product_manager",
+      "title": "Product Manager",
+      "isco": 1,
+      "sectors": [
+        "software",
+        "it_services",
+        "finance",
+        "retail"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "champion",
+      "isco08": [
+        "1219"
+      ]
+    },
+    {
+      "id": "procurement_manager",
+      "title": "Procurement Manager",
+      "isco": 1,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise",
+        "government"
+      ],
+      "buyer_role": "procurement",
+      "isco08": [
+        "1324"
+      ]
+    },
+    {
+      "id": "retail_store_manager",
+      "title": "Retail / Branch Manager",
+      "isco": 1,
+      "sectors": [
+        "retail",
+        "finance"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "1420"
+      ]
+    },
+    {
+      "id": "public_official",
+      "title": "Senior Government Official",
+      "isco": 1,
+      "sectors": [
+        "public_sector"
+      ],
+      "company_types": [
+        "government"
+      ],
+      "buyer_role": "economic_buyer",
+      "isco08": [
+        "1112"
+      ]
+    },
+    {
+      "id": "software_engineer",
+      "title": "Software Engineer",
+      "isco": 2,
+      "sectors": [
+        "software",
+        "it_services",
+        "finance"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "technical",
+      "isco08": [
+        "2511",
+        "2512",
+        "2513",
+        "2514",
+        "2519"
+      ]
+    },
+    {
+      "id": "it_services_engineer",
+      "title": "Software Engineer at a large IT services firm (e.g. Infosys, TCS, Cognizant, Wipro, Accenture)",
+      "isco": 2,
+      "sectors": [
+        "it_services"
+      ],
+      "company_types": [
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2522",
+        "2523",
+        "2529"
+      ]
+    },
+    {
+      "id": "it_services_analyst",
+      "title": "Financial / Business Analyst at a large IT services firm (e.g. Infosys, Cognizant, TCS)",
+      "isco": 2,
+      "sectors": [
+        "it_services",
+        "finance"
+      ],
+      "company_types": [
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2511"
+      ]
+    },
+    {
+      "id": "financial_analyst",
+      "title": "Financial Analyst",
+      "isco": 2,
+      "sectors": [
+        "finance"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2413"
+      ]
+    },
+    {
+      "id": "investment_banker",
+      "title": "Investment Banker",
+      "isco": 2,
+      "sectors": [
+        "finance"
+      ],
+      "company_types": [
+        "enterprise"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "2412"
+      ]
+    },
+    {
+      "id": "vc_investor",
+      "title": "Venture Capital Investor",
+      "isco": 2,
+      "sectors": [
+        "finance"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket"
+      ],
+      "buyer_role": "none",
+      "population": "unknown"
+    },
+    {
+      "id": "accountant",
+      "title": "Accountant",
+      "isco": 2,
+      "sectors": [
+        "finance",
+        "all"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2411"
+      ]
+    },
+    {
+      "id": "data_scientist",
+      "title": "Data Scientist / ML Engineer",
+      "isco": 2,
+      "sectors": [
+        "software",
+        "finance",
+        "it_services"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "technical",
+      "isco08": [
+        "2120"
+      ]
+    },
+    {
+      "id": "designer",
+      "title": "Product / UX Designer",
+      "isco": 2,
+      "sectors": [
+        "software",
+        "media"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2163",
+        "2166"
+      ]
+    },
+    {
+      "id": "management_consultant",
+      "title": "Management Consultant",
+      "isco": 2,
+      "sectors": [
+        "services"
+      ],
+      "company_types": [
+        "enterprise",
+        "midmarket"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "2421"
+      ]
+    },
+    {
+      "id": "lawyer",
+      "title": "Lawyer / In-house Counsel",
+      "isco": 2,
+      "sectors": [
+        "services",
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise",
+        "smb"
+      ],
+      "buyer_role": "security_legal",
+      "isco08": [
+        "2611"
+      ]
+    },
+    {
+      "id": "doctor",
+      "title": "Doctor / Physician",
+      "isco": 2,
+      "sectors": [
+        "healthcare"
+      ],
+      "company_types": [
+        "smb",
+        "enterprise",
+        "government"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2211",
+        "2212"
+      ]
+    },
+    {
+      "id": "nurse",
+      "title": "Nurse",
+      "isco": 2,
+      "sectors": [
+        "healthcare"
+      ],
+      "company_types": [
+        "enterprise",
+        "government"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2221",
+        "3221"
+      ]
+    },
+    {
+      "id": "teacher",
+      "title": "School Teacher",
+      "isco": 2,
+      "sectors": [
+        "education"
+      ],
+      "company_types": [
+        "government",
+        "smb"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2330",
+        "2341",
+        "2342"
+      ]
+    },
+    {
+      "id": "professor",
+      "title": "University Professor / Researcher",
+      "isco": 2,
+      "sectors": [
+        "education"
+      ],
+      "company_types": [
+        "government",
+        "enterprise"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "2310"
+      ]
+    },
+    {
+      "id": "civil_engineer",
+      "title": "Civil / Mechanical Engineer",
+      "isco": 2,
+      "sectors": [
+        "manufacturing",
+        "construction"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2142"
+      ]
+    },
+    {
+      "id": "marketing_specialist",
+      "title": "Marketing Specialist",
+      "isco": 2,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2431"
+      ]
+    },
+    {
+      "id": "journalist",
+      "title": "Journalist / Content Creator",
+      "isco": 2,
+      "sectors": [
+        "media"
+      ],
+      "company_types": [
+        "smb",
+        "enterprise"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "2642"
+      ]
+    },
+    {
+      "id": "policy_analyst",
+      "title": "Policy Analyst / Civil Servant",
+      "isco": 2,
+      "sectors": [
+        "public_sector"
+      ],
+      "company_types": [
+        "government"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "2422"
+      ]
+    },
+    {
+      "id": "it_support",
+      "title": "IT Support / Systems Administrator",
+      "isco": 3,
+      "sectors": [
+        "it_services",
+        "all"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "technical",
+      "isco08": [
+        "3511",
+        "3512"
+      ]
+    },
+    {
+      "id": "sales_rep",
+      "title": "B2B Sales Representative / Account Executive",
+      "isco": 2,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "2433",
+        "3322"
+      ]
+    },
+    {
+      "id": "bookkeeper",
+      "title": "Bookkeeper / Finance Associate",
+      "isco": 3,
+      "sectors": [
+        "finance",
+        "all"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "3313",
+        "4311"
+      ]
+    },
+    {
+      "id": "lab_technician",
+      "title": "Lab / Medical Technician",
+      "isco": 3,
+      "sectors": [
+        "healthcare"
+      ],
+      "company_types": [
+        "enterprise",
+        "smb"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "3111",
+        "3212"
+      ]
+    },
+    {
+      "id": "real_estate_agent",
+      "title": "Real Estate Agent",
+      "isco": 3,
+      "sectors": [
+        "real_estate"
+      ],
+      "company_types": [
+        "smb"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "3334"
+      ]
+    },
+    {
+      "id": "freelancer",
+      "title": "Freelance Developer / Designer",
+      "isco": 3,
+      "sectors": [
+        "software",
+        "media"
+      ],
+      "company_types": [
+        "self_employed"
+      ],
+      "buyer_role": "economic_buyer",
+      "population": "own_account"
+    },
+    {
+      "id": "admin_assistant",
+      "title": "Administrative Assistant",
+      "isco": 3,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket",
+        "enterprise",
+        "government"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "3343",
+        "4110",
+        "4120"
+      ]
+    },
+    {
+      "id": "bpo_agent",
+      "title": "Customer Support / BPO Agent",
+      "isco": 4,
+      "sectors": [
+        "it_services",
+        "telecom"
+      ],
+      "company_types": [
+        "enterprise",
+        "midmarket"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "4222"
+      ]
+    },
+    {
+      "id": "bank_clerk",
+      "title": "Bank Clerk / Teller",
+      "isco": 4,
+      "sectors": [
+        "finance"
+      ],
+      "company_types": [
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "4211"
+      ]
+    },
+    {
+      "id": "data_entry",
+      "title": "Data Entry Operator",
+      "isco": 4,
+      "sectors": [
+        "all"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "end_user",
+      "isco08": [
+        "4132"
+      ]
+    },
+    {
+      "id": "retail_worker",
+      "title": "Retail Sales Worker / Shopkeeper",
+      "isco": 5,
+      "sectors": [
+        "retail"
+      ],
+      "company_types": [
+        "smb",
+        "enterprise"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "5223",
+        "5230"
+      ]
+    },
+    {
+      "id": "restaurant_worker",
+      "title": "Cook / Waiter",
+      "isco": 5,
+      "sectors": [
+        "hospitality"
+      ],
+      "company_types": [
+        "smb"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "5120",
+        "5131",
+        "9412"
+      ]
+    },
+    {
+      "id": "gig_driver",
+      "title": "Ride-hailing / Delivery Driver",
+      "isco": 8,
+      "sectors": [
+        "logistics"
+      ],
+      "company_types": [
+        "self_employed"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "8322"
+      ]
+    },
+    {
+      "id": "caregiver",
+      "title": "Caregiver / Personal Care Worker",
+      "isco": 5,
+      "sectors": [
+        "healthcare"
+      ],
+      "company_types": [
+        "smb",
+        "self_employed"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "5311",
+        "5322"
+      ]
+    },
+    {
+      "id": "security_guard",
+      "title": "Security Guard / Police Officer",
+      "isco": 5,
+      "sectors": [
+        "public_sector",
+        "services"
+      ],
+      "company_types": [
+        "government",
+        "smb"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "5414"
+      ]
+    },
+    {
+      "id": "farmer",
+      "title": "Farmer",
+      "isco": 6,
+      "sectors": [
+        "agriculture"
+      ],
+      "company_types": [
+        "self_employed",
+        "smb"
+      ],
+      "buyer_role": "economic_buyer",
+      "isco08": [
+        "61",
+        "63"
+      ]
+    },
+    {
+      "id": "agri_worker",
+      "title": "Agricultural / Fishery Worker",
+      "isco": 9,
+      "sectors": [
+        "agriculture"
+      ],
+      "company_types": [
+        "smb"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "92"
+      ]
+    },
+    {
+      "id": "electrician",
+      "title": "Electrician / Plumber",
+      "isco": 7,
+      "sectors": [
+        "construction"
+      ],
+      "company_types": [
+        "smb",
+        "self_employed"
+      ],
+      "buyer_role": "economic_buyer",
+      "isco08": [
+        "7411",
+        "7412"
+      ]
+    },
+    {
+      "id": "construction_worker",
+      "title": "Construction Worker / Mason",
+      "isco": 7,
+      "sectors": [
+        "construction"
+      ],
+      "company_types": [
+        "smb"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "7111",
+        "7112",
+        "7113",
+        "7114",
+        "7115",
+        "7119",
+        "9312",
+        "9313"
+      ]
+    },
+    {
+      "id": "tailor",
+      "title": "Garment / Textile Worker",
+      "isco": 7,
+      "sectors": [
+        "manufacturing"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "7531",
+        "7533"
+      ]
+    },
+    {
+      "id": "factory_operator",
+      "title": "Factory Machine Operator",
+      "isco": 8,
+      "sectors": [
+        "manufacturing"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "81",
+        "82"
+      ]
+    },
+    {
+      "id": "truck_driver",
+      "title": "Truck / Bus Driver",
+      "isco": 8,
+      "sectors": [
+        "logistics"
+      ],
+      "company_types": [
+        "smb",
+        "midmarket"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "8332"
+      ]
+    },
+    {
+      "id": "cleaner",
+      "title": "Cleaner / Domestic Worker",
+      "isco": 9,
+      "sectors": [
+        "services"
+      ],
+      "company_types": [
+        "smb",
+        "self_employed"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "9111",
+        "9112"
+      ]
+    },
+    {
+      "id": "laborer",
+      "title": "General Laborer",
+      "isco": 9,
+      "sectors": [
+        "construction",
+        "manufacturing",
+        "agriculture"
+      ],
+      "company_types": [
+        "smb"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "9311",
+        "9321",
+        "9329"
+      ]
+    },
+    {
+      "id": "warehouse_worker",
+      "title": "Warehouse / Delivery Worker",
+      "isco": 4,
+      "sectors": [
+        "logistics",
+        "retail"
+      ],
+      "company_types": [
+        "midmarket",
+        "enterprise"
+      ],
+      "buyer_role": "none",
+      "isco08": [
+        "4321",
+        "9333"
+      ]
+    },
+    {
+      "id": "student",
+      "title": "University Student",
+      "isco": 0,
+      "sectors": [
+        "education"
+      ],
+      "company_types": [
+        "none"
+      ],
+      "buyer_role": "none",
+      "population": "students"
+    },
+    {
+      "id": "retiree",
+      "title": "Retiree",
+      "isco": 0,
+      "sectors": [
+        "none"
+      ],
+      "company_types": [
+        "none"
+      ],
+      "buyer_role": "none",
+      "population": "retirees"
+    },
+    {
+      "id": "homemaker",
+      "title": "Homemaker",
+      "isco": 0,
+      "sectors": [
+        "none"
+      ],
+      "company_types": [
+        "none"
+      ],
+      "buyer_role": "none",
+      "population": "outside_labour_force"
+    },
+    {
+      "id": "unemployed",
+      "title": "Job Seeker",
+      "isco": 0,
+      "sectors": [
+        "none"
+      ],
+      "company_types": [
+        "none"
+      ],
+      "buyer_role": "none",
+      "population": "unemployed"
+    }
   ],
-  "base_share": "Estimated share of the employed workforce in this job in a large high-income economy (US-like). A country's headcount scales it by how big the job's ISCO group is there compared with that reference, and by sector factors (startup density for founders, software spend for tech jobs, IT-services hubs). Rough order-of-magnitude estimates, not census counts.",
-  "reference_isco": [
-   0.12,
-   0.23,
-   0.18,
-   0.08,
-   0.15,
-   0.005,
-   0.08,
-   0.06,
-   0.1
-  ],
-  "adult_share": "Share of all adults (non-workers). Retirees use the country's 65+ share; job seekers use unemployment.",
-  "isco08": "isco08: official ISCO-08 unit groups for each job. population: jobs without an ISCO code are counted from another real source (ILO employers, own-account workers, students, retirees, unemployed) or marked unknown. A 2-digit code means the whole sub-major group."
- },
- "occupations": [
-  {
-   "id": "founder_b2b_saas",
-   "title": "Founder / CEO of a B2B SaaS startup",
-   "isco": 1,
-   "weight": 0.6,
-   "sectors": [
-    "software"
-   ],
-   "company_types": [
-    "startup",
-    "scaleup"
-   ],
-   "income_mult": 2.2,
-   "tech": 0.9,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.0003,
-   "population": "unknown"
-  },
-  {
-   "id": "founder_d2c",
-   "title": "Founder of a consumer / D2C brand",
-   "isco": 1,
-   "weight": 0.5,
-   "sectors": [
-    "retail"
-   ],
-   "company_types": [
-    "startup",
-    "smb"
-   ],
-   "income_mult": 1.8,
-   "tech": 0.7,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.0003,
-   "population": "unknown"
-  },
-  {
-   "id": "smb_owner",
-   "title": "Small business owner",
-   "isco": 1,
-   "weight": 3.0,
-   "sectors": [
-    "retail",
-    "services",
-    "hospitality",
-    "manufacturing"
-   ],
-   "company_types": [
-    "smb"
-   ],
-   "income_mult": 1.4,
-   "tech": 0.45,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.03,
-   "population": "employers"
-  },
-  {
-   "id": "ceo_enterprise",
-   "title": "CEO / Managing Director of a large company",
-   "isco": 1,
-   "weight": 0.15,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "enterprise"
-   ],
-   "income_mult": 8.0,
-   "tech": 0.6,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.0005,
-   "isco08": [
-    "1120"
-   ]
-  },
-  {
-   "id": "cfo",
-   "title": "CFO / Finance Director",
-   "isco": 1,
-   "weight": 0.5,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 4.5,
-   "tech": 0.55,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.002,
-   "isco08": [
-    "1211"
-   ]
-  },
-  {
-   "id": "cto",
-   "title": "CTO / VP Engineering",
-   "isco": 1,
-   "weight": 0.4,
-   "sectors": [
-    "software",
-    "it_services",
-    "finance"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 4.0,
-   "tech": 0.95,
-   "buyer_role": "technical",
-   "base_share": 0.0015,
-   "isco08": [
-    "1330"
-   ]
-  },
-  {
-   "id": "cio",
-   "title": "CIO / Head of IT",
-   "isco": 1,
-   "weight": 0.4,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise",
-    "government"
-   ],
-   "income_mult": 4.0,
-   "tech": 0.85,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.001,
-   "isco08": [
-    "1330"
-   ]
-  },
-  {
-   "id": "ciso",
-   "title": "CISO / Head of Security",
-   "isco": 1,
-   "weight": 0.15,
-   "sectors": [
-    "finance",
-    "software",
-    "it_services",
-    "healthcare"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 4.0,
-   "tech": 0.9,
-   "buyer_role": "security_legal",
-   "base_share": 0.0002,
-   "isco08": [
-    "1330"
-   ]
-  },
-  {
-   "id": "vp_sales",
-   "title": "VP / Head of Sales",
-   "isco": 1,
-   "weight": 0.6,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 3.5,
-   "tech": 0.6,
-   "buyer_role": "champion",
-   "base_share": 0.003,
-   "isco08": [
-    "1221"
-   ]
-  },
-  {
-   "id": "head_marketing",
-   "title": "Head of Marketing / CMO",
-   "isco": 1,
-   "weight": 0.5,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 3.2,
-   "tech": 0.7,
-   "buyer_role": "champion",
-   "base_share": 0.002,
-   "isco08": [
-    "1221"
-   ]
-  },
-  {
-   "id": "head_hr",
-   "title": "Head of HR / CHRO",
-   "isco": 1,
-   "weight": 0.4,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 3.0,
-   "tech": 0.5,
-   "buyer_role": "champion",
-   "base_share": 0.001,
-   "isco08": [
-    "1212"
-   ]
-  },
-  {
-   "id": "head_ops",
-   "title": "Head of Operations / COO",
-   "isco": 1,
-   "weight": 0.5,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 3.6,
-   "tech": 0.6,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.003,
-   "isco08": [
-    "1219"
-   ]
-  },
-  {
-   "id": "product_manager",
-   "title": "Product Manager",
-   "isco": 1,
-   "weight": 0.6,
-   "sectors": [
-    "software",
-    "it_services",
-    "finance",
-    "retail"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 2.6,
-   "tech": 0.85,
-   "buyer_role": "champion",
-   "base_share": 0.003,
-   "isco08": [
-    "1219"
-   ]
-  },
-  {
-   "id": "procurement_manager",
-   "title": "Procurement Manager",
-   "isco": 1,
-   "weight": 0.4,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise",
-    "government"
-   ],
-   "income_mult": 2.4,
-   "tech": 0.45,
-   "buyer_role": "procurement",
-   "base_share": 0.002,
-   "isco08": [
-    "1324"
-   ]
-  },
-  {
-   "id": "retail_store_manager",
-   "title": "Retail / Branch Manager",
-   "isco": 1,
-   "weight": 1.2,
-   "sectors": [
-    "retail",
-    "finance"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.5,
-   "tech": 0.4,
-   "buyer_role": "end_user",
-   "base_share": 0.01,
-   "isco08": [
-    "1420"
-   ]
-  },
-  {
-   "id": "public_official",
-   "title": "Senior Government Official",
-   "isco": 1,
-   "weight": 0.3,
-   "sectors": [
-    "public_sector"
-   ],
-   "company_types": [
-    "government"
-   ],
-   "income_mult": 2.5,
-   "tech": 0.4,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.002,
-   "isco08": [
-    "1112"
-   ]
-  },
-  {
-   "id": "software_engineer",
-   "title": "Software Engineer",
-   "isco": 2,
-   "weight": 2.0,
-   "sectors": [
-    "software",
-    "it_services",
-    "finance"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 2.0,
-   "tech": 0.95,
-   "buyer_role": "technical",
-   "base_share": 0.012,
-   "isco08": [
-    "2511",
-    "2512",
-    "2513",
-    "2514",
-    "2519"
-   ]
-  },
-  {
-   "id": "it_services_engineer",
-   "title": "Software Engineer at a large IT services firm (e.g. Infosys, TCS, Cognizant, Wipro, Accenture)",
-   "isco": 2,
-   "weight": 1.2,
-   "sectors": [
-    "it_services"
-   ],
-   "company_types": [
-    "enterprise"
-   ],
-   "income_mult": 1.6,
-   "tech": 0.85,
-   "buyer_role": "end_user",
-   "base_share": 0.002,
-   "isco08": [
-    "2522",
-    "2523",
-    "2529"
-   ]
-  },
-  {
-   "id": "it_services_analyst",
-   "title": "Financial / Business Analyst at a large IT services firm (e.g. Infosys, Cognizant, TCS)",
-   "isco": 2,
-   "weight": 0.6,
-   "sectors": [
-    "it_services",
-    "finance"
-   ],
-   "company_types": [
-    "enterprise"
-   ],
-   "income_mult": 1.5,
-   "tech": 0.7,
-   "buyer_role": "end_user",
-   "base_share": 0.001,
-   "isco08": [
-    "2511"
-   ]
-  },
-  {
-   "id": "financial_analyst",
-   "title": "Financial Analyst",
-   "isco": 2,
-   "weight": 0.8,
-   "sectors": [
-    "finance"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.9,
-   "tech": 0.65,
-   "buyer_role": "end_user",
-   "base_share": 0.003,
-   "isco08": [
-    "2413"
-   ]
-  },
-  {
-   "id": "investment_banker",
-   "title": "Investment Banker",
-   "isco": 2,
-   "weight": 0.15,
-   "sectors": [
-    "finance"
-   ],
-   "company_types": [
-    "enterprise"
-   ],
-   "income_mult": 4.0,
-   "tech": 0.6,
-   "buyer_role": "none",
-   "base_share": 0.0005,
-   "isco08": [
-    "2412"
-   ]
-  },
-  {
-   "id": "vc_investor",
-   "title": "Venture Capital Investor",
-   "isco": 2,
-   "weight": 0.05,
-   "sectors": [
-    "finance"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket"
-   ],
-   "income_mult": 4.5,
-   "tech": 0.8,
-   "buyer_role": "none",
-   "base_share": 5e-05,
-   "population": "unknown"
-  },
-  {
-   "id": "accountant",
-   "title": "Accountant",
-   "isco": 2,
-   "weight": 1.5,
-   "sectors": [
-    "finance",
-    "all"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.4,
-   "tech": 0.5,
-   "buyer_role": "end_user",
-   "base_share": 0.009,
-   "isco08": [
-    "2411"
-   ]
-  },
-  {
-   "id": "data_scientist",
-   "title": "Data Scientist / ML Engineer",
-   "isco": 2,
-   "weight": 0.5,
-   "sectors": [
-    "software",
-    "finance",
-    "it_services"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 2.3,
-   "tech": 0.97,
-   "buyer_role": "technical",
-   "base_share": 0.0015,
-   "isco08": [
-    "2120"
-   ]
-  },
-  {
-   "id": "designer",
-   "title": "Product / UX Designer",
-   "isco": 2,
-   "weight": 0.4,
-   "sectors": [
-    "software",
-    "media"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.7,
-   "tech": 0.85,
-   "buyer_role": "end_user",
-   "base_share": 0.002,
-   "isco08": [
-    "2163",
-    "2166"
-   ]
-  },
-  {
-   "id": "management_consultant",
-   "title": "Management Consultant",
-   "isco": 2,
-   "weight": 0.4,
-   "sectors": [
-    "services"
-   ],
-   "company_types": [
-    "enterprise",
-    "midmarket"
-   ],
-   "income_mult": 2.6,
-   "tech": 0.65,
-   "buyer_role": "none",
-   "base_share": 0.006,
-   "isco08": [
-    "2421"
-   ]
-  },
-  {
-   "id": "lawyer",
-   "title": "Lawyer / In-house Counsel",
-   "isco": 2,
-   "weight": 0.6,
-   "sectors": [
-    "services",
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise",
-    "smb"
-   ],
-   "income_mult": 2.5,
-   "tech": 0.45,
-   "buyer_role": "security_legal",
-   "base_share": 0.005,
-   "isco08": [
-    "2611"
-   ]
-  },
-  {
-   "id": "doctor",
-   "title": "Doctor / Physician",
-   "isco": 2,
-   "weight": 1.0,
-   "sectors": [
-    "healthcare"
-   ],
-   "company_types": [
-    "smb",
-    "enterprise",
-    "government"
-   ],
-   "income_mult": 2.8,
-   "tech": 0.55,
-   "buyer_role": "end_user",
-   "base_share": 0.006,
-   "isco08": [
-    "2211",
-    "2212"
-   ]
-  },
-  {
-   "id": "nurse",
-   "title": "Nurse",
-   "isco": 2,
-   "weight": 2.0,
-   "sectors": [
-    "healthcare"
-   ],
-   "company_types": [
-    "enterprise",
-    "government"
-   ],
-   "income_mult": 1.1,
-   "tech": 0.45,
-   "buyer_role": "end_user",
-   "base_share": 0.02,
-   "isco08": [
-    "2221",
-    "3221"
-   ]
-  },
-  {
-   "id": "teacher",
-   "title": "School Teacher",
-   "isco": 2,
-   "weight": 3.0,
-   "sectors": [
-    "education"
-   ],
-   "company_types": [
-    "government",
-    "smb"
-   ],
-   "income_mult": 1.0,
-   "tech": 0.45,
-   "buyer_role": "end_user",
-   "base_share": 0.025,
-   "isco08": [
-    "2330",
-    "2341",
-    "2342"
-   ]
-  },
-  {
-   "id": "professor",
-   "title": "University Professor / Researcher",
-   "isco": 2,
-   "weight": 0.5,
-   "sectors": [
-    "education"
-   ],
-   "company_types": [
-    "government",
-    "enterprise"
-   ],
-   "income_mult": 1.7,
-   "tech": 0.65,
-   "buyer_role": "none",
-   "base_share": 0.008,
-   "isco08": [
-    "2310"
-   ]
-  },
-  {
-   "id": "civil_engineer",
-   "title": "Civil / Mechanical Engineer",
-   "isco": 2,
-   "weight": 1.0,
-   "sectors": [
-    "manufacturing",
-    "construction"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.6,
-   "tech": 0.6,
-   "buyer_role": "end_user",
-   "base_share": 0.006,
-   "isco08": [
-    "2142"
-   ]
-  },
-  {
-   "id": "marketing_specialist",
-   "title": "Marketing Specialist",
-   "isco": 2,
-   "weight": 0.8,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.3,
-   "tech": 0.7,
-   "buyer_role": "end_user",
-   "base_share": 0.006,
-   "isco08": [
-    "2431"
-   ]
-  },
-  {
-   "id": "journalist",
-   "title": "Journalist / Content Creator",
-   "isco": 2,
-   "weight": 0.3,
-   "sectors": [
-    "media"
-   ],
-   "company_types": [
-    "smb",
-    "enterprise"
-   ],
-   "income_mult": 1.1,
-   "tech": 0.7,
-   "buyer_role": "none",
-   "base_share": 0.002,
-   "isco08": [
-    "2642"
-   ]
-  },
-  {
-   "id": "policy_analyst",
-   "title": "Policy Analyst / Civil Servant",
-   "isco": 2,
-   "weight": 0.5,
-   "sectors": [
-    "public_sector"
-   ],
-   "company_types": [
-    "government"
-   ],
-   "income_mult": 1.4,
-   "tech": 0.5,
-   "buyer_role": "none",
-   "base_share": 0.004,
-   "isco08": [
-    "2422"
-   ]
-  },
-  {
-   "id": "it_support",
-   "title": "IT Support / Systems Administrator",
-   "isco": 3,
-   "weight": 1.0,
-   "sectors": [
-    "it_services",
-    "all"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.2,
-   "tech": 0.8,
-   "buyer_role": "technical",
-   "base_share": 0.006,
-   "isco08": [
-    "3511",
-    "3512"
-   ]
-  },
-  {
-   "id": "sales_rep",
-   "title": "B2B Sales Representative / Account Executive",
-   "isco": 2,
-   "weight": 2.0,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 1.4,
-   "tech": 0.6,
-   "buyer_role": "end_user",
-   "base_share": 0.012,
-   "isco08": [
-    "2433",
-    "3322"
-   ]
-  },
-  {
-   "id": "bookkeeper",
-   "title": "Bookkeeper / Finance Associate",
-   "isco": 3,
-   "weight": 1.0,
-   "sectors": [
-    "finance",
-    "all"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket"
-   ],
-   "income_mult": 1.0,
-   "tech": 0.5,
-   "buyer_role": "end_user",
-   "base_share": 0.01,
-   "isco08": [
-    "3313",
-    "4311"
-   ]
-  },
-  {
-   "id": "lab_technician",
-   "title": "Lab / Medical Technician",
-   "isco": 3,
-   "weight": 0.6,
-   "sectors": [
-    "healthcare"
-   ],
-   "company_types": [
-    "enterprise",
-    "smb"
-   ],
-   "income_mult": 1.0,
-   "tech": 0.55,
-   "buyer_role": "end_user",
-   "base_share": 0.003,
-   "isco08": [
-    "3111",
-    "3212"
-   ]
-  },
-  {
-   "id": "real_estate_agent",
-   "title": "Real Estate Agent",
-   "isco": 3,
-   "weight": 0.5,
-   "sectors": [
-    "real_estate"
-   ],
-   "company_types": [
-    "smb"
-   ],
-   "income_mult": 1.2,
-   "tech": 0.5,
-   "buyer_role": "end_user",
-   "base_share": 0.004,
-   "isco08": [
-    "3334"
-   ]
-  },
-  {
-   "id": "freelancer",
-   "title": "Freelance Developer / Designer",
-   "isco": 3,
-   "weight": 0.6,
-   "sectors": [
-    "software",
-    "media"
-   ],
-   "company_types": [
-    "self_employed"
-   ],
-   "income_mult": 1.2,
-   "tech": 0.9,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.004,
-   "population": "own_account"
-  },
-  {
-   "id": "admin_assistant",
-   "title": "Administrative Assistant",
-   "isco": 3,
-   "weight": 2.0,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket",
-    "enterprise",
-    "government"
-   ],
-   "income_mult": 0.8,
-   "tech": 0.45,
-   "buyer_role": "end_user",
-   "base_share": 0.02,
-   "isco08": [
-    "3343",
-    "4110",
-    "4120"
-   ]
-  },
-  {
-   "id": "bpo_agent",
-   "title": "Customer Support / BPO Agent",
-   "isco": 4,
-   "weight": 1.5,
-   "sectors": [
-    "it_services",
-    "telecom"
-   ],
-   "company_types": [
-    "enterprise",
-    "midmarket"
-   ],
-   "income_mult": 0.75,
-   "tech": 0.55,
-   "buyer_role": "end_user",
-   "base_share": 0.015,
-   "isco08": [
-    "4222"
-   ]
-  },
-  {
-   "id": "bank_clerk",
-   "title": "Bank Clerk / Teller",
-   "isco": 4,
-   "weight": 1.0,
-   "sectors": [
-    "finance"
-   ],
-   "company_types": [
-    "enterprise"
-   ],
-   "income_mult": 0.9,
-   "tech": 0.45,
-   "buyer_role": "end_user",
-   "base_share": 0.003,
-   "isco08": [
-    "4211"
-   ]
-  },
-  {
-   "id": "data_entry",
-   "title": "Data Entry Operator",
-   "isco": 4,
-   "weight": 1.0,
-   "sectors": [
-    "all"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 0.7,
-   "tech": 0.4,
-   "buyer_role": "end_user",
-   "base_share": 0.004,
-   "isco08": [
-    "4132"
-   ]
-  },
-  {
-   "id": "retail_worker",
-   "title": "Retail Sales Worker / Shopkeeper",
-   "isco": 5,
-   "weight": 4.0,
-   "sectors": [
-    "retail"
-   ],
-   "company_types": [
-    "smb",
-    "enterprise"
-   ],
-   "income_mult": 0.65,
-   "tech": 0.35,
-   "buyer_role": "none",
-   "base_share": 0.03,
-   "isco08": [
-    "5223",
-    "5230"
-   ]
-  },
-  {
-   "id": "restaurant_worker",
-   "title": "Cook / Waiter",
-   "isco": 5,
-   "weight": 2.5,
-   "sectors": [
-    "hospitality"
-   ],
-   "company_types": [
-    "smb"
-   ],
-   "income_mult": 0.6,
-   "tech": 0.3,
-   "buyer_role": "none",
-   "base_share": 0.03,
-   "isco08": [
-    "5120",
-    "5131",
-    "9412"
-   ]
-  },
-  {
-   "id": "gig_driver",
-   "title": "Ride-hailing / Delivery Driver",
-   "isco": 8,
-   "weight": 1.5,
-   "sectors": [
-    "logistics"
-   ],
-   "company_types": [
-    "self_employed"
-   ],
-   "income_mult": 0.65,
-   "tech": 0.55,
-   "buyer_role": "none",
-   "base_share": 0.01,
-   "isco08": [
-    "8322"
-   ]
-  },
-  {
-   "id": "caregiver",
-   "title": "Caregiver / Personal Care Worker",
-   "isco": 5,
-   "weight": 2.0,
-   "sectors": [
-    "healthcare"
-   ],
-   "company_types": [
-    "smb",
-    "self_employed"
-   ],
-   "income_mult": 0.6,
-   "tech": 0.3,
-   "buyer_role": "none",
-   "base_share": 0.015,
-   "isco08": [
-    "5311",
-    "5322"
-   ]
-  },
-  {
-   "id": "security_guard",
-   "title": "Security Guard / Police Officer",
-   "isco": 5,
-   "weight": 1.2,
-   "sectors": [
-    "public_sector",
-    "services"
-   ],
-   "company_types": [
-    "government",
-    "smb"
-   ],
-   "income_mult": 0.75,
-   "tech": 0.3,
-   "buyer_role": "none",
-   "base_share": 0.008,
-   "isco08": [
-    "5414"
-   ]
-  },
-  {
-   "id": "farmer",
-   "title": "Farmer",
-   "isco": 6,
-   "weight": 5.0,
-   "sectors": [
-    "agriculture"
-   ],
-   "company_types": [
-    "self_employed",
-    "smb"
-   ],
-   "income_mult": 0.5,
-   "tech": 0.25,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.004,
-   "isco08": [
-    "61",
-    "63"
-   ]
-  },
-  {
-   "id": "agri_worker",
-   "title": "Agricultural / Fishery Worker",
-   "isco": 9,
-   "weight": 3.0,
-   "sectors": [
-    "agriculture"
-   ],
-   "company_types": [
-    "smb"
-   ],
-   "income_mult": 0.4,
-   "tech": 0.2,
-   "buyer_role": "none",
-   "base_share": 0.006,
-   "isco08": [
-    "92"
-   ]
-  },
-  {
-   "id": "electrician",
-   "title": "Electrician / Plumber",
-   "isco": 7,
-   "weight": 2.0,
-   "sectors": [
-    "construction"
-   ],
-   "company_types": [
-    "smb",
-    "self_employed"
-   ],
-   "income_mult": 0.9,
-   "tech": 0.35,
-   "buyer_role": "economic_buyer",
-   "base_share": 0.012,
-   "isco08": [
-    "7411",
-    "7412"
-   ]
-  },
-  {
-   "id": "construction_worker",
-   "title": "Construction Worker / Mason",
-   "isco": 7,
-   "weight": 3.0,
-   "sectors": [
-    "construction"
-   ],
-   "company_types": [
-    "smb"
-   ],
-   "income_mult": 0.7,
-   "tech": 0.2,
-   "buyer_role": "none",
-   "base_share": 0.015,
-   "isco08": [
-    "7111",
-    "7112",
-    "7113",
-    "7114",
-    "7115",
-    "7119",
-    "9312",
-    "9313"
-   ]
-  },
-  {
-   "id": "tailor",
-   "title": "Garment / Textile Worker",
-   "isco": 7,
-   "weight": 1.5,
-   "sectors": [
-    "manufacturing"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket"
-   ],
-   "income_mult": 0.55,
-   "tech": 0.2,
-   "buyer_role": "none",
-   "base_share": 0.002,
-   "isco08": [
-    "7531",
-    "7533"
-   ]
-  },
-  {
-   "id": "factory_operator",
-   "title": "Factory Machine Operator",
-   "isco": 8,
-   "weight": 3.0,
-   "sectors": [
-    "manufacturing"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 0.75,
-   "tech": 0.3,
-   "buyer_role": "none",
-   "base_share": 0.02,
-   "isco08": [
-    "81",
-    "82"
-   ]
-  },
-  {
-   "id": "truck_driver",
-   "title": "Truck / Bus Driver",
-   "isco": 8,
-   "weight": 2.0,
-   "sectors": [
-    "logistics"
-   ],
-   "company_types": [
-    "smb",
-    "midmarket"
-   ],
-   "income_mult": 0.8,
-   "tech": 0.3,
-   "buyer_role": "none",
-   "base_share": 0.015,
-   "isco08": [
-    "8332"
-   ]
-  },
-  {
-   "id": "cleaner",
-   "title": "Cleaner / Domestic Worker",
-   "isco": 9,
-   "weight": 3.0,
-   "sectors": [
-    "services"
-   ],
-   "company_types": [
-    "smb",
-    "self_employed"
-   ],
-   "income_mult": 0.45,
-   "tech": 0.15,
-   "buyer_role": "none",
-   "base_share": 0.015,
-   "isco08": [
-    "9111",
-    "9112"
-   ]
-  },
-  {
-   "id": "laborer",
-   "title": "General Laborer",
-   "isco": 9,
-   "weight": 3.0,
-   "sectors": [
-    "construction",
-    "manufacturing",
-    "agriculture"
-   ],
-   "company_types": [
-    "smb"
-   ],
-   "income_mult": 0.45,
-   "tech": 0.15,
-   "buyer_role": "none",
-   "base_share": 0.015,
-   "isco08": [
-    "9311",
-    "9321",
-    "9329"
-   ]
-  },
-  {
-   "id": "warehouse_worker",
-   "title": "Warehouse / Delivery Worker",
-   "isco": 4,
-   "weight": 1.5,
-   "sectors": [
-    "logistics",
-    "retail"
-   ],
-   "company_types": [
-    "midmarket",
-    "enterprise"
-   ],
-   "income_mult": 0.6,
-   "tech": 0.3,
-   "buyer_role": "none",
-   "base_share": 0.012,
-   "isco08": [
-    "4321",
-    "9333"
-   ]
-  },
-  {
-   "id": "student",
-   "title": "University Student",
-   "isco": 0,
-   "weight": 1.0,
-   "sectors": [
-    "education"
-   ],
-   "company_types": [
-    "none"
-   ],
-   "income_mult": 0.2,
-   "tech": 0.85,
-   "buyer_role": "none",
-   "adult_share": 0.07,
-   "population": "students"
-  },
-  {
-   "id": "retiree",
-   "title": "Retiree",
-   "isco": 0,
-   "weight": 1.0,
-   "sectors": [
-    "none"
-   ],
-   "company_types": [
-    "none"
-   ],
-   "income_mult": 0.6,
-   "tech": 0.25,
-   "buyer_role": "none",
-   "adult_share": 0.0,
-   "population": "retirees"
-  },
-  {
-   "id": "homemaker",
-   "title": "Homemaker",
-   "isco": 0,
-   "weight": 1.0,
-   "sectors": [
-    "none"
-   ],
-   "company_types": [
-    "none"
-   ],
-   "income_mult": 0.3,
-   "tech": 0.35,
-   "buyer_role": "none",
-   "adult_share": 0.05,
-   "population": "outside_labour_force"
-  },
-  {
-   "id": "unemployed",
-   "title": "Job Seeker",
-   "isco": 0,
-   "weight": 0.5,
-   "sectors": [
-    "none"
-   ],
-   "company_types": [
-    "none"
-   ],
-   "income_mult": 0.25,
-   "tech": 0.45,
-   "buyer_role": "none",
-   "adult_share": 0.0,
-   "population": "unemployed"
+  "company_types": {
+    "self_employed": {
+      "label": "Self-employed",
+      "employees": [
+        1,
+        1
+      ]
+    },
+    "startup": {
+      "label": "Early-stage startup",
+      "employees": [
+        2,
+        50
+      ]
+    },
+    "scaleup": {
+      "label": "Scale-up",
+      "employees": [
+        50,
+        500
+      ]
+    },
+    "smb": {
+      "label": "Small business",
+      "employees": [
+        2,
+        100
+      ]
+    },
+    "midmarket": {
+      "label": "Mid-market company",
+      "employees": [
+        100,
+        2000
+      ]
+    },
+    "enterprise": {
+      "label": "Large enterprise",
+      "employees": [
+        2000,
+        300000
+      ]
+    },
+    "government": {
+      "label": "Government / public body",
+      "employees": [
+        50,
+        100000
+      ]
+    },
+    "none": {
+      "label": "Not employed",
+      "employees": [
+        0,
+        0
+      ]
+    }
   }
- ],
- "company_types": {
-  "self_employed": {
-   "label": "Self-employed",
-   "employees": [
-    1,
-    1
-   ]
-  },
-  "startup": {
-   "label": "Early-stage startup",
-   "employees": [
-    2,
-    50
-   ]
-  },
-  "scaleup": {
-   "label": "Scale-up",
-   "employees": [
-    50,
-    500
-   ]
-  },
-  "smb": {
-   "label": "Small business",
-   "employees": [
-    2,
-    100
-   ]
-  },
-  "midmarket": {
-   "label": "Mid-market company",
-   "employees": [
-    100,
-    2000
-   ]
-  },
-  "enterprise": {
-   "label": "Large enterprise",
-   "employees": [
-    2000,
-    300000
-   ]
-  },
-  "government": {
-   "label": "Government / public body",
-   "employees": [
-    50,
-    100000
-   ]
-  },
-  "none": {
-   "label": "Not employed",
-   "employees": [
-    0,
-    0
-   ]
-  }
- },
- "it_services_hubs": {
-  "IND": 6.0,
-  "PHL": 4.0,
-  "LKA": 2.0,
-  "POL": 2.0,
-  "ROU": 2.0,
-  "UKR": 2.5,
-  "BLR": 1.5,
-  "VNM": 2.0,
-  "EGY": 1.5,
-  "MEX": 1.5,
-  "COL": 1.3,
-  "ARG": 1.5,
-  "BRA": 1.3,
-  "CRI": 2.0,
-  "IRL": 2.0,
-  "ISR": 1.5,
-  "MYS": 1.5,
-  "BGD": 1.2,
-  "PAK": 1.3,
-  "CZE": 1.3,
-  "HUN": 1.3,
-  "SRB": 1.5,
-  "BGR": 1.5
- }
 }

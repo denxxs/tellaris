@@ -2,7 +2,8 @@
 
 Source: Prem K, van Zandvoort K, Klepac P, et al. (2021) "Projecting contact matrices in 177
 geographical regions: an update and comparison with empirical data for the COVID-19 era."
-PLOS Computational Biology 17(7): e1009098. doi:10.1371/journal.pcbi.1009098 (CC BY 4.0).
+PLOS Computational Biology 17(7): e1009098. doi:10.1371/journal.pcbi.1009098 (article CC BY 4.0;
+matrices from the GPL-3.0 repository below, corrected version of Oct 2022).
 The matrices extend the POLYMOD and other diary surveys (a contact = a conversation of at least a
 few words, or touch) to 177 countries using each country's household, school and work data.
 
@@ -74,7 +75,7 @@ def main() -> None:
     OUT.write_text(json.dumps({
         "_meta": {
             "built": date.today().isoformat(),
-            "source": "Prem et al. (2021) PLOS Comput Biol 17(7): e1009098, doi:10.1371/journal.pcbi.1009098, CC BY 4.0",
+            "source": "Prem et al. (2021) PLOS Comput Biol 17(7): e1009098, doi:10.1371/journal.pcbi.1009098; matrices from github.com/kieshaprem/synthetic-contact-matrices (GPL-3.0, corrected 2022 version)",
             "note": "Mean daily contacts a person in the row age band has with people in the column age band, by setting. Ages 15+ only.",
             "bands": BANDS,
             "settings": SETTINGS,
