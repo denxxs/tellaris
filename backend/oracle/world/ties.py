@@ -1,6 +1,6 @@
 """Each country's measured ties to the rest of the world (built by scripts/build_ties.py).
 
-Trade in goods (CEPII Gravity / BACI, 2019), trade in services (OECD-WTO BaTIS), friendships
+Trade in goods (CEPII BACI, 2024), trade in services (OECD-WTO BaTIS), friendships
 (Meta Social Connectedness Index) and people living abroad (UN DESA migrant stock 2024).
 """
 
@@ -36,7 +36,7 @@ CHANNELS: dict[str, dict[str, Any]] = {
                    "text": "{tgt} is an EU member, so EU law applies directly.", "about": "Rules that apply across borders"},
 }
 SOURCES = {
-    "exports": "CEPII Gravity (BACI), 2019", "commodities": "CEPII Gravity (BACI), 2019", "imports": "CEPII Gravity (BACI), 2019",
+    "exports": "CEPII BACI 2024", "commodities": "CEPII BACI 2024", "imports": "CEPII BACI 2024",
     "tech_exports": "OECD-WTO BaTIS", "finance_exports": "OECD-WTO BaTIS", "business_exports": "OECD-WTO BaTIS", "tourism": "OECD-WTO BaTIS",
     "friends": "Meta Social Connectedness Index", "diaspora": "UN migrant stock 2024", "regulation": "EU membership",
 }
@@ -75,7 +75,7 @@ def partners(iso: str, channel: str) -> list[tuple[str, float, dict]]:
         total = e.get("total") or 0
         return [(k, n / total, {"n": n}) for k, n in (e.get("by_country") or {}).items()] if total else []
     d = t.get(name) or {}
-    return [(k, v, {"year": d.get("year")}) for k, v in (d.get("shares") or {}).items()]
+    return [(k, v, {"year": d.get("year"), "source": d.get("source")}) for k, v in (d.get("shares") or {}).items()]
 
 
 def pair_note(iso: str, partner: str) -> str:

@@ -48,6 +48,8 @@ def test_ties_are_measured_and_sourced():
     infl = expand(["IND"], sectors=["it_services"])
     tech = {i.code: e for i in infl for e in i.edges if e.channel == "tech_exports"}
     assert "USA" in tech and "EU" in tech
+    # India doesn't report its partners; its central bank's survey of software exporters does.
+    assert tech["USA"].strength > 0.5 and "RBI" in tech["USA"].note
     assert all(0 < e.strength <= 1 and "Source:" in e.note for i in infl for e in i.edges)
     # EU law applies to members as a fact; non-members get no invented "regulation" strength.
     assert any(e.channel == "regulation" and e.strength == 1.0 for i in expand(["DEU"]) for e in i.edges)
@@ -60,7 +62,12 @@ def test_contacts_abroad_follow_friendship_data():
     ind = country_mix("IND", ["IND", "USA"])
     mex = country_mix("MEX", ["MEX", "USA"])
     assert ind["IND"] > 0.95 and mex["USA"] > ind["USA"] * 5  # Mexico is far more tied to the US
-    assert country_mix("CHN", ["CHN", "USA"]) == {"CHN": 1.0}  # no data (Facebook is blocked): no guessed ties
+    # Meta has no index for China: its ties are estimated by the model fitted on measured pairs,
+    # and say so.
+    from oracle.world import ties as ties_mod
+    chn = country_mix("CHN", ["CHN", "USA"])
+    assert chn["CHN"] > 0.9 and 0 < chn["USA"] < 0.1
+    assert ties_mod.of("CHN")["friendships"]["estimated"] is True
 
 
 def test_allocate_exact_and_covering():

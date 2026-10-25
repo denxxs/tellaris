@@ -77,7 +77,8 @@ def measured_edges(target: str) -> list[InfluenceEdge]:
                 sname = "other EU countries" if eu and target in eu.members else "the EU"
             note = spec["text"].format(src=sname, tgt=tname, pct=_pct(share), n=f"{extra.get('n', 0):,}")
             note = note[0].upper() + note[1:]
-            note += ties_mod.pair_note(target, src) + f". Source: {ties_mod.SOURCES[ch]}" + (f" {extra['year']}" if extra.get("year") else "") + "."
+            src_name = extra.get("source") or ties_mod.SOURCES[ch]
+            note += ties_mod.pair_note(target, src) + f". Source: {src_name}" + (f" {extra['year']}" if extra.get("year") and str(extra["year"]) not in src_name else "") + "."
             out.append(InfluenceEdge(source=src, target=target, channel=ch, strength=round(share, 4), sectors=spec["sectors"], note=note, origin="data"))
     return out
 
