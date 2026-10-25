@@ -1,6 +1,6 @@
 """Current affairs: the real news around a question, and who in the crowd would know it.
 
-Every run starts from the world as it is today. Oracle searches recent news for the question,
+Every run starts from the world as it is today. Tellaris searches recent news for the question,
 keeps items that are relevant and recent enough to matter, and gives each simulated person only
 the items they would plausibly have come across: mass news reaches most people in a country,
 niche news only reaches the people it concerns (an RBI circular reaches an Indian finance worker,

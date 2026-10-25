@@ -1,7 +1,7 @@
 """Asking a group: put a follow-up question to people from a finished run.
 
 You pick a group (everyone, or any mix of the Where it works breakdowns such as
-"Under 30s in India") and a question. Oracle picks people from that group at
+"Under 30s in India") and a question. Tellaris picks people from that group at
 random (so smaller countries are heard too), asks each one in character, using
 what they decided and remember, and sums the answers up like a small survey: a
 chart for multiple choice, number and 0-10 questions, themes and quotes for open

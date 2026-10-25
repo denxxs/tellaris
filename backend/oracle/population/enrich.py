@@ -19,7 +19,7 @@ names), a one-line tagline (who they are, like a social media bio), a 1-2 senten
 1-2 sentence typical day, and a one-line description of how they talk.
 Restate the given facts in human words; do NOT add new facts. In particular, never invent which products, apps or
 brands they use, where they get news, their values, opinions, priorities, problems, family or anything about the
-topic being simulated. Those would change how they answer, and Oracle only lets real data do that."""
+topic being simulated. Those would change how they answer, and Tellaris only lets real data do that."""
 
 
 class Enriched(BaseModel):

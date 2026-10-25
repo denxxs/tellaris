@@ -64,7 +64,7 @@ async def lifespan(_: FastAPI):
     await store.close()
 
 
-app = FastAPI(title="Product Oracle", version=__version__, lifespan=lifespan)
+app = FastAPI(title="Project Tellaris", version=__version__, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware, allow_origins=env.cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )

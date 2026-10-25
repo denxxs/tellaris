@@ -44,7 +44,7 @@ FRIENDS_OUT = ROOT / "oracle" / "data" / "friendships.json"
 TRADE_YEAR = 2024
 TOP = 8  # partners kept per list (the full distribution sums to 1; we keep the largest)
 
-# BaTIS EBOPS 2010 items -> the services Oracle's jobs work in.
+# BaTIS EBOPS 2010 items -> the services Tellaris's jobs work in.
 SERVICE_ITEMS = {
     "ict": ["SI"],  # telecommunications, computer and information services
     "finance": ["SF", "SG"],  # insurance and pension, financial services

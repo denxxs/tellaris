@@ -475,7 +475,7 @@ export function MethodTab({ live }: { live: LiveState }) {
             (r.headline.awareness != null ? (
               <li>The answer is for people who hear about it. You set awareness at {pctSmart(r.headline.awareness)}, which gives the totals for the whole audience.</li>
             ) : (
-              <li>The answer is for people who hear about it. Oracle doesn&apos;t guess how many will; totals are given per 1% of the audience who hears, and you can set your own awareness in the setup.</li>
+              <li>The answer is for people who hear about it. Tellaris doesn&apos;t guess how many will; totals are given per 1% of the audience who hears, and you can set your own awareness in the setup.</li>
             ))}
           <li>Each person counts for the number of real people they stand for, estimated from World Bank and ILO data for their country and job.</li>
           <li>The range comes from resampling people and model answers 1,000 times.</li>

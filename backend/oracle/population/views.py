@@ -104,7 +104,7 @@ BY_KEY = {q.key: q for q in QUESTIONS}
 
 # ISCO-08 major group -> WVS "occupational group" (Q281) codes.
 ISCO_TO_WVS = {1: {2}, 2: {1}, 3: {1}, 4: {3}, 5: {4, 5}, 6: {9, 10}, 7: {6}, 8: {7}, 9: {8, 9}, 0: {11}}
-# Oracle's non-worker kinds -> WVS employment status (Q279).
+# Tellaris's non-worker kinds -> WVS employment status (Q279).
 WORK_OF = {"retirees": {4}, "outside_labour_force": {5}, "students": {6}, "unemployed": {7}}
 WORKING = {1, 2, 3}
 SELF_EMPLOYED = {3}

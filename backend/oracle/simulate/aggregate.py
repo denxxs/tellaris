@@ -50,7 +50,7 @@ class Aggregator:
         self.lens = lens_of(spec)
         self.action = self.lens.say_do
         # The headline is what people answered. Awareness (how many will even hear of it) is only
-        # applied when the user gave it; Oracle never guesses it.
+        # applied when the user gave it; Tellaris never guesses it.
         self.reach = 1.0
         self.awareness = spec.assumed_reach if self.lens.reach and spec.assumed_reach is not None else None
         # Turns a share into people: everyone for opinion questions, the aware for adoption questions.

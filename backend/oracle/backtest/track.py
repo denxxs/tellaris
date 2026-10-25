@@ -1,7 +1,7 @@
 """Track record: predictions made before the outcome was known, scored once it is.
 
 Backtests replay famous past events that models may already know, so their scores
-flatter Oracle. The track record is the honest test. You save a finished run's
+flatter Tellaris. The track record is the honest test. You save a finished run's
 headline with the date the real answer will be known, then enter what really
 happened. Each prediction is frozen when it is saved, so it cannot be tuned after
 the fact.

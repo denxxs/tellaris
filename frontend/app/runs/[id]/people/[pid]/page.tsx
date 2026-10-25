@@ -88,7 +88,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
   }, [id, pid]);
 
   useEffect(() => {
-    if (data) document.title = `${data.persona.name} | Oracle`;
+    if (data) document.title = `${data.persona.name} | Tellaris`;
   }, [data]);
 
   const p = data?.persona;
@@ -303,7 +303,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string; 
                 </Card>
                 {(p.priorities.length > 0 || p.frustrations.length > 0 || p.info_sources.length > 0) && (
                   <Card>
-                    <CardHead title="What's on their mind">Written by the model in an older version of Oracle.</CardHead>
+                    <CardHead title="What's on their mind">Written by the model in an older version of Tellaris.</CardHead>
                     <dl className="flex flex-col gap-3">
                       {p.priorities.length > 0 && <Fact label="Priorities right now">{p.priorities.join("; ")}</Fact>}
                       {p.frustrations.length > 0 && <Fact label="Frustrations">{p.frustrations.join("; ")}</Fact>}

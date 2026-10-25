@@ -67,7 +67,7 @@ def test_full_run_and_whatif(client):
     assert len(res["diffusion"]["rounds"]) == 3
     assert res["wtp"]["curve"]
     assert run["report"]["headline"]
-    # There is no published count of SaaS founders, so Oracle weights the groups equally and
+    # There is no published count of SaaS founders, so Tellaris weights the groups equally and
     # leaves the audience size, customers and revenue blank rather than guessing them.
     assert "B2B SaaS founders" in " ".join(res["sizes"]["unknown"]) or res["sizes"]["unknown"]
     assert res["sizes"]["weighting"] == "equal"

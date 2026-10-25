@@ -143,7 +143,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
 
   return (
     <div>
-      <Section title="The question" aside="What Oracle predicts, and what each simulated person is asked about their own behaviour.">
+      <Section title="The question" aside="What Tellaris predicts, and what each simulated person is asked about their own behaviour.">
         {meta && (
           <Field label="Reading this as" hint={lens?.description ?? "How people are asked, and how answers turn into the headline."}>
             {() => (
@@ -181,7 +181,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
         </div>
       </Section>
 
-      <Section title="What people see" aside="Describe it the way a person would first come across it. People only judge what is written here and the facts Oracle finds.">
+      <Section title="What people see" aside="Describe it the way a person would first come across it. People only judge what is written here and the facts Tellaris finds.">
         <Field label="Description">{(id) => <Textarea id={id} rows={4} value={spec.subject} onChange={(e) => set("subject", e.target.value)} />}</Field>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Field label="Price" hint="Leave empty when there is no price.">
@@ -261,7 +261,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
 
       <Section
         title="Who"
-        aside="Groups of people, their jobs and where they live. Oracle sizes each group from real population data, so there's nothing to balance by hand."
+        aside="Groups of people, their jobs and where they live. Tellaris sizes each group from real population data, so there's nothing to balance by hand."
         summary={totalHeads > 0 ? <>These groups stand for about <span className="num text-text">{people(totalHeads)}</span> real people.</> : undefined}
       >
         {segs.map((s, i) => (
@@ -404,7 +404,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
 
       <Section
         title="What-if events"
-        aside="Real news and scheduled events are added automatically. Use this only to test something that hasn't happened, like a rival cutting its price or a new law. It's always shown as an assumption, and Oracle also runs the same people without it so you can see the difference."
+        aside="Real news and scheduled events are added automatically. Use this only to test something that hasn't happened, like a rival cutting its price or a new law. It's always shown as an assumption, and Tellaris also runs the same people without it so you can see the difference."
         summary={events.length ? <>{events.length} {events.length === 1 ? "event" : "events"} on the timeline.</> : undefined}
       >
         {!spec.modes.includes("diffusion") && <p className="text-[13px] text-muted">Events land while people talk it over. Turn on Society under How to simulate to use them.</p>}
@@ -533,7 +533,7 @@ export function ScenarioEditor({ spec, onSpec, config, onConfig }: Props) {
                 description={
                   spec.assumed_reach != null
                     ? "Your own estimate of the share of the audience who hears about it in the time frame. Used for totals like customers and revenue."
-                    : "Off: Oracle doesn't guess this. The answer is for people who hear about it, and totals are shown per 1% who hear."
+                    : "Off: Tellaris doesn't guess this. The answer is for people who hear about it, and totals are shown per 1% who hear."
                 }
               />
               {spec.assumed_reach != null && (

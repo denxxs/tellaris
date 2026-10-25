@@ -7,7 +7,7 @@
 - Age and gender filters use the job's real age and gender mix (ILOSTAT), or the country's
   population by age and sex (World Bank) for people outside jobs.
 - When no source exists (e.g. "startup founders"), the size is unknown and returned as None:
-  Oracle never makes one up.
+  Tellaris never makes one up.
 """
 
 from __future__ import annotations

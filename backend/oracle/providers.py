@@ -64,7 +64,7 @@ PROVIDERS: list[dict] = [
         "id": "ollama", "label": "Ollama (local)", "key_env": None, "base_env": "OLLAMA_API_BASE", "base_default": "http://localhost:11434",
         "models": ["llama3.1", "qwen2.5", "mistral"], "note": "Runs on your machine. No key needed.",
     },
-    {"id": "mock", "label": "Demo (offline)", "key_env": None, "models": ["oracle"], "note": "Runs without any model. Shows how Oracle works; not predictions."},
+    {"id": "mock", "label": "Demo (offline)", "key_env": None, "models": ["oracle"], "note": "Runs without any model. Shows how Tellaris works; not predictions."},
 ]
 
 
