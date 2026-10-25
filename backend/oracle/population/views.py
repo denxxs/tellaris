@@ -170,7 +170,9 @@ def match(iso: str, rng: np.random.Generator, *, sex: str, age: int, population:
     else:
         work_exact = np.isin(c["work"], list(SELF_EMPLOYED if self_employed else WORKING))
         work_broad = np.isin(c["work"], list(WORKING))
-        occ_m = np.isin(c["occ"], list(ISCO_TO_WVS.get(isco_major, set()))) if isco_major is not None else np.ones_like(sex_m)
+        has_occ = bool((c["occ"] >= 0).any())  # some surveys (EVS in the joint file) record no occupation
+        occ_m = (np.isin(c["occ"], list(ISCO_TO_WVS.get(isco_major, set())))
+                 if isco_major is not None and has_occ else np.ones_like(sex_m))
     inc_m = None
     if income_pct is not None:
         inc_m = (c["inc_lo"] <= income_pct) & (income_pct < c["inc_hi"])
@@ -192,7 +194,7 @@ def match(iso: str, rng: np.random.Generator, *, sex: str, age: int, population:
                 return None
             w = c["weight"][idx]
             pick = int(idx[rng.choice(len(idx), p=w / w.sum())])
-            if population in WORK_OF:
+            if population in WORK_OF or not bool((c["occ"] >= 0).any()):
                 on = [x for x in on if x != "occupation"]
             return Match(answers=dict(c["answers"][pick]), year=c["year"], matched_on=on)
     return None
