@@ -94,3 +94,19 @@ frontend/       Next.js app
 ```
 
 Tests: `cd backend && python -m pytest`.
+
+## Licence
+
+Copyright (C) 2026 denxxs (https://github.com/denxxs).
+
+Code: [GNU AGPL-3.0](LICENSE). You can use, change and self-host Project Tellaris freely. If you
+run a modified version as a service for others, you must publish your changes under the same
+licence. For other terms (closed-source use, a hosted service without sharing changes), a
+commercial licence is available from the copyright holder.
+
+Data: the files in `backend/oracle/data/` are built from public sources and keep their own
+licences (CC BY 4.0, CC0, ODbL, public domain and others), listed in each file's `_meta` block.
+Datasets that forbid redistribution, such as the World Values Survey, are not included; the
+build scripts read your own download from `backend/var/`.
+
+Contributions are welcome under the terms in [CONTRIBUTING.md](CONTRIBUTING.md).
