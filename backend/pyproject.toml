@@ -3,6 +3,7 @@ name = "tellaris"
 version = "0.1.0"
 description = "Multi-agent world simulation for predicting how products and scenarios land across countries, jobs and segments."
 requires-python = ">=3.11"
+license = { text = "AGPL-3.0-only" }
 dependencies = [
   "fastapi>=0.115",
   "uvicorn>=0.30",
