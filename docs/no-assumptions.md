@@ -36,8 +36,8 @@ settings with a sensitivity test. Status: done, open, or setting.
 | Data | Own data now | Target | Source | Status |
 |---|---|---|---|---|
 | Labour force (simulatable) | 187 | 202 | Territory statistics offices | open |
-| Workplace size by job | 99: 98 from ILOSTAT + India from PLFS 2025 (455,930 workers; 20+ split at 50 with the income-group average); 88 use the income-group average | ~170, rest by a tested model | World Bank Enterprise Surveys (user waiting for approval; 79 of the 88 covered), national registers | open |
-| Enterprise size above 250 | US shape everywhere | Own data | Enterprise Surveys, national registers | open |
+| Workplace size by job | 99: 98 from ILOSTAT + India from PLFS 2025 (455,930 workers; 20+ split at 50 with the income-group average); 88 use the income-group average | ~170, rest by a tested model | World Bank Enterprise Surveys tested and rejected: on 74 countries with the truth, their shape misplaces 33% of workers vs 16% for the income-group average, and adjusting the average by them doesn't help (docs/enterprise_surveys_test.json). National registers remain | open |
+| Enterprise size above 250 | OECD/SUSB where available; income-group average elsewhere; US shape for the finer classes | Own data | Enterprise Surveys tested and rejected for the 50-249 vs 250+ split (error 0.13 direct, 0.062 adjusted vs 0.054 for the average; 40 countries) | open |
 | Workplace vs enterprise size | Mixed | Both, labelled | ILO, SUSB, Eurostat, OECD | open |
 | Public sector share | ~106 (ILOSTAT + India PLFS 2025) | Same, plus a tested model | ILOSTAT, PLFS | open |
 | Detailed jobs inside ISCO groups | US mix everywhere | ~15 own, rest borrowed and tested | UK ONS, Canada and Australia censuses, Brazil PNAD, Mexico ENOE, Chile, Peru, Colombia | open |

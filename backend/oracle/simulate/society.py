@@ -23,7 +23,7 @@ from ..research.news import draw, know_chance
 from ..scenario.models import ScenarioSpec
 from .calibrate import Calibration, apply_array
 from .diffusion import build_network
-from .feed import FeedState, apply_engagement, pick, record_seen, travel_summary
+from .feed import FEED_SIZE, FeedState, apply_engagement, pick, record_seen, travel_summary
 from .memory import Mind, mind_record, reflect_all
 from .memory import summarize as summarize_minds
 from .reaction import JUSTER, Reaction, juster_point
@@ -108,6 +108,7 @@ async def run_society(
     feed_style: str = "word_of_mouth",
     events: list[dict[str, Any]] | None = None,
     periods: list[dict[str, Any]] | None = None,
+    feed_size: int = FEED_SIZE,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Run the society. With memory on, each person keeps and recalls memories and reflects at the end;
     their memories and reflection are written into minds_out (person id -> record).
@@ -225,7 +226,7 @@ async def run_society(
             await on_items([ni for _, ni in landing])
 
         talk_so_far = [it for it in feed if it["kind"] in ("post", "reply")]
-        shown = {pid: pick(feed_style, pid, rnd, talk_so_far, g, fs, names, feed_rng) for pid in pids}
+        shown = {pid: pick(feed_style, pid, rnd, talk_so_far, g, fs, names, feed_rng, feed_size) for pid in pids}
         for pid in pids:
             record_seen(fs, pid, shown[pid], item_by_id, g)
         actions: list[tuple[str, list[str], str | None]] = []

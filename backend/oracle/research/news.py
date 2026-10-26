@@ -245,7 +245,7 @@ def _context(spec: ScenarioSpec, as_of: date) -> str:
     )
 
 
-async def gather_news(spec: ScenarioSpec, provider: str, model: str, as_of: date) -> tuple[list[NewsItem], int]:
+async def gather_news(spec: ScenarioSpec, provider: str, model: str, as_of: date, max_items: int = MAX_ITEMS) -> tuple[list[NewsItem], int]:
     """The current affairs around this question, best first, and how many results were read."""
     if provider == "none":
         return [], 0
@@ -288,7 +288,7 @@ async def gather_news(spec: ScenarioSpec, provider: str, model: str, as_of: date
             )
         )
     items.sort(key=lambda it: -it.score)
-    items = items[:MAX_ITEMS]
+    items = items[:max_items]
     for i, it in enumerate(items):
         it.id = f"n{i + 1:02d}"
     return items, len(hits)

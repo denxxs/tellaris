@@ -195,7 +195,7 @@ class Runner:
         if self.cfg.news and self.settings.search_provider != "none":
             await self.stage("news", "start")
             try:
-                news, read = await gather_news(spec, self.settings.search_provider, roles.analyst, as_of)
+                news, read = await gather_news(spec, self.settings.search_provider, roles.analyst, as_of, self.cfg.news_items)
                 await self.log(f"Read {read} news stories, kept {len(news)} that matter now" if read else "Found no recent news on this; people go on what they already know")
                 await self.ch.emit("news", [n.model_dump() for n in news])
                 await self.stage("news", "done", items=len(news))
@@ -322,7 +322,7 @@ class Runner:
             summary, feed = await run_society(
                 people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
                 self.cfg.temperature, seed=self.cfg.seed, initial_items=meetings, on_items=on_items, on_round=on_round,
-                memory=self.cfg.memory, minds_out=minds, feed_style=self.cfg.feed_style, events=events, periods=periods,
+                memory=self.cfg.memory, minds_out=minds, feed_style=self.cfg.feed_style, events=events, periods=periods, feed_size=self.cfg.feed_size,
             )
             if any(e["kind"] == "assumed" for e in events):
                 # The same people again with only the real world, so you can see what your what-ifs add.
@@ -330,7 +330,7 @@ class Runner:
                 base_summary, _ = await run_society(
                     people, reactions, spec, cal, crowd, self.cfg.diffusion_rounds, self.cfg.diffusion_agent_cap,
                     self.cfg.temperature, seed=self.cfg.seed, initial_items=meetings, memory=self.cfg.memory,
-                    feed_style=self.cfg.feed_style, events=[dict(e) for e in events if e["kind"] != "assumed"], periods=periods,
+                    feed_style=self.cfg.feed_style, events=[dict(e) for e in events if e["kind"] != "assumed"], periods=periods, feed_size=self.cfg.feed_size,
                 )
                 base = {
                     "opinion": [{"round": r["round"], "value": r["calibrated"]} for r in base_summary["rounds"]],

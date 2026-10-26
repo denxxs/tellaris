@@ -1,0 +1,19 @@
+{
+ "source": "World Bank Enterprise Surveys, Standardized Raw Database 2006-2025 (latest survey per country, firms with 5+ employees, workers = weight x full-time employees)",
+ "countries_with_es": 173,
+ "within_5plus_shape": {
+  "countries": 74,
+  "median_share_misplaced_es_direct": 0.33,
+  "median_share_misplaced_income_group_average": 0.158,
+  "median_share_misplaced_adjusted_loo": 0.155,
+  "correlation_es_deviation_vs_true_deviation": -0.054
+ },
+ "mid_share_of_50plus": {
+  "countries": 40,
+  "median_abs_error_es_direct": 0.129,
+  "median_abs_error_income_group_average": 0.054,
+  "median_abs_error_adjusted_loo": 0.062,
+  "correlation_es_deviation_vs_true_deviation": 0.432
+ },
+ "decision": "Not used: no estimate built from the Enterprise Surveys beat the income-group average on countries where the truth is known."
+}

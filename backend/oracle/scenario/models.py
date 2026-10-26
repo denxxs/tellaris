@@ -162,6 +162,8 @@ class RunConfig(BaseModel):
         default="word_of_mouth",
         description="How people's feeds are chosen: their contacts only (word of mouth), a platform ranking, or viral amplification",
     )
+    feed_size: int = Field(default=5, ge=1, le=20, description="Posts on the topic each person sees per day (a setting; see the sensitivity test)")
+    news_items: int = Field(default=14, ge=1, le=30, description="Current-affairs items kept per run (a prompt budget; see the sensitivity test)")
     seed: int | None = None
     temperature: float = Field(default=0.9, ge=0, le=1.5)
     weighting: Literal["population", "equal"] = Field(

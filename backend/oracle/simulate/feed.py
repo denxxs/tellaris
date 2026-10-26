@@ -79,6 +79,7 @@ def pick(
     fs: FeedState,
     names: dict[str, str],
     rng: np.random.Generator | None = None,
+    size: int = FEED_SIZE,
 ) -> list[dict[str, Any]]:
     """The items person `pid` sees in round `rnd`, best first.
 
@@ -92,7 +93,7 @@ def pick(
     if style not in UNCONNECTED:
         recent = [it for it in fresh if it["author"] in contacts]
         recent.sort(key=lambda it: (-it["round"], -(it["agrees"] + it["disagrees"]), it["id"]))
-        return [{**it, "via": None} for it in recent[:FEED_SIZE]]
+        return [{**it, "via": None} for it in recent[:size]]
 
     two_hop = {n2 for n in contacts for n2 in g.neighbors(n)} - contacts - {pid}
     pools: dict[bool, list[tuple[float, dict[str, Any]]]] = {True: [], False: []}
@@ -112,10 +113,10 @@ def pick(
     for pool in pools.values():
         pool.sort(key=lambda s: (-s[0], s[1]["id"]))
     share = UNCONNECTED[style]
-    n_out = int(rng.binomial(FEED_SIZE, share)) if rng is not None else round(FEED_SIZE * share)
+    n_out = int(rng.binomial(size, share)) if rng is not None else round(size * share)
     take_out = min(n_out, len(pools[False]))
-    take_in = min(FEED_SIZE - take_out, len(pools[True]))
-    take_out = min(FEED_SIZE - take_in, len(pools[False]))  # an empty pool's slots go to the other
+    take_in = min(size - take_out, len(pools[True]))
+    take_out = min(size - take_in, len(pools[False]))  # an empty pool's slots go to the other
     chosen = pools[True][:take_in] + pools[False][:take_out]
     chosen.sort(key=lambda s: (-s[0], s[1]["id"]))
     return [it for _, it in chosen]
