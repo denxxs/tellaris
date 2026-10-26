@@ -1,15 +1,19 @@
 """How each person's feed is chosen in the society.
 
 Three styles:
-- word_of_mouth: you see your own contacts' recent posts, newest first. Nothing travels
-  beyond the people you know unless someone you know says it again in their own words.
-- ranked: a platform-style feed. Every recent post is a candidate; each gets a score from
-  how fresh it is, how much engagement it has (likes, reshares, replies) and how close you
-  are to it (your contact wrote it, a contact reshared it, a friend of a friend, or a stranger).
-- viral: the same ranker with engagement weighted much more heavily and strangers' posts
-  pushed further, so a few popular posts reach most people.
+- word_of_mouth: you see your own contacts' posts you haven't seen yet, newest first. Nothing
+  travels beyond the people you know unless someone you know says it again in their own words.
+- ranked: a Facebook-style feed. The share of slots filled with posts from people you aren't
+  connected to is Meta's own figure for US Facebook feeds (Widely Viewed Content Report, Q2 2026:
+  36.6% of views unconnected, 49.6% from friends, groups and followed pages; the 13.8% "other" left out).
+- viral: a TikTok-style feed. Only 10.3% of videos watched come from accounts the viewer follows
+  (Zannettou et al. 2024, CHI, data donated by 347 users, 9.2 million views).
 
-The ranker is plain arithmetic, so the same inputs and seed always give the same feeds.
+Within each pool posts are ranked by how much attention a story keeps after that many days
+(Wikipedia pageviews, research/news.attention; a round is a day) times their engagement in
+Facebook's own "meaningful social interactions" points (internal note, Dec 2017, reported by
+CNN 2021): a like 1, a reshare without text 5, a comment 30. Feeds don't repeat a post you have
+already been shown. The ranker is plain arithmetic, so the same inputs and seed give the same feeds.
 """
 
 from __future__ import annotations
@@ -24,23 +28,16 @@ from ..research.news import attention
 
 FeedStyle = Literal["word_of_mouth", "ranked", "viral"]
 
-FEED_SIZE = 5
+FEED_SIZE = 5  # posts on this topic per person per day: a setting, see docs/no-assumptions.md
 
-
-@dataclass(frozen=True)
-class Weights:
-    contact: float
-    reshared: float
-    two_hop: float
-    stranger: float
-    engagement: float  # how much each like/reshare/reply lifts a post
-    power: float  # >1 makes popular posts pull away from the rest
-
-
-STYLES: dict[str, Weights] = {
-    "ranked": Weights(contact=1.0, reshared=0.8, two_hop=0.25, stranger=0.03, engagement=0.3, power=1.0),
-    "viral": Weights(contact=1.0, reshared=0.9, two_hop=0.45, stranger=0.25, engagement=1.0, power=1.6),
+# Share of feed slots given to posts from people you aren't connected to.
+UNCONNECTED = {
+    "ranked": round(36.6 / (36.6 + 49.6), 4),  # Meta Widely Viewed Content Report, US, Q2 2026
+    "viral": round(1 - 0.103, 4),  # Zannettou et al. 2024: 10.3% of TikTok views from followed accounts
 }
+
+# Facebook's meaningful-social-interaction points (2018 weights, reported by CNN, Oct 2021).
+POINTS = {"likes": 1.0, "reshares": 5.0, "replies": 30.0}
 
 LABELS = {
     "word_of_mouth": "Word of mouth",
@@ -50,8 +47,8 @@ LABELS = {
 
 
 def engagement(it: dict[str, Any]) -> float:
-    """Likes count once, replies one and a half times, reshares twice."""
-    return it.get("likes", 0) + 1.5 * it.get("replies", 0) + 2.0 * it.get("reshares", 0)
+    """Facebook's interaction points: a like 1, a reshare 5, a reply 30."""
+    return sum(w * it.get(k, 0) for k, w in POINTS.items())
 
 
 @dataclass
@@ -86,42 +83,42 @@ def pick(
     """The items person `pid` sees in round `rnd`, best first.
 
     Returns shallow copies with two extra keys for the prompt and the UI: `via` (why it is in
-    the feed: None for a contact's own post) and `score`.
+    the feed: None for a contact's own post) and `score`. Without an rng the number of
+    unconnected slots is the rounded expectation; with one it is drawn slot by slot.
     """
     contacts = set(g.neighbors(pid))
-    if style not in STYLES:
-        recent = [it for it in talk if it["round"] >= rnd - 2 and it["author"] in contacts]
-        recent.sort(key=lambda it: (-it["round"], -(it["agrees"] + it["disagrees"])))
+    already = fs.seen.get(pid, set())
+    fresh = [it for it in talk if it["author"] != pid and (rnd - 1) - it["round"] >= 0 and it["id"] not in already]
+    if style not in UNCONNECTED:
+        recent = [it for it in fresh if it["author"] in contacts]
+        recent.sort(key=lambda it: (-it["round"], -(it["agrees"] + it["disagrees"]), it["id"]))
         return [{**it, "via": None} for it in recent[:FEED_SIZE]]
 
-    w = STYLES[style]
     two_hop = {n2 for n in contacts for n2 in g.neighbors(n)} - contacts - {pid}
-    already = fs.seen.get(pid, set())
-    scored: list[tuple[float, dict[str, Any]]] = []
-    for it in talk:
+    pools: dict[bool, list[tuple[float, dict[str, Any]]]] = {True: [], False: []}
+    for it in fresh:
         age = (rnd - 1) - it["round"]
-        if it["author"] == pid or age < 0:
-            continue
         sharers = fs.resharers.get(it["id"], set()) & contacts
         if it["author"] in contacts:
-            kind, close, via = "contact", w.contact, None
+            kind, via = "contact", None
         elif sharers:
-            kind, close = "reshared", w.reshared
-            via = names.get(sorted(sharers)[0])
+            kind, via = "reshared", names.get(sorted(sharers)[0])
         elif it["author"] in two_hop:
-            kind, close, via = "two_hop", w.two_hop, None
+            kind, via = "two_hop", None
         else:
-            kind, close, via = "stranger", w.stranger, None
-        # A round is a day (the network is daily contacts); a post keeps the share of attention a news
-        # story keeps after that many days (Wikipedia pageviews, research/news.attention).
-        score = close * attention(age) * (1 + w.engagement * engagement(it)) ** w.power
-        if it["id"] in already:
-            score *= 0.3  # feeds rarely show the same thing twice
-        if rng is not None:
-            score *= 0.9 + 0.2 * float(rng.random())
-        scored.append((score, {**it, "via": why_shown(kind, via), "score": round(score, 3)}))
-    scored.sort(key=lambda s: (-s[0], s[1]["id"]))
-    return [it for _, it in scored[:FEED_SIZE]]
+            kind, via = "stranger", None
+        score = attention(age) * (1 + engagement(it))
+        pools[kind in ("contact", "reshared")].append((score, {**it, "via": why_shown(kind, via), "score": round(score, 3)}))
+    for pool in pools.values():
+        pool.sort(key=lambda s: (-s[0], s[1]["id"]))
+    share = UNCONNECTED[style]
+    n_out = int(rng.binomial(FEED_SIZE, share)) if rng is not None else round(FEED_SIZE * share)
+    take_out = min(n_out, len(pools[False]))
+    take_in = min(FEED_SIZE - take_out, len(pools[True]))
+    take_out = min(FEED_SIZE - take_in, len(pools[False]))  # an empty pool's slots go to the other
+    chosen = pools[True][:take_in] + pools[False][:take_out]
+    chosen.sort(key=lambda s: (-s[0], s[1]["id"]))
+    return [it for _, it in chosen]
 
 
 def record_seen(fs: FeedState, pid: str, shown: list[dict[str, Any]], item_by_id: dict[str, dict[str, Any]], g: nx.Graph) -> None:

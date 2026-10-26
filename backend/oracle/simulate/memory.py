@@ -3,18 +3,19 @@
 Each person keeps a short stream of memories as the society runs: what they said
 first, posts and replies from their contacts, replies to them, news, the buying
 meeting they sat in, and their own one-line takeaway from each round. Every round
-they see their most important memories, not just their first quote. At the end each
+they see everything they still remember, not just their first quote. At the end each
 person reflects once on what they remember and says how they see it now and what
 moved them.
 
-Importance is scored without extra model calls: things aimed at you (replies,
-your own meeting) and news weigh more; views unlike your own stand out; older
-memories fade.
+What is still remembered follows recall of news events (a round is a day; research/news.remembered):
+each memory is kept or forgotten by a fixed draw against that curve. Nothing is ranked by a
+made-up importance score; the person (the model) decides what matters to them.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from collections.abc import Callable
 from typing import Any, Literal
 
@@ -23,6 +24,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..llm import LLMError, llm
 from ..research.news import remembered
+from .reaction import juster_point
 from ..population.models import Persona
 from ..scenario.models import ScenarioSpec
 
@@ -37,7 +39,6 @@ KIND_LABEL = {
     "thought": "their own thinking",
 }
 
-RECALL = 6
 
 
 class Memory(BaseModel):
@@ -47,7 +48,7 @@ class Memory(BaseModel):
     text: str
     who: str | None = None
     item: str | None = None
-    importance: float = Field(ge=0, le=1)
+    importance: float | None = None  # older runs only
 
 
 class Mind:
@@ -57,22 +58,27 @@ class Mind:
         self.memories: list[Memory] = []
         self.trajectory: list[float] = []
 
-    def add(self, rnd: int, kind: Kind, text: str, importance: float, who: str | None = None, item: str | None = None) -> None:
+    def add(self, rnd: int, kind: Kind, text: str, who: str | None = None, item: str | None = None) -> None:
         text = " ".join(text.split())[:240]
         if not text:
             return
         if item and any(m.item == item for m in self.memories):
             return
-        self.memories.append(Memory(n=len(self.memories) + 1, round=rnd, kind=kind, text=text, who=who, item=item, importance=round(min(1.0, max(0.0, importance)), 3)))
+        self.memories.append(Memory(n=len(self.memories) + 1, round=rnd, kind=kind, text=text, who=who, item=item))
 
-    def recall(self, now: int, k: int = RECALL) -> list[Memory]:
-        """The memories most likely to be on their mind now: important and still remembered. A round
-        is a day; how much fades per day follows recall of news events (research/news.remembered)."""
-        scored = sorted(self.memories, key=lambda m: -(m.importance * remembered(max(0, now - m.round))))
-        return sorted(scored[:k], key=lambda m: m.n)
+    def recall(self, now: int, key: str = "") -> list[Memory]:
+        """Everything they still remember now, in the order it happened. A round is a day; each
+        memory survives with the share of people who still recall a news event that old."""
+        return [m for m in self.memories if kept(key, m, now)]
 
-    def lines(self, now: int, k: int = RECALL) -> str:
-        return "\n".join(f"[{m.n}] round {m.round}, {describe(m)}" for m in self.recall(now, k))
+    def lines(self, now: int, key: str = "") -> str:
+        return "\n".join(f"[{m.n}] round {m.round}, {describe(m)}" for m in self.recall(now, key))
+
+
+def kept(key: str, m: Memory, now: int) -> bool:
+    """A fixed draw, so reruns agree, against the measured recall curve."""
+    h = hashlib.sha256(f"{key}|{m.n}|{m.round}".encode()).digest()
+    return int.from_bytes(h[:8], "big") / 2**64 < remembered(max(0, now - m.round))
 
 
 def describe(m: Memory) -> str:
@@ -88,11 +94,6 @@ def describe(m: Memory) -> str:
         return f"in your company's meeting: {m.text}"
     return f"you thought: {m.text}"
 
-
-def seen_importance(item_p: float | None, own_p: float, engagement: int) -> float:
-    """Posts that disagree with you and posts many people reacted to stick."""
-    surprise = abs((item_p if item_p is not None else own_p) - own_p)
-    return 0.35 + 0.35 * min(1.0, surprise / 0.5) + 0.2 * min(1.0, engagement / 6)
 
 
 class Reflection(BaseModel):
@@ -132,7 +133,7 @@ async def reflect_all(
         p, mind = people[pid], minds[pid]
         if not mind.memories:
             return
-        recalled = mind.recall(now, k=8)
+        recalled = mind.recall(now, pid)
         user = (
             f"YOU:\n{p.card()}\n\nTHE TOPIC: {spec.subject}\nThe question for you: {spec.persona_question}\n"
             f"Where you started: {mind.trajectory[0]:.0%}. Your view now: {state[pid]:.0%}.\n\n"
@@ -146,13 +147,12 @@ async def reflect_all(
         except LLMError:
             return
         valid = {m.n for m in mind.memories}
-        target = juster.get(r.juster, state[pid])
-        p_after = 0.5 * state[pid] + 0.5 * target
+        p_after = juster.get(r.juster, state[pid])  # their view is what they answer
         out[pid] = {
             "belief": r.belief.strip()[:400],
             "p": round(p_after, 4),
             "influences": [n for n in r.influences if n in valid],
-            "changed_mind": r.changed_mind and abs(p_after - mind.trajectory[0]) > 0.08,
+            "changed_mind": r.changed_mind and juster_point(p_after) != juster_point(mind.trajectory[0]),
         }
 
     await asyncio.gather(*(one(i, pid) for i, pid in enumerate(minds)))

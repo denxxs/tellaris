@@ -1,10 +1,12 @@
 """Turn what simulated people SAY into what people are likely to DO.
 
 Two corrections:
-1. Intent-to-behaviour: stated intentions overstate action (well documented in
-   purchase-intent research). We shrink in log-odds space with a Platt-style map
-   logit(p') = a * logit(p) + b. Defaults depend on the kind of question and are
-   replaced by parameters fitted from backtests once you have them.
+1. Intent-to-behaviour: a Platt-style map logit(p') = a * logit(p) + b, fitted from backtests.
+   Until there are backtests it is the identity: people answer on the Juster purchase-probability
+   scale, and a meta-analysis of published studies found probability scales empirically unbiased
+   as predictors of purchase rates (Wright & MacRae 2007, Journal of the Academy of Marketing
+   Science 35:617-624, doi:10.1007/s11747-007-0049-x). Whether simulated people say more than
+   real people do is exactly what the backtests measure.
 2. Reach: people can only act on what they hear about. For adoption-style
    questions the realistic number is reach x calibrated intent.
 """
@@ -19,9 +21,9 @@ from pydantic import BaseModel
 ACTION_KINDS = {"product", "feature", "pricing", "campaign", "company", "market", "personal", "habit"}
 
 DEFAULT_PARAMS = {
-    # (a, b) for logit(p') = a * logit(p) + b
-    "action": (0.85, -0.55),  # buying, switching, signing up: big say/do gap
-    "belief": (0.9, 0.0),     # opinions about events or policies: mild shrink toward 50%
+    # (a, b) for logit(p') = a * logit(p) + b: the identity until backtests fit them (see above).
+    "action": (1.0, 0.0),
+    "belief": (1.0, 0.0),
 }
 
 
@@ -65,7 +67,7 @@ def fit_platt(predicted: list[float], actual: list[float], kind: str) -> Calibra
     """Fit (a, b) by logistic regression on log-odds of the raw prediction.
 
     `actual` may be 0/1 outcomes or observed rates in [0, 1]. Uses a light prior
-    toward the defaults so a handful of cases cannot produce wild parameters."""
+    toward the defaults (the identity) so a handful of cases cannot produce wild parameters."""
     x = np.array([_logit(p) for p in predicted])
     y = np.clip(np.array(actual, dtype=float), 0, 1)
     a0, b0 = DEFAULT_PARAMS[kind]

@@ -1,6 +1,6 @@
 {
 "_meta": {
-"built": "2026-10-24",
+"built": "2026-10-26",
 "source": "BLS OEWS oesm24nat.zip (detailed occupations, national) mapped to ISCO-08 with the BLS ISCO-08/2010 SOC crosswalk and the BLS 2010-to-2018 SOC crosswalk",
 "coverage": 0.981,
 "note": "US within-group mix, applied to every country's real 2-digit counts. US wage-and-salary jobs only."

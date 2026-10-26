@@ -169,20 +169,26 @@ def monthly_earnings(iso: str, major: int | None, gdp_pc_usd: float) -> tuple[fl
         return e["groups"][key], f"ILOSTAT mean earnings {e['year']}"
     if e and "TOTAL" in e["groups"]:
         return e["groups"]["TOTAL"] * _earnings_ratio().get(key, 1.0), f"ILOSTAT national mean earnings {e['year']}, group ratio from other countries"
-    # No earnings survey: national income per person, with the typical group ratio.
-    return gdp_pc_usd / 12 * _earnings_ratio().get(key, 1.0), "World Bank GDP per person, group ratio from ILOSTAT countries"
+    # No earnings survey: labour income per worker (ILO labour share of GDP / employed) times the median
+    # ratio of employees' mean earnings to it where both exist (tested: build_people earnings_model).
+    li = get(iso).get("labour_income_month")
+    model = _all().get("_meta", {}).get("earnings_model") or {}
+    if li and model.get("ratio"):
+        return (li["value"] * model["ratio"] * _earnings_ratio().get(key, 1.0),
+                f"ILO labour income per worker {li['year']} x employees' share, group ratio from ILOSTAT countries")
+    return gdp_pc_usd / 12 * _earnings_ratio().get(key, 1.0), "World Bank GDP per person (no labour-income estimate), group ratio from ILOSTAT countries"
 
 
-@lru_cache(maxsize=1)
-def _median_gini() -> float:
-    vals = [c["gini"]["value"] for c in _all()["countries"].values() if c.get("gini")]
-    return median(vals) if vals else 38.0
-
-
-def income_sigma(iso: str) -> tuple[float, str]:
+def income_sigma(iso: str) -> tuple[float | None, str]:
     """Spread of a lognormal income distribution with the country's Gini: G = 2*Phi(sigma/sqrt(2)) - 1."""
     g = get(iso).get("gini")
-    gini, src = (g["value"], f"World Bank Gini {g['year']}") if g else (_median_gini(), "median Gini of countries with data")
+    if not g:
+        return None, "no Gini for this country"
+    if g.get("borrowed_from"):
+        src = f"Gini of the most similar countries ({', '.join(g['borrowed_from'])})"
+    else:
+        src = f"{g.get('source', 'World Bank')} Gini {g['year']}"
+    gini = g["value"]
     sigma = math.sqrt(2) * NormalDist().inv_cdf((gini / 100 + 1) / 2)
     return sigma, src
 

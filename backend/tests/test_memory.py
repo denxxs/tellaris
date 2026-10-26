@@ -17,18 +17,19 @@ def client():
         yield c
 
 
-def test_recall_prefers_important_and_recent():
+def test_recall_keeps_what_the_recall_curve_keeps():
     m = Mind()
-    m.add(0, "said", "I like it", 0.9)
+    m.add(0, "said", "I like it")
     for i in range(1, 9):
-        m.add(i, "saw", f"post {i}", 0.4, who="A", item=f"f{i}")
-    m.add(3, "reply", "you're wrong", 0.85, who="B", item="r1")
-    m.add(3, "reply", "duplicate", 0.85, who="B", item="r1")  # same item is remembered once
-    got = m.recall(now=9, k=4)
-    texts = [x.text for x in got]
+        m.add(i, "saw", f"post {i}", who="A", item=f"f{i}")
+    m.add(3, "reply", "you're wrong", who="B", item="r1")
+    m.add(3, "reply", "duplicate", who="B", item="r1")  # same item is remembered once
+    texts = [x.text for x in m.recall(now=9, key="p1")]
     assert "you're wrong" in texts and "duplicate" not in texts
-    assert "post 8" in texts and "post 1" not in texts
-    assert [x.n for x in got] == sorted(x.n for x in got)
+    assert len(texts) >= 7  # after nine days about 94% of memories are still there
+    assert [x.n for x in m.recall(now=9, key="p1")] == sorted(x.n for x in m.recall(now=9, key="p1"))
+    # a year on, about four in ten are gone
+    assert 0.3 < len(m.recall(now=400, key="p1")) / 10 < 0.9
 
 
 def test_people_remember_and_reflect(client):

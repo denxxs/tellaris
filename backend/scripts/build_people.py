@@ -164,6 +164,7 @@ def main() -> None:
     print("World Bank: Gini and tertiary enrolment")
     for iso, (v, y) in wb("SI.POV.GINI").items():
         c(iso)["gini"] = {"value": v, "year": y}
+    swiid_fill(countries, c)
     for iso, (v, y) in wb("SE.TER.ENRR").items():
         c(iso)["tertiary_enrolment"] = {"value": round(v, 2), "year": y}
 
@@ -237,6 +238,10 @@ def main() -> None:
                 "own_account": round(employed * own_pct[iso][0] / 100), "employed": employed, "source": "World Bank SL.EMP.MPYR.ZS; own-account = SL.EMP.SELF.ZS - employers - SL.FAM.WORK.ZS",
             }
 
+    labour_income(countries, c)
+    earnings_test = test_earnings_model(countries)
+    gini_test = borrow_gini(countries)
+
     # Labour-force participation by age.
     print("ILOSTAT: labour-force participation by age")
     rows = ilo("DF_EAP_2WAP_SEX_AGE_RT", ".A..SEX_T.AGE_YTHADULT_Y15-24+AGE_AGGREGATE_YGE65+AGE_YTHADULT_YGE15", "lfpr")
@@ -251,7 +256,8 @@ def main() -> None:
             "built": date.today().isoformat(),
             "sources": {
                 "age_sex": "World Bank, SP.POP.<band>.<sex>.5Y and SP.POP.TOTL.<sex>.IN (UN World Population Prospects)",
-                "gini": "World Bank, SI.POV.GINI",
+                "gini": "World Bank, SI.POV.GINI; where missing, SWIID 9.92 disposable-income Gini (Solt, Harvard Dataverse doi:10.7910/DVN/LM4OWF, CC0); where neither, the mean of the 3 most similar countries (same region, closest log GDP per person; test in gini_standin_test)",
+                "labour_income_month": "ILOSTAT, DF_LAP_2GDP_NOC_RT labour income share of GDP (ILO modelled estimates) x World Bank GDP (NY.GDP.MKTP.CD) / employed (SL.TLF.TOTL.IN x (1 - SL.UEM.TOTL.ZS)) / 12, US dollars",
                 "findex": "World Bank Global Findex (source 28): con26d daily internet use, con9a smartphone, account.t.d account, fin10 credit card, fin24aN+fin24aVD emergency funds not possible or very difficult, con30d read news online; by sex, age, income and labour-force status",
                 "labour": "World Bank, SL.TLF.TOTL.IN and SL.UEM.TOTL.ZS (ILO modelled estimates)",
                 "tertiary_enrolment": "World Bank, SE.TER.ENRR (gross, %)",
@@ -264,6 +270,8 @@ def main() -> None:
             "licence": "World Bank and ILOSTAT data are CC BY 4.0.",
             "note": "Each block carries the year it refers to: the latest year the source has since 2015. Counts are people.",
             "count": len(countries),
+            "earnings_model": earnings_test,
+            "gini_standin_test": gini_test,
         },
         "countries": dict(sorted(countries.items())),
     }
@@ -272,6 +280,149 @@ def main() -> None:
     print(f"wrote {OUT} ({OUT.stat().st_size // 1024} KB) for {len(countries)} countries: {have}")
 
 
+
+# ---------------------------------------------------------------- gaps: inequality and earnings
+
+
+SWIID_ZIP = ROOT / "var" / "datasets" / "swiid" / "swiid9_92.zip"
+SWIID_NAMES = {"Congo-Brazzaville": "COG", "Congo-Kinshasa": "COD", "Korea": "KOR", "Laos": "LAO", "Palestinian Territories": "PSE",
+               "Kosovo": "XKX", "Micronesia": "FSM", "Turkey": "TUR", "Russia": "RUS", "Iran": "IRN", "Syria": "SYR", "Taiwan": "TWN",
+               "Vietnam": "VNM", "Moldova": "MDA", "Bolivia": "BOL", "Venezuela": "VEN", "Tanzania": "TZA", "Brunei": "BRN",
+               "Cape Verde": "CPV", "Czech Republic": "CZE", "St. Kitts and Nevis": "KNA", "St. Lucia": "LCA",
+               "St. Vincent and Grenadines": "VCT", "Gambia": "GMB", "Bahamas": "BHS", "Egypt": "EGY", "Yemen": "YEM",
+               "Hong Kong": "HKG", "Kyrgyzstan": "KGZ", "Slovakia": "SVK", "North Macedonia": "MKD", "Eswatini": "SWZ"}
+
+
+def _iso_for(name: str) -> str | None:
+    import pycountry
+
+    if name in SWIID_NAMES:
+        return SWIID_NAMES[name]
+    if name.startswith("C") and "te d" in name:
+        return "CIV"
+    if name.startswith("S") and "Tom" in name:
+        return "STP"
+    try:
+        return pycountry.countries.lookup(name).alpha_3
+    except LookupError:
+        return None
+
+
+def swiid_fill(countries: dict, c) -> None:
+    """Disposable-income Gini from SWIID for countries the World Bank has no recent Gini for."""
+    import zipfile
+
+    import pandas as pd
+
+    if not SWIID_ZIP.exists():
+        print("  SWIID not downloaded; skipped")
+        return
+    with zipfile.ZipFile(SWIID_ZIP) as z:
+        name = next(n for n in z.namelist() if n.endswith("_summary.csv"))
+        d = pd.read_csv(z.open(name), encoding="latin-1")
+    d = d.dropna(subset=["gini_disp"])
+    latest = d.sort_values("year").groupby("country").tail(1)
+    n = 0
+    for _, r in latest.iterrows():
+        iso = _iso_for(r["country"])
+        if iso and not countries.get(iso, {}).get("gini") and int(r["year"]) >= 2000:
+            c(iso)["gini"] = {"value": round(float(r["gini_disp"]), 1), "year": int(r["year"]), "se": round(float(r["gini_disp_se"]), 2),
+                              "source": "SWIID 9.92"}
+            n += 1
+    print(f"  SWIID filled {n} Ginis")
+
+
+def _profile() -> dict[str, tuple[str, float]]:
+    """Region and log GDP per person per country, from countries.json."""
+    import math
+
+    d = json.loads((ROOT / "oracle" / "data" / "countries.json").read_text(encoding="utf-8"))
+    out = {}
+    for v in d["countries"]:
+        if v.get("gdp_pc_usd") and v.get("region"):
+            out[v["iso3"]] = (v["region"], math.log(v["gdp_pc_usd"]))
+    return out
+
+
+def _donors(iso: str, have: list[str], prof: dict, k: int = 3, leave: float = 1.0) -> list[str]:
+    """The same stand-in rule as survey views (scripts/build_views.py): the 3 closest by log GDP per
+    person in the same region, or anywhere if the region's 3rd closest is more than `leave` away."""
+    reg, g = prof[iso]
+    cand = [d for d in have if d != iso and d in prof]
+    same = sorted([d for d in cand if prof[d][0] == reg], key=lambda d: abs(prof[d][1] - g))[:k]
+    if len(same) == k and abs(prof[same[-1]][1] - g) <= leave:
+        return same
+    return sorted(cand, key=lambda d: abs(prof[d][1] - g))[:k]
+
+
+def borrow_gini(countries: dict) -> dict:
+    """Countries with no Gini at all take the mean of their 3 most similar countries; tested by hiding
+    each country that has one."""
+    from statistics import mean, median
+
+    prof = _profile()
+    have = [i for i, v in countries.items() if v.get("gini") and i in prof]
+    errs, base = [], []
+    med = median(countries[i]["gini"]["value"] for i in have)
+    for i in have:
+        ds = _donors(i, have, prof)
+        errs.append(abs(mean(countries[d]["gini"]["value"] for d in ds) - countries[i]["gini"]["value"]))
+        base.append(abs(med - countries[i]["gini"]["value"]))
+    n = 0
+    for i, v in countries.items():
+        if not v.get("gini") and i in prof:
+            ds = _donors(i, have, prof)
+            v["gini"] = {"value": round(mean(countries[d]["gini"]["value"] for d in ds), 1), "borrowed_from": ds,
+                         "year": max(countries[d]["gini"]["year"] for d in ds)}
+            n += 1
+    test = {"countries": len(have), "median_abs_error_points": round(median(errs), 2),
+            "median_abs_error_points_median_rule": round(median(base), 2), "borrowed": n}
+    print(f"  Gini stand-ins for {n} countries; hidden-country test {test}")
+    return test
+
+
+def labour_income(countries: dict, c) -> None:
+    """Mean monthly labour income per worker: ILO's modelled labour share of GDP, World Bank GDP, employed."""
+    rows = ilo("DF_LAP_2GDP_NOC_RT", ".A.", "labour_share")
+    rows = [r for r in rows if int(r["TIME_PERIOD"]) < date.today().year]
+    share = latest_complete(rows, "MEASURE")
+    gdp = wb("NY.GDP.MKTP.CD")
+    n = 0
+    for iso, (y, vals) in share.items():
+        lab = countries.get(iso, {}).get("labour")
+        if iso not in gdp or not lab:
+            continue
+        employed = lab["force"] * (1 - lab["unemployment_pct"] / 100)
+        if employed <= 0:
+            continue
+        v = next(iter(vals.values())) / 100 * gdp[iso][0] / employed / 12
+        c(iso)["labour_income_month"] = {"value": round(v, 1), "year": min(y, gdp[iso][1])}
+        n += 1
+    print(f"  labour income per worker for {n} countries")
+
+
+def test_earnings_model(countries: dict) -> dict:
+    """Where a country has no earnings survey, mean earnings = labour income per worker x the median
+    ratio of employees' mean earnings to it in countries that have both. Tested by hiding each such
+    country, and compared with the old rule (GDP per person / 12)."""
+    import math
+    from statistics import median
+
+    pairs = {i: (v["earnings_usd_month"]["groups"]["TOTAL"], v["labour_income_month"]["value"])
+             for i, v in countries.items()
+             if (v.get("earnings_usd_month") or {}).get("groups", {}).get("TOTAL") and v.get("labour_income_month")}
+    gdp = {i: g for i, (g, _) in wb("NY.GDP.PCAP.CD").items()}
+    errs, old = [], []
+    for i, (e, li) in pairs.items():
+        r = median(a / b for j, (a, b) in pairs.items() if j != i)
+        errs.append(abs(math.log(li * r / e)))
+        if i in gdp:
+            old.append(abs(math.log(gdp[i] / 12 / e)))
+    ratio = median(a / b for a, b in pairs.values())
+    out = {"ratio": round(ratio, 4), "countries": len(pairs),
+           "median_abs_log_error": round(median(errs), 3), "median_abs_log_error_gdp_rule": round(median(old), 3)}
+    print(f"  earnings model {out}")
+    return out
 
 # ---------------------------------------------------------------- detailed job split (US data)
 

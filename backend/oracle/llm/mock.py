@@ -774,7 +774,7 @@ def reflect(ctx: dict[str, Any]) -> dict[str, Any]:
     """Weigh what you remember: memories that disagree and matter most pull you a little."""
     p, cur, start, mems = ctx["persona"], ctx["p"], ctx["start"], ctx.get("memories") or []
     r = _rng("reflect", p["id"], len(mems))
-    ranked = sorted(mems, key=lambda m: -m["importance"])
+    ranked = sorted(mems, key=lambda m: -m["n"])  # offline stand-in: most recent first
     picked = [m["n"] for m in ranked if m["kind"] != "said"][: r.choice([0, 1, 2, 2, 3])]
     news = any(m["kind"] == "news" for m in mems if m["n"] in picked)
     new = _clip(cur + (-0.04 if news else 0.02) * _traits(p)["conformity"] + r.gauss(0, 0.03), 0.01, 0.99)

@@ -22,6 +22,11 @@ from ..scenario.lenses import lens_of
 # Juster scale: verbal probability anchors that predict real purchases better
 # than "would you buy?" questions.
 JUSTER = {0: 0.01, 1: 0.10, 2: 0.20, 3: 0.30, 4: 0.40, 5: 0.50, 6: 0.60, 7: 0.70, 8: 0.80, 9: 0.90, 10: 0.99}
+
+
+def juster_point(p: float) -> int:
+    """The Juster scale point closest to a probability: the finest change people can report."""
+    return min(JUSTER, key=lambda k: (abs(JUSTER[k] - p), k))
 JUSTER_TEXT = (
     "10 Certain, practically certain (99 in 100) | 9 Almost sure (9 in 10) | 8 Very probable (8 in 10) | "
     "7 Probable (7 in 10) | 6 Good possibility (6 in 10) | 5 Fairly good possibility (5 in 10) | "

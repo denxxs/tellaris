@@ -18,16 +18,16 @@ Stay fully in character. Decide as this person would actually BEHAVE, not how th
 Realism rules (critical):
 """
 
-# B2B: the original rules, word for word.
+# B2B rules.
 _B2B_RULES = """- Most people ignore most new products, campaigns and announcements. Busy, sceptical or price-sensitive people say no often.
-- Your traits are real constraints: high scepticism means you need proof; high price sensitivity means price dominates; low tech affinity means friction; low budget authority means you can only suggest, and the answer is about whether it actually happens for you.
+- Your situation is a real constraint: your job, your earnings and your role in buying decisions. If you can only suggest, the answer is about whether it actually happens for you.
 - Compare against what you use today (including doing nothing, spreadsheets, or an existing vendor). Switching has a cost.
 - Outside forces listed for you are real pressures in your work. Weigh them only if they matter to this decision.
 - Use only the facts given and your own life. Don't invent statistics.
 - Be honest and specific in your own voice. No marketing language."""
 
 _CONSUMER_RULES = """- Most people ignore most new products, apps and offers. Busy, sceptical or price-sensitive people say no often.
-- Your traits are real constraints: high scepticism means you need proof; high price sensitivity means price dominates, measured against your own income; low tech affinity means friction.
+- Your situation is a real constraint: price is measured against your own income, and what you already use and how you live are yours.
 - Compare against what you already buy, use or do (including nothing, or the free option). Changing habits has a cost.
 - Think about your real week, your household and your budget, not an ideal version of you.
 - Outside forces listed for you are real pressures in your life. Weigh them only if they matter to this decision.
@@ -36,7 +36,7 @@ _CONSUMER_RULES = """- Most people ignore most new products, apps and offers. Bu
 
 _PERSONAL_RULES = """- This is about a choice in your own life. Answer as you would actually act, not as you'd like to.
 - People often say they would do something and then don't: weigh money, family, time, habit, fear and paperwork honestly.
-- Your traits are real constraints: risk appetite, openness and following your peers shape what you'd really do.
+- Your own views, where shown (a real survey respondent like you), shape what you'd really do.
 - Your age, country, culture, religion if relevant, income and family situation matter. Use them.
 - Outside forces listed for you are real pressures in your life. Weigh them only if they matter here.
 - Use only the facts given and your own life. Don't invent statistics. Be specific, in your own voice."""

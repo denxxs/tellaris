@@ -41,8 +41,7 @@ MEDIA = ["tv", "newspaper", "radio", "internet", "social", "friends"]
 REACH_LABEL = {"mass": "Everyone's talking about it", "broad": "Widely covered", "niche": "Specialist news"}
 # Chance a person in the country hears an item of this reach, before anything about them.
 REACH_BASE = {"mass": 0.85, "broad": 0.45, "niche": 0.07}
-MAX_ITEMS = 14
-PER_PERSON = 4
+MAX_ITEMS = 14  # items kept per run: a prompt budget, see docs/no-assumptions.md
 
 
 @lru_cache(maxsize=1)
@@ -288,7 +287,6 @@ async def gather_news(spec: ScenarioSpec, provider: str, model: str, as_of: date
                 score=score(d.relevance, h.published, d.lasting, as_of), age_days=max((as_of - h.published).days, 0),
             )
         )
-    items = [it for it in items if it.score >= 0.15]
     items.sort(key=lambda it: -it.score)
     items = items[:MAX_ITEMS]
     for i, it in enumerate(items):
@@ -346,7 +344,7 @@ def assign(people: list[Persona], items: list[NewsItem], seed: Any) -> dict[str,
         known = [it for it in items
                  if draw(seed, p.id, it.id) < know_chance(p, it.countries, it.reach, it.audiences, it.media, it.age_days, it.lasting)]
         known.sort(key=lambda it: -it.score)
-        out[p.id] = known[:PER_PERSON]
+        out[p.id] = known
     weights = {p.id: max(p.weight, 1e-9) for p in people if p.influencer_voice is None}
     total = sum(weights.values()) or 1.0
     for it in items:

@@ -10,7 +10,8 @@
       "end_user",
       "none"
     ],
-    "isco08": "isco08: official ISCO-08 unit groups for each job. population: jobs without an ISCO code are counted from another real source (ILO employers, own-account workers, students, retirees, unemployed) or marked unknown. A 2-digit code means the whole sub-major group."
+    "isco08": "isco08: official ISCO-08 unit groups for each job. population: jobs without an ISCO code are counted from another real source (ILO employers, own-account workers, students, retirees, unemployed) or marked unknown. A 2-digit code means the whole sub-major group.",
+    "company_types": "Size bands follow published definitions. Small business, mid-market and large enterprise: Gartner IT Glossary (small and midsize business: fewer than 100 employees small, 100-999 midsize; large enterprise 1,000+); the top is the largest employer's headcount (Walmart, about 2.1 million, 2024 annual report), so it means no upper limit. Start-up: a small enterprise in the EU definition (fewer than 50 employees, Commission Recommendation 2003/361/EC). Scale-up: OECD-Eurostat high-growth enterprise (at least 10 employees; Eurostat-OECD Manual on Business Demography Statistics, 2007) below the EU large-enterprise line (fewer than 250). Government sizes are not drawn (public-sector share from ILOSTAT)."
   },
   "occupations": [
     {
@@ -1095,35 +1096,35 @@
       "label": "Early-stage startup",
       "employees": [
         2,
-        50
+        49
       ]
     },
     "scaleup": {
       "label": "Scale-up",
       "employees": [
-        50,
-        500
+        10,
+        249
       ]
     },
     "smb": {
       "label": "Small business",
       "employees": [
         2,
-        100
+        99
       ]
     },
     "midmarket": {
       "label": "Mid-market company",
       "employees": [
         100,
-        2000
+        999
       ]
     },
     "enterprise": {
       "label": "Large enterprise",
       "employees": [
-        2000,
-        300000
+        1000,
+        2100000
       ]
     },
     "government": {

@@ -53,12 +53,30 @@ def test_ranked_feed_reaches_beyond_contacts_and_says_why():
     assert got["f4"]["via"] == "reshared by Ana"
 
 
-def test_viral_lifts_popular_strangers_more_than_ranked():
+def test_platforms_mix_in_unconnected_posts_at_the_measured_share():
+    # Ten contacts' posts and ten strangers' posts: Facebook-style gives strangers about 42% of
+    # the five slots (Meta), TikTok-style about 90% (data donations); word of mouth none.
+    g = nx.Graph()
+    g.add_edges_from(("me", f"c{i}") for i in range(10))
+    g.add_nodes_from(f"s{i}" for i in range(10))
+    talk = [_item(f"c{i}p", f"c{i}", 0) for i in range(10)] + [_item(f"s{i}p", f"s{i}", 0) for i in range(10)]
+
+    def strangers(style):
+        return sum(x["id"].startswith("s") for x in pick(style, "me", 1, talk, g, FeedState(), {}))
+
+    assert strangers("word_of_mouth") == 0
+    assert strangers("ranked") == 2
+    assert strangers("viral") == 4
+
+
+def test_feed_never_repeats_a_post_and_ranks_by_interaction_points():
     g = _graph()
-    talk = [_item("f1", "a", 0), _item("f3", "s", 0, likes=12, reshares=2)]
-    ranked = [x["id"] for x in pick("ranked", "me", 1, talk, g, FeedState(), {})]
-    viral = [x["id"] for x in pick("viral", "me", 1, talk, g, FeedState(), {})]
-    assert ranked[0] == "f1" and viral[0] == "f3"
+    talk = [_item("f1", "a", 0, likes=10), _item("f2", "a", 0, replies=1)]
+    fs = FeedState()
+    got = [x["id"] for x in pick("ranked", "me", 1, talk, g, fs, {})]
+    assert got == ["f2", "f1"]  # one comment (30 points) outranks ten likes
+    fs.seen["me"] = {"f2"}
+    assert [x["id"] for x in pick("ranked", "me", 2, talk, g, fs, {})] == ["f1"]
 
 
 def test_engagement_only_counts_items_you_saw():

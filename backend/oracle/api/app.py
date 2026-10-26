@@ -406,7 +406,7 @@ def _mind_context(mind: dict[str, Any] | None) -> str:
     from ..simulate.memory import Memory, describe
 
     mems = [Memory.model_validate(m) for m in mind.get("memories", [])]
-    top = sorted(sorted(mems, key=lambda m: -m.importance)[:8], key=lambda m: m.n)
+    top = mems  # everything they remembered at the end of the run
     out = "\n\nWHAT YOU REMEMBER FROM TALKING IT OVER:\n" + "\n".join(f"- round {m.round}, {describe(m)}" for m in top)
     ref = mind.get("reflection")
     traj = mind.get("trajectory") or []

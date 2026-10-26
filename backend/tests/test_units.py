@@ -226,9 +226,11 @@ def test_general_population_uses_country_mix():
     assert farmers > 0.12  # agriculture is a big share of Indian employment
 
 
-def test_calibration_shrinks_action_intent():
+def test_calibration_is_the_identity_until_backtests():
+    # Juster probability scales are unbiased for real people (Wright & MacRae 2007 meta-analysis);
+    # any gap for simulated people comes from backtests, not a guess.
     cal = default_calibration("product")
-    assert apply(0.6, cal) < 0.6
+    assert abs(apply(0.6, cal) - 0.6) < 1e-6
     belief = default_calibration("event")
     assert abs(apply(0.5, belief) - 0.5) < 1e-6
 

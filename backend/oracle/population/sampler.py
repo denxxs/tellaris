@@ -247,6 +247,8 @@ class PopulationBuilder:
             return None, None, "none" if o.id in NON_WORKERS else "unknown"
         mean, _ = realdata.monthly_earnings(iso, o.major, c.gdp_pc_usd)
         sigma, _ = realdata.income_sigma(iso)
+        if not sigma:  # no inequality figure: the mean, and no place in the distribution
+            return int(round(mean * 12, -2)), None, "unknown"
         x = mean * 12 * float(self.rng.lognormal(-sigma**2 / 2, sigma))  # mean-preserving
         # Where they stand among all employees in the country.
         national, _ = realdata.monthly_earnings(iso, None, c.gdp_pc_usd)

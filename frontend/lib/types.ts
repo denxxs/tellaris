@@ -427,7 +427,7 @@ export type MindMemory = {
   text: string;
   who: string | null;
   item: string | null;
-  importance: number;
+  importance?: number | null;
 };
 export type Mind = {
   memories: MindMemory[];

@@ -24,9 +24,9 @@ from ..scenario.models import ScenarioSpec
 from .calibrate import Calibration, apply_array
 from .diffusion import build_network
 from .feed import FeedState, apply_engagement, pick, record_seen, travel_summary
-from .memory import Mind, mind_record, reflect_all, seen_importance
+from .memory import Mind, mind_record, reflect_all
 from .memory import summarize as summarize_minds
-from .reaction import JUSTER, Reaction
+from .reaction import JUSTER, Reaction, juster_point
 
 
 class Turn(BaseModel):
@@ -61,7 +61,6 @@ Decide what you do this round:
 - "post": share your own take with your network.
 - "reply": answer one specific item in your feed, by its id. Disagree when you disagree; people push back.
 Write like a real person in your position: specific, short, your own register, no hashtags or marketing language.
-Your traits matter: people who follow their peers move with their circle; sceptics want evidence, not enthusiasm.
 Then give your current view on the Juster scale: 0 no chance (1%), 1 very slight (10%), 3 some (30%),
 5 fair-good (50%), 7 probable (70%), 9 almost sure (90%), 10 certain (99%)."""
 
@@ -140,14 +139,14 @@ async def run_society(
         for pid in pids:
             m = minds[pid] = Mind()
             m.trajectory.append(state[pid])
-            m.add(0, "said", first[pid].quote, 0.9)
+            m.add(0, "said", first[pid].quote)
         for it in initial_items or []:
             if it.get("kind") == "meeting":
                 for member in it.get("members", []):
                     mid = member.get("persona_id")
                     if mid in minds:
                         d = it.get("decision") or {}
-                        minds[mid].add(0, "meeting", f"the company chose to {d.get('decision', 'decide')}: {it.get('text', '')}", 0.9, item=it["id"])
+                        minds[mid].add(0, "meeting", f"the company chose to {d.get('decision', 'decide')}: {it.get('text', '')}", item=it["id"])
 
     feed: list[dict[str, Any]] = list(initial_items or [])
     counter = [len(feed)]
@@ -253,16 +252,15 @@ async def run_society(
             ]
             mind = minds.get(pid)
             past = (
-                f"WHAT YOU REMEMBER:\n{mind.lines(rnd)}\n\n" if mind and len(mind.memories) > 1
+                f"WHAT YOU REMEMBER:\n{mind.lines(rnd, pid)}\n\n" if mind and len(mind.memories) > 1
                 else f"What you said before: \"{first[pid].quote}\"\n\n"
             )
             if mind:
                 for it in visible:
                     kind = "reply" if it["kind"] == "reply" and item_by_id.get(it.get("parent") or "", {}).get("author") == pid else "saw"
-                    imp = 0.85 if kind == "reply" else seen_importance(it.get("p"), state[pid], it["agrees"] + it["disagrees"])
-                    mind.add(rnd, kind, it["text"], imp, who=it["author_name"], item=it["id"])
+                    mind.add(rnd, kind, it["text"], who=it["author_name"], item=it["id"])
                 for e, ni in mine:
-                    mind.add(rnd, "news", e["name"], 0.8, item=ni["id"])
+                    mind.add(rnd, "news", e["name"], item=ni["id"])
             user = (
                 f"YOU:\n{p.card()}\n\nTHE TOPIC: {spec.subject}\nThe question for you: {spec.persona_question}\n"
                 + (f"It is now {period_label[rnd]}.\n" if rnd in period_label else "")
@@ -287,8 +285,8 @@ async def run_society(
             p_new = JUSTER.get(t.juster, state[pid])  # their view is what they answer
             new_state[pid] = p_new
             if mind and t.takeaway.strip():
-                mind.add(rnd, "thought", t.takeaway, 0.7)
-            moved = abs(p_new - state[pid]) > 0.08
+                mind.add(rnd, "thought", t.takeaway)
+            moved = juster_point(p_new) != juster_point(state[pid])  # a step on the scale they answer on
             async with lock:
                 if isinstance(t, FeedTurn) and (t.like or t.reshare):
                     actions.append((pid, list(t.like), t.reshare))
@@ -328,7 +326,7 @@ async def run_society(
             engaged["likes"] += nl
             engaged["reshares"] += nr
             if nr and pid in minds and reshare:
-                minds[pid].add(rnd, "said", f"I reshared: {item_by_id[reshare]['text']}", 0.75, item=reshare)
+                minds[pid].add(rnd, "said", f"I reshared: {item_by_id[reshare]['text']}", item=reshare)
         for pid, mind in minds.items():
             mind.trajectory.append(state[pid])
         produced.sort(key=lambda it: it["id"])
