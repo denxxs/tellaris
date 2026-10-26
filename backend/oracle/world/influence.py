@@ -86,7 +86,6 @@ def measured_edges(target: str) -> list[InfluenceEdge]:
 def expand(
     targets: list[str],
     extra: list[InfluenceEdge] | None = None,
-    threshold: float = 0.0,  # kept for old callers; measured ties aren't cut by a judged strength
     sectors: list[str] | None = None,
 ) -> list[Influencer]:
     """Countries and blocs tied to the targets, strongest tie first.

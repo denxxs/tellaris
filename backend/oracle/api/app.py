@@ -113,7 +113,6 @@ async def meta() -> dict[str, Any]:
 class PreviewRequest(BaseModel):
     prompt: str = Field(min_length=10, max_length=20000)
     targets: list[str] = Field(default_factory=list)
-    influence_threshold: float = 0.25
     file_ids: list[str] = Field(default_factory=list)
     lens: str | None = None
     scope: str | None = None
@@ -170,7 +169,7 @@ async def preview(req: PreviewRequest) -> dict[str, Any]:
         raise HTTPException(502, f"Scenario builder failed: {exc}") from exc
     finally:
         current_usage.reset(token)
-    infl = expand(spec.targets, _forces_as_edges(spec), req.influence_threshold, spec.sectors or None)
+    infl = expand(spec.targets, _forces_as_edges(spec), sectors=spec.sectors or None)
     return {"spec": spec.model_dump(), "world": graph_payload(spec.targets, infl), "usage": usage.to_dict()}
 
 
@@ -211,14 +210,13 @@ async def headcount(req: HeadcountRequest) -> dict[str, Any]:
 class WorldRequest(BaseModel):
     targets: list[str]
     sectors: list[str] = Field(default_factory=list)
-    threshold: float = 0.25
     spec: ScenarioSpec | None = None
 
 
 @app.post("/api/world/influence")
 async def world(req: WorldRequest) -> dict[str, Any]:
     extra = _forces_as_edges(req.spec) if req.spec else []
-    infl = expand(req.targets, extra, req.threshold, req.sectors or None)
+    infl = expand(req.targets, extra, sectors=req.sectors or None)
     return graph_payload(req.targets, infl)
 
 

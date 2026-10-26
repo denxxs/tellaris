@@ -231,7 +231,7 @@ class Runner:
             for t in (f.affects or spec.targets)
             if t != f.origin
         ]
-        influencers = expand(spec.targets, extra, self.cfg.influence_threshold, spec.sectors or None)
+        influencers = expand(spec.targets, extra, sectors=spec.sectors or None)
         world = graph_payload(spec.targets, influencers)
         await store.update_run(self.id, world=world)
         await self.ch.emit("world", world)

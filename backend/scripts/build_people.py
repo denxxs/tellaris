@@ -156,6 +156,8 @@ def main() -> None:
         if ok:
             c(iso)["age_sex"] = rec
 
+    wpp_fill(countries, c)
+
     print("World Bank: labour force and unemployment")
     lf, un = wb("SL.TLF.TOTL.IN"), wb("SL.UEM.TOTL.ZS")
     for iso in set(lf) & set(un):
@@ -255,7 +257,7 @@ def main() -> None:
         "_meta": {
             "built": date.today().isoformat(),
             "sources": {
-                "age_sex": "World Bank, SP.POP.<band>.<sex>.5Y and SP.POP.TOTL.<sex>.IN (UN World Population Prospects)",
+                "age_sex": "World Bank, SP.POP.<band>.<sex>.5Y and SP.POP.TOTL.<sex>.IN (UN World Population Prospects); where the World Bank has none (Taiwan, some territories), UN WPP 2024 directly (CC BY 3.0 IGO)",
                 "gini": "World Bank, SI.POV.GINI; where missing, SWIID 9.92 disposable-income Gini (Solt, Harvard Dataverse doi:10.7910/DVN/LM4OWF, CC0); where neither, the mean of the 3 most similar countries (same region, closest log GDP per person; test in gini_standin_test)",
                 "labour_income_month": "ILOSTAT, DF_LAP_2GDP_NOC_RT labour income share of GDP (ILO modelled estimates) x World Bank GDP (NY.GDP.MKTP.CD) / employed (SL.TLF.TOTL.IN x (1 - SL.UEM.TOTL.ZS)) / 12, US dollars",
                 "findex": "World Bank Global Findex (source 28): con26d daily internet use, con9a smartphone, account.t.d account, fin10 credit card, fin24aN+fin24aVD emergency funds not possible or very difficult, con30d read news online; by sex, age, income and labour-force status",
@@ -330,6 +332,34 @@ def swiid_fill(countries: dict, c) -> None:
                               "source": "SWIID 9.92"}
             n += 1
     print(f"  SWIID filled {n} Ginis")
+
+
+WPP_CSV = ROOT / "var" / "datasets" / "unwpp" / "WPP2024_PopulationByAge5GroupSex_Medium.csv.gz"
+
+
+def wpp_fill(countries: dict, c) -> None:
+    """Population by age and sex from UN World Population Prospects 2024 (CC BY 3.0 IGO) where the World
+    Bank has none (Taiwan and some territories). The World Bank's own figures come from the same source."""
+    import pandas as pd
+
+    if not WPP_CSV.exists():
+        print("  UN WPP not downloaded; skipped")
+        return
+    year = min(date.today().year - 1, 2025)
+    d = pd.read_csv(WPP_CSV, usecols=["ISO3_code", "Time", "AgeGrpStart", "PopMale", "PopFemale"], dtype={"ISO3_code": str})
+    d = d[(d.Time == year) & d.ISO3_code.notna()]
+    n = 0
+    for iso, g in d.groupby("ISO3_code"):
+        if countries.get(iso, {}).get("age_sex"):
+            continue
+        band = (g.AgeGrpStart.clip(upper=80) // 5).astype(int)
+        by = g.groupby(band)[["PopFemale", "PopMale"]].sum()
+        if len(by) != len(AGE5):
+            continue
+        c(iso)["age_sex"] = {"year": year, "bands": AGE5_LABEL, "female": [round(v * 1000) for v in by.PopFemale],
+                             "male": [round(v * 1000) for v in by.PopMale], "source": "UN WPP 2024"}
+        n += 1
+    print(f"  UN WPP filled age and sex for {n} countries")
 
 
 def _profile() -> dict[str, tuple[str, float]]:

@@ -131,7 +131,6 @@ export type RunConfig = {
   knowledge_graph?: boolean;
   news?: boolean;
   feed_style?: FeedStyle;
-  influence_threshold: number;
   seed: number | null;
   temperature: number;
   weighting: "population" | "equal";
